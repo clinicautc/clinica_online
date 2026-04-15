@@ -94,7 +94,7 @@ export default function NutritionPractitionerDashboard() {
    * MODIFICACIÓN: Redirección al Formulario Maestro Integrado
    */
   const handleAccessForms = (appointment: Appointment) => {
-    navigate(`/nutrition-master-form/${appointment.id}`);
+    navigate(`/nutrition-form-master/${appointment.id}`);
   };
 
   if (authLoading) {

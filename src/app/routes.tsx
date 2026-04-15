@@ -18,7 +18,9 @@ import PhysiotherapyAdminDashboard from './pages/PhysiotherapyAdminDashboard';
 import NutritionAdminDashboard from './pages/NutritionAdminDashboard';
 // --- 1. IMPORTAMOS EL NUEVO DASHBOARD MASTER ---
 import MasterAdminDashboard from './pages/MasterAdminDashboard'; 
+// --- iMPort para la seccion de olvidar contraseñas --
 
+import ForgotPassword from './pages/ForgotPassword';
 import NutritionFormMaster from './pages/NutritionFormMaster';
 import PhysiotherapyFormPage from './pages/PhysiotherapyFormPage';
 import StatisticsPage from './pages/StatisticsPage';
@@ -118,6 +120,10 @@ export const router = createBrowserRouter([
     path: '/login',
     element: <Login />
   },
+  {
+  path: '/forgot-password',
+  element: <ForgotPassword />
+},
   {
     path: '/register',
     element: <Register />

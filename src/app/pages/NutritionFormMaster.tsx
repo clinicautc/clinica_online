@@ -1608,7 +1608,7 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
 function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { appointmentId } = useParams();
-  const { user } = useAuth(); // Usamos user para verificar el rol
+  const { user } = useAuth(); // Usamos user para verificar el rol y NO usamos logout
   const navigate = useNavigate();
 
   // --- LÓGICA DE GUARDADO REAL ---
@@ -1642,12 +1642,12 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
       if (response.ok) {
         toast.success('¡Se guardó con éxito en la base de datos!');
         
-        // MODIFICACIÓN DE REDIRECCIÓN CORREGIDA
+        // REDIRECCIÓN DINÁMICA: Te regresa a tu perfil sin cerrar sesión
         setTimeout(() => {
           if (user?.role === 'admin') {
-            navigate('/admin-dashboard'); 
+            navigate('/nutrition-admin-dashboard'); 
           } else {
-            navigate('/practitioner-dashboard');
+            navigate('/nutrition-practitioner-dashboard');
           }
         }, 1500);
       } else {
