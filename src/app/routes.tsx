@@ -146,7 +146,7 @@ export const router = createBrowserRouter([
    * RUTAS DE FORMULARIOS (Sincronizadas con la DB)
    */
   {
-    path: '/forms/nutricion/:appointmentId',
+    path: '/forms/nutricion/:appointmentId', // <--- Esta es la "dirección" real
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <NutritionMasterForm />
