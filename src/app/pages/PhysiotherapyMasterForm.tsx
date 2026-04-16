@@ -1,12 +1,4 @@
-/**
- * ============================================================================
- * ARCHIVO: PhysiotherapyMasterForm.tsx
- * PROPÓSITO: Formulario Multi-pasos (3 Steps) para Fisioterapia.
- * ESTRUCTURA: Basada en MasterForm con persistencia de datos total.
- * ============================================================================
- */
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; //
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext'; 
 import { toast } from 'sonner';
@@ -16,7 +8,6 @@ import caritasImg from './Caritas.png';
 import Humano1Img from './Humano_1.png'; 
 import Humano2Img from './Humano_2.png';
 
-// --- INTERFAZ PARA LAS PROPS DE TODAS LAS PÁGINAS ---
 interface PageProps {
   accumulatedData: any;
   onUpdate: (page: string, data: any) => void;
@@ -24,24 +15,48 @@ interface PageProps {
   onNext: () => void;
   appointmentId?: string;
   isSaving?: boolean;
-  setIsSaving: (value: boolean) => void; // Agrégalo así, simple.
+  setIsSaving: (value: boolean) => void;
 }
 
 const PhysiotherapyMasterForm: React.FC = () => {
+  const [isReadOnly, setIsReadOnly] = useState(false); //
   const navigate = useNavigate();
   const { appointmentId } = useParams();
   const { user } = useAuth();
-
-  // --- CONTROL DE PASOS ---
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- OBJETO MAESTRO DE DATOS ---
   const [formData, setFormData] = useState<any>({
     pagina_1: {},
     pagina_2: { markers: [] },
     pagina_3: { markers: [] }
   });
+
+  // Lógica de carga automática desde PostgreSQL
+  useEffect(() => {
+    const cargarHistorialExistente = async () => {
+      if (!appointmentId) return;
+      try {
+        const response = await fetch('http://localhost:3001/api/historiales');
+        if (response.ok) {
+          const todos: any[] = await response.json();
+          const encontrado = todos.find(h => 
+            String(h.appointment_id) === String(appointmentId) && h.tipo === 'fisioterapia'
+          );
+          if (encontrado) {
+            setFormData(encontrado.datos); // Inyecta los datos guardados
+            setIsReadOnly(true); // Activa modo lectura
+            toast.info("Visualizando historial clínico guardado.");
+          }
+        }
+      } catch (error) {
+        console.error("Error al recuperar historial:", error);
+      }
+    };
+    cargarHistorialExistente();
+  }, [appointmentId]);
+
+  // ... (Sigue el resto del código: updateGlobalData, handleNext, etc.)
 
   // Función núcleo para actualizar datos globalmente
   const updateGlobalData = (page: string, data: any) => {
@@ -1366,4 +1381,4 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
     </>
   );
 };
-export default PhysiotherapyMasterForm;
+export default PhysiotherapyMasterForm ;
