@@ -32,6 +32,38 @@ const NutritionMasterForm: React.FC = () => {
     pagina_4: {}
   });
 
+  const [isReadOnly, setIsReadOnly] = useState(false);
+
+    // AGREGA ESTE BLOQUE AQUÍ:
+  useEffect(() => {
+    const cargarDatosGuardados = async () => {
+      if (!appointmentId) return;
+
+      try {
+        const response = await fetch('http://localhost:3001/api/historiales');
+        if (response.ok) {
+          const todos: any[] = await response.json();
+          
+          // Buscamos el historial de nutrición que coincida con la cita
+          const encontrado = todos.find(h => 
+            String(h.appointment_id) === String(appointmentId) && 
+            h.tipo === 'nutricion'
+          );
+
+          if (encontrado) {
+            setFormData(encontrado.datos); // Inyecta los datos de la DB al formulario
+            setIsReadOnly(true);          // Activa el modo solo lectura
+            toast.info("Visualizando historial de nutrición guardado.");
+          }
+        }
+      } catch (error) {
+        console.error("Error al recuperar datos:", error);
+      }
+    };
+
+    cargarDatosGuardados();
+  }, [appointmentId]);
+
   // Función núcleo para actualizar datos sin perder los anteriores
   const updateGlobalData = (page: string, data: any) => {
     setFormData((prev: any) => ({
@@ -1623,42 +1655,29 @@ const handleFinalizar = async () => {
   try {
     setIsSaving(true);
 
-    // Captura exhaustiva de datos de las 3 páginas para el objeto JSONB
-    const fullHistoryData = {
-      pagina_1: accumulatedData?.pagina_1 || {},
-      pagina_2: accumulatedData?.pagina_2 || {},
-      pagina_3: accumulatedData?.pagina_3 || {}
-    };
+    // ... (lógica de preparación del payload)
 
     const response = await fetch('http://localhost:3001/api/historiales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        paciente_id: accumulatedData?.pagina_1?.paciente_id || 1, 
-        // 1. AGREGAMOS EL NOMBRE DEL PACIENTE (Desde el input de la Página 1)
-        paciente_nombre: accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre",
-        tipo: 'nutricion',
-        datos: fullHistoryData,
-        creado_por: user?.id, 
-        // 2. AGREGAMOS EL NOMBRE DEL CREADOR (Desde el AuthContext)
-        creado_por_nombre: user?.nombre || user?.name || "Usuario del Sistema",
-        appointment_id: appointmentId
+        // ... (tus datos de envío)
       })
     });
 
-     if (response.ok) {
-  toast.success('¡Historial clínico guardado con éxito!');
-  
-  // ✅ CORRECCIÓN DEFINITIVA: 
-  // No navegues a rutas de fisioterapia. 
-  // Usa la ruta raíz para que el sistema reconozca tu sesión activa.
-  setTimeout(() => {
-    navigate('/dashboard'); 
-  }, 1500);
+    if (response.ok) {
+      toast.success('¡Historial clínico guardado con éxito!');
+      
+      // ✅ CORRECCIÓN AQUÍ:
+      // Redirigimos a '/dashboard' para que el sistema reconozca tu sesión activa.
+      // Esto evita que el router te expulse al Login por usar una ruta inexistente.
+      setTimeout(() => {
+        navigate('/dashboard'); 
+      }, 1500);
 
-} else {
-  toast.error('Error al guardar en el servidor.');
-}
+    } else {
+      toast.error('Error al guardar en el servidor.');
+    }
   } catch (error) {
     console.error("Error en el guardado final:", error);
     toast.error('Fallo crítico al conectar con el servidor.');
@@ -1666,7 +1685,6 @@ const handleFinalizar = async () => {
     setIsSaving(false);
   }
 };
-
   const styles: { [key: string]: React.CSSProperties } = {
     bodyWrapper: {
       fontFamily: 'Segoe UI, Arial, sans-serif',
