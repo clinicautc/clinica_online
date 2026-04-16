@@ -1637,7 +1637,7 @@ const handleFinalizar = async () => {
         paciente_id: accumulatedData?.pagina_1?.paciente_id || 1, 
         // 1. AGREGAMOS EL NOMBRE DEL PACIENTE (Desde el input de la Página 1)
         paciente_nombre: accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre",
-        tipo: 'fisioterapia',
+        tipo: 'nutricion',
         datos: fullHistoryData,
         creado_por: user?.id, 
         // 2. AGREGAMOS EL NOMBRE DEL CREADOR (Desde el AuthContext)
@@ -1646,20 +1646,19 @@ const handleFinalizar = async () => {
       })
     });
 
-    if (response.ok) {
-      toast.success('¡Se guardó con éxito en la base de datos!');
-      
-      // REDIRECCIÓN INTELIGENTE: Sin cerrar sesión
-      setTimeout(() => {
-        if (user?.rol === 'admin' || user?.rol === 'master') {
-          navigate('/physiotherapy-admin-dashboard'); 
-        } else {
-          navigate('/physiotherapy-practitioner-dashboard');
-        }
-      }, 1500);
-    } else {
-      toast.error('Error al guardar. Verifica la conexión con PostgreSQL.');
-    }
+     if (response.ok) {
+  toast.success('¡Historial clínico guardado con éxito!');
+  
+  // ✅ CORRECCIÓN DEFINITIVA: 
+  // No navegues a rutas de fisioterapia. 
+  // Usa la ruta raíz para que el sistema reconozca tu sesión activa.
+  setTimeout(() => {
+    navigate('/dashboard'); 
+  }, 1500);
+
+} else {
+  toast.error('Error al guardar en el servidor.');
+}
   } catch (error) {
     console.error("Error en el guardado final:", error);
     toast.error('Fallo crítico al conectar con el servidor.');
