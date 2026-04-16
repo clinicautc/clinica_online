@@ -262,17 +262,17 @@ app.get('/api/historiales', async (req, res) => {
 
 // Guardar nuevo historial clínico detallado (SOPORTE DUAL DINÁMICO)
 app.post('/api/historiales', async (req, res) => {
-  const { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre } = req.body;
+  const { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id } = req.body;
   
   // DETERMINAR TABLA SEGÚN TIPO
-  let tablaDestino = 'historiales_medicos';
-  if (tipo === 'nutricion') tablaDestino = 'historiales_nutricion';
-  else if (tipo === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
-
+let tablaDestino = 'historiales_medicos';
+if (tipo === 'nutricion') tablaDestino = 'historiales_nutricion';
+else if (tipo === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
   try {
+    // AJUSTE: Se incluye appointment_id en la consulta SQL
     const result = await pool.query(
-      `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [paciente_id, paciente_nombre, tipo, JSON.stringify(datos), creado_por, creado_por_nombre]
+      `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [paciente_id, paciente_nombre, tipo, JSON.stringify(datos), creado_por, creado_por_nombre, appointment_id]
     );
     console.log(`📄 Historial generado en ${tablaDestino} para: ${paciente_nombre}`);
     res.status(201).json(result.rows[0]);

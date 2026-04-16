@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * ARCHIVO: routes.tsx (Versión de Blindaje Total - Sincronizada con Master)
- * PROPÓSITO: Sincronización absoluta de rutas, incluyendo el nuevo rol Master.
+ * PROPÓSITO: Sincronización absoluta de rutas, incluyendo el nuevo rol Master y Visor de Historiales.
  * ============================================================================
  */
 
@@ -19,12 +19,17 @@ import NutritionAdminDashboard from './pages/NutritionAdminDashboard';
 // --- 1. IMPORTAMOS EL NUEVO DASHBOARD MASTER ---
 import MasterAdminDashboard from './pages/MasterAdminDashboard'; 
 // --- iMPort para la seccion de olvidar contraseñas --
-
 import ForgotPassword from './pages/ForgotPassword';
-import NutritionFormMaster from './pages/NutritionFormMaster';
-import PhysiotherapyFormPage from './pages/PhysiotherapyFormPage';
+
+// --- CORRECCIÓN DE IMPORTACIONES (Sincronizadas con archivos físicos) ---
+import NutritionMasterForm from './pages/NutritionMasterForm';
+import PhysiotherapyMasterForm from './pages/PhysiotherapyMasterForm';
+
 import StatisticsPage from './pages/StatisticsPage';
 import ManagePractitionersPage from './pages/ManagePractitionersPage';
+
+// --- NUEVA IMPORTACIÓN: VISOR DE HISTORIALES ---
+import MedicalHistoryViewer from './components/MedicalHistoryViewer';
 
 /**
  * COMPONENTE: ProtectedRoute
@@ -144,7 +149,7 @@ export const router = createBrowserRouter([
     path: '/forms/nutricion/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <NutritionFormMaster />
+        <NutritionMasterForm />
       </ProtectedRoute>
     )
   },
@@ -152,7 +157,20 @@ export const router = createBrowserRouter([
     path: '/forms/fisioterapia/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <PhysiotherapyFormPage />
+        <PhysiotherapyMasterForm />
+      </ProtectedRoute>
+    )
+  },
+
+  /**
+   * RUTA: VISOR DE HISTORIAL CLÍNICO
+   * Esta ruta permite cargar la base de datos de un paciente específico.
+   */
+  {
+    path: '/medical-history-viewer/:patientId',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <MedicalHistoryViewer />
       </ProtectedRoute>
     )
   },

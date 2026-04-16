@@ -1605,61 +1605,68 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
     </>
   );
 }
+/**
+ * ============================================================================
+ * COMPONENTE: NutritionPage4Component (Adaptación Visual Exacta)
+ * PROPÓSITO: Coincidir visualmente con el diseño de ingeniería.
+ * ============================================================================
+ */
+
 function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { appointmentId } = useParams();
-  const { user } = useAuth(); // Usamos user para verificar el rol y NO usamos logout
+  const { user } = useAuth(); // Obtenemos el usuario autenticado
   const navigate = useNavigate();
 
   // --- LÓGICA DE GUARDADO REAL ---
-  const handleFinalizar = async () => {
-    try {
-      setIsSaving(true);
+const handleFinalizar = async () => {
+  try {
+    setIsSaving(true);
 
-      const fullHistoryData = {
-        pagina_1: accumulatedData?.pagina_1 || {},
-        pagina_2: accumulatedData?.pagina_2 || {},
-        pagina_3: accumulatedData?.pagina_3 || {},
-        pagina_4: {
-          diagnosticos_nutricios: (document.querySelector('textarea') as HTMLTextAreaElement)?.value || "",
+    // Captura exhaustiva de datos de las 3 páginas para el objeto JSONB
+    const fullHistoryData = {
+      pagina_1: accumulatedData?.pagina_1 || {},
+      pagina_2: accumulatedData?.pagina_2 || {},
+      pagina_3: accumulatedData?.pagina_3 || {}
+    };
+
+    const response = await fetch('http://localhost:3001/api/historiales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paciente_id: accumulatedData?.pagina_1?.paciente_id || 1, 
+        // 1. AGREGAMOS EL NOMBRE DEL PACIENTE (Desde el input de la Página 1)
+        paciente_nombre: accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre",
+        tipo: 'fisioterapia',
+        datos: fullHistoryData,
+        creado_por: user?.id, 
+        // 2. AGREGAMOS EL NOMBRE DEL CREADOR (Desde el AuthContext)
+        creado_por_nombre: user?.nombre || user?.name || "Usuario del Sistema",
+        appointment_id: appointmentId
+      })
+    });
+
+    if (response.ok) {
+      toast.success('¡Se guardó con éxito en la base de datos!');
+      
+      // REDIRECCIÓN INTELIGENTE: Sin cerrar sesión
+      setTimeout(() => {
+        if (user?.rol === 'admin' || user?.rol === 'master') {
+          navigate('/physiotherapy-admin-dashboard'); 
+        } else {
+          navigate('/physiotherapy-practitioner-dashboard');
         }
-      };
-
-      const response = await fetch('http://localhost:3001/api/historiales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paciente_id: accumulatedData?.paciente_id || 5, 
-          paciente_nombre: accumulatedData?.paciente_nombre || "Paciente Juan Pérez",
-          tipo: 'nutricion',
-          datos: fullHistoryData,
-          creado_por: user?.id,
-          creado_por_nombre: user?.name,
-          appointment_id: appointmentId
-        })
-      });
-
-      if (response.ok) {
-        toast.success('¡Se guardó con éxito en la base de datos!');
-        
-        // REDIRECCIÓN DINÁMICA: Te regresa a tu perfil sin cerrar sesión
-        setTimeout(() => {
-          if (user?.role === 'admin') {
-            navigate('/nutrition-admin-dashboard'); 
-          } else {
-            navigate('/nutrition-practitioner-dashboard');
-          }
-        }, 1500);
-      } else {
-        toast.error('Error al guardar. Verifica la conexión con PostgreSQL.');
-      }
-    } catch (error) {
-      console.error("Error en el guardado final:", error);
-      toast.error('Fallo crítico al conectar con el servidor.');
-    } finally {
-      setIsSaving(false);
+      }, 1500);
+    } else {
+      toast.error('Error al guardar. Verifica la conexión con PostgreSQL.');
     }
-  };
+  } catch (error) {
+    console.error("Error en el guardado final:", error);
+    toast.error('Fallo crítico al conectar con el servidor.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const styles: { [key: string]: React.CSSProperties } = {
     bodyWrapper: {
@@ -1857,9 +1864,6 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
       border: '0.5px solid #1a428a',
       padding: '0',
     },
-    rowTotalSombreado: {
-      backgroundColor: '#f2f5f9',
-    },
     inputInvisible: {
       border: 'none',
       width: '100%',
@@ -1939,40 +1943,42 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
       </button>
 
       <div style={styles.container} className="printable-page">
+        {/* SECCIÓN SUPERIOR */}
         <div style={styles.seccionSuperior}>
           <div style={styles.colHeader}>Diagnósticos Nutricios</div>
           <div style={styles.colHeader}>Objetivo general</div>
           <div style={styles.colHeader}>Educación Nutricia</div>
           <div style={{...styles.colHeader, borderRight: 'none'}}>Consejería Nutricia</div>
 
-          <div style={styles.cellContent}><textarea style={styles.inputInvisible}></textarea></div>
+          <div style={styles.cellContent}><textarea name="diag" style={styles.inputInvisible}></textarea></div>
           
           <div style={styles.cellContent}>
-            <textarea style={{...styles.inputInvisible, height: '140px'}}></textarea>
+            <textarea className="objetivo-textarea" style={{...styles.inputInvisible, height: '140px'}}></textarea>
             <ul style={styles.smartList}>
-              <li style={{listStyle: 'none', marginLeft: '-10px', marginBottom: '4px', color: '#1a428a'}}>En formato SMART:</li>
-              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Specific</strong></li>
-              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Measurable</strong></li>
-              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Achievable</strong></li>
-              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Relevant</strong></li>
-              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Time-bound</strong></li>
+              <li style={{listStyle: 'none', marginLeft: '-10px', marginBottom: '4px', color: '#1a428a'}}>En formato SMART (por sus siglas en inglés):</li>
+              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Specific:</strong> Definición del fenómeno</li>
+              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Measurable:</strong> Selección del indicador</li>
+              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Achievable:</strong> Evaluación de factibilidad</li>
+              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Relevant:</strong> Relación con el problema clínico</li>
+              <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Time-bound:</strong> Dinámica temporal de adaptación</li>
             </ul>
           </div>
 
           <div style={{...styles.cellContent, padding: 0}}>
-            <div style={styles.subCell}><span style={styles.labelBlue}>Contenido (E-1.<input type="text" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
-            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Aplicación (E-2.<input type="text" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={styles.subCell}><span style={styles.labelBlue}>Contenido (E-1.<input type="text" className="edu-cont-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Aplicación (E-2.<input type="text" className="edu-app-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
           </div>
 
           <div style={{...styles.cellContent, padding: 0, borderRight: 'none'}}>
-            <div style={styles.subCell}><span style={styles.labelBlue}>Bases (C-1.<input type="text" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
-            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Estrategias (C-2.<input type="text" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={styles.subCell}><span style={styles.labelBlue}>Bases/Acercamiento Teórico (C-1.<input type="text" className="cons-bases-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Estrategias (C-2.<input type="text" className="cons-est-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
           </div>
         </div>
 
         <div style={styles.intervencionContainer}>
           <div style={styles.intervencionTitle}>Intervención</div>
           <div style={styles.grid3Columns}>
+            
             <div style={styles.card}>
               <div style={styles.cardHeader}>Indicación de Alimentos/Nutrimentos</div>
               <div style={{padding: '5px'}}>
@@ -2026,6 +2032,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
                       <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
                     </tr>
                   ))}
+                  <tr style={{backgroundColor: '#f0f4fa'}}>
+                    <td style={{fontWeight: 'bold', color: '#1a428a', border: '1px solid #1a428a', padding: '1px 2px'}}>Tot.</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', border: '1px solid #1a428a'}}>100%</td>
+                    <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
+                    <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
+                    <td style={{fontSize: '5px', textAlign: 'right', border: '1px solid #1a428a'}}>kcal/kg/d</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2052,6 +2065,22 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
                   {[...Array(10)].map((_, i) => <td key={i} style={styles.tablaPorcionesTd}><input type="text" style={styles.inputInvisible} /></td>)}
                 </tr>
               ))}
+              <tr style={{backgroundColor: '#f2f5f9'}}>
+                <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>Total</td>
+                <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>kcal</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+              </tr>
+              <tr style={{backgroundColor: '#f2f5f9'}}>
+                <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>% Adecuación</td>
+                <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -2060,12 +2089,20 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
           <thead>
             <tr><th colSpan={5} style={{...styles.headerCell, padding: '3px', fontSize: '11px'}}>Menú del día</th></tr>
             <tr style={{backgroundColor: '#f0f4fa', fontWeight: 'bold', textAlign: 'center', fontSize: '10px'}}>
-              {["Desayuno", "C.M.", "Comida", "C.V.", "Cena"].map(t => <td key={t} style={{border: '1px solid #1a428a', padding: '4px'}}>{t}</td>)}
+              <td style={{border: '1px solid #1a428a', padding: '4px'}}>Desayuno</td>
+              <td style={{border: '1px solid #1a428a', padding: '4px'}}>C.M.</td>
+              <td style={{border: '1px solid #1a428a', padding: '4px'}}>Comida</td>
+              <td style={{border: '1px solid #1a428a', padding: '4px'}}>C.V.</td>
+              <td style={{border: '1px solid #1a428a', padding: '4px'}}>Cena</td>
             </tr>
           </thead>
           <tbody>
             <tr>
-              {[...Array(5)].map((_, i) => <td key={i} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}><textarea style={{...styles.inputInvisible, fontSize: '9px'}}></textarea></td>)}
+              {[...Array(5)].map((_, i) => (
+                <td key={i} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}>
+                  <textarea style={{...styles.inputInvisible, fontSize: '9px'}}></textarea>
+                </td>
+              ))}
             </tr>
           </tbody>
         </table>
