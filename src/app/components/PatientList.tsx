@@ -1,18 +1,20 @@
 /**
  * ============================================================================
  * ARCHIVO: PatientList.tsx (Versión Sincronizada PostgreSQL - Formato Arial)
- * PROPÓSITO: Listado en tiempo real de usuarios con rol 'paciente'.
- * FUNCIONALIDADES: Búsqueda dinámica, Scroll interno y Tipografía Arial.
+ * PROPÓSITO: Listado en tiempo real con acceso a MedicalHistoryViewer.
+ * FUNCIONALIDADES: Búsqueda dinámica, Scroll interno y Acceso a Historiales.
  * ============================================================================
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Input } from './ui/input';
+import { Button } from './ui/button';
 // ICONOS
-import { Users, Mail, Search, Loader2, UserCircle } from 'lucide-react';
+import { Users, Mail, Search, Loader2, UserCircle, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Definimos la interfaz para que coincida con las columnas de SQL
@@ -28,6 +30,7 @@ export default function PatientList() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate(); // Hook para navegación
 
   /**
    * EFECTO: Carga inicial desde la Base de Datos
@@ -62,6 +65,14 @@ export default function PatientList() {
   }, []);
 
   /**
+   * FUNCIÓN: Ir al Historial Médico (MedicalHistoryViewer)
+   */
+  const handleViewHistory = (patientId: string | number) => {
+    // Redirige al MedicalHistoryViewer pasando el ID del paciente como parámetro en la URL
+    navigate(`/medical-history-viewer/${patientId}`);
+  };
+
+  /**
    * LÓGICA DE BÚSQUEDA DINÁMICA
    */
   const filteredPatients = patients.filter(patient => 
@@ -83,7 +94,7 @@ export default function PatientList() {
               Expedientes de Pacientes
             </CardTitle>
             <CardDescription className="font-medium" style={arialStyle}>
-              Base de datos real: Usuarios registrados con el rol de paciente.
+              Gestión de expedientes: Acceda a los historiales clínicos detallados.
             </CardDescription>
           </div>
 
@@ -121,7 +132,7 @@ export default function PatientList() {
             {/* VISTA MÓVIL: Formato de Tarjetas */}
             <div className="block md:hidden divide-y divide-blue-900/10">
               {filteredPatients.map((patient) => (
-                <div key={patient.id} className="p-4 bg-white space-y-2 hover:bg-blue-50/30 transition-colors">
+                <div key={patient.id} className="p-4 bg-white space-y-3 hover:bg-blue-50/30 transition-colors">
                   <div className="flex justify-between items-start">
                     <span className="text-xs font-mono font-bold text-blue-900/40">ID: {patient.id}</span>
                     <Badge className="bg-green-100 text-green-700 border-green-200 font-bold uppercase text-[9px]" style={arialStyle}>
@@ -132,6 +143,13 @@ export default function PatientList() {
                   <p className="text-xs text-slate-500 flex items-center gap-2" style={arialStyle}>
                     <Mail className="w-3 h-3" /> {patient.email}
                   </p>
+                  <Button 
+                    size="sm" 
+                    className="w-full bg-blue-900 hover:bg-blue-800 font-bold gap-2 text-xs"
+                    onClick={() => handleViewHistory(patient.id)}
+                  >
+                    <BookOpen className="w-3 h-3" /> Historiales
+                  </Button>
                 </div>
               ))}
             </div>
@@ -145,6 +163,7 @@ export default function PatientList() {
                     <TableHead className="text-blue-900 font-bold" style={arialStyle}>Nombre Completo</TableHead>
                     <TableHead className="text-blue-900 font-bold" style={arialStyle}>Email Institucional</TableHead>
                     <TableHead className="text-blue-900 font-bold text-center" style={arialStyle}>Estado</TableHead>
+                    <TableHead className="text-blue-900 font-bold text-right" style={arialStyle}>Expediente</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -163,6 +182,16 @@ export default function PatientList() {
                         <Badge className="bg-green-600 text-white border-none font-black text-[9px] px-2 shadow-sm" style={arialStyle}>
                           ACTIVO
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="border-blue-900 text-blue-900 hover:bg-blue-900 hover:text-white font-bold gap-2"
+                          onClick={() => handleViewHistory(patient.id)}
+                        >
+                          <BookOpen className="w-4 h-4" /> Historiales
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

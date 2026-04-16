@@ -77,9 +77,17 @@ export default function PhysiotherapyPractitionerDashboard() {
     navigate('/login');
   };
 
-  const handleAccessForms = (appointment: Appointment) => {
-    navigate(`/forms/fisioterapia/${appointment.id}`);
-  };
+  /**
+   * MODIFICACIÓN: Redirección al Formulario Maestro Unificado
+   * Apunta a la ruta del MasterForm pasando el ID de la cita.
+   */
+  /**
+ * MODIFICACIÓN: Redirección al Formulario Maestro Unificado
+ */
+const handleAccessForms = (appointment: Appointment) => {
+  // Cambiamos 'physiotherapy-master-form' por 'forms/fisioterapia'
+  navigate(`/forms/fisioterapia/${appointment.id}`);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
