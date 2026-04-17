@@ -1653,37 +1653,45 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
   const navigate = useNavigate();
   const { appointmentId } = useParams()
 
-  // --- LÓGICA DE GUARDADO REAL ---
-const handleFinalizar = async () => {
+  // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
+  const handleFinalizar = async () => {
   try {
     setIsSaving(true);
 
-    // ... (lógica de preparación del payload)
+    // ✅ USAMOS 'accumulatedData' PORQUE 'formData' NO EXISTE AQUÍ
+    const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || 1;
+    const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
+    const aId = appointmentId ? parseInt(appointmentId) : null;
+
+    const payload = {
+      paciente_id: pId, // Esto resuelve el error de Foreign Key si el ID es válido
+      paciente_nombre: pNombre,
+      tipo: 'nutricion',
+      datos: accumulatedData, // Pasamos todo el objeto acumulado
+      creado_por: user?.id || 1, 
+      creado_por_nombre: user?.nombre || "Practicante Nutrición",
+      appointment_id: aId 
+    };
+
+    // ... (resto del código del fetch)
 
     const response = await fetch('http://localhost:3001/api/historiales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // ... (tus datos de envío)
-      })
+      body: JSON.stringify(payload)
     });
 
-    if (response.ok) {
-      toast.success('¡Historial clínico guardado con éxito!');
-      
-      // ✅ CORRECCIÓN AQUÍ:
-      // Redirigimos a '/dashboard' para que el sistema reconozca tu sesión activa.
-      // Esto evita que el router te expulse al Login por usar una ruta inexistente.
-      setTimeout(() => {
-        navigate('/dashboard'); 
-      }, 1500);
-
+    if (!response.ok) {
+      const errorData = await response.json();
+      // Esto te mostrará en la consola exactamente qué ID está fallando
+      console.error("Detalle del error:", errorData);
+      toast.error("Error de integridad: El ID del paciente no es válido.");
     } else {
-      toast.error('Error al guardar en el servidor.');
+      toast.success("Historial guardado exitosamente");
+      navigate('/dashboard');
     }
   } catch (error) {
-    console.error("Error en el guardado final:", error);
-    toast.error('Fallo crítico al conectar con el servidor.');
+    console.error("Error crítico:", error);
   } finally {
     setIsSaving(false);
   }

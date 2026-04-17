@@ -1,10 +1,11 @@
 /**
  * ============================================================================
- * ARCHIVO: index.js (Servidor Backend UTC - Versión Flexibilidad Total)
+ * ARCHIVO: index_v2.js (Servidor Backend UTC - Versión Flexibilidad Total)
  * PROPÓSITO: API REST para gestión de clínica universitaria
  * CONEXIÓN: PostgreSQL (Render)
  * STATUS: Sincronizado con Triggers de Base de Datos
  * MODIFICACIÓN: Soporte para Comunicación Bidireccional (Emisor/Receptor)
+ * VERSIÓN 2: Con endpoints específicos para historiales de nutrición y fisioterapia
  * ============================================================================
  */
 
@@ -249,7 +250,11 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// Listar historiales médicos (Uso de JSONB para flexibilidad)
+// ============================================================================
+// SECCIÓN: HISTORIALES MÉDICOS - ENDPOINTS ESPECÍFICOS POR ÁREA
+// ============================================================================
+
+// Listar historiales médicos GENERALES (tabla historiales_medicos)
 app.get('/api/historiales', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM historiales_medicos ORDER BY fecha_creacion DESC');
@@ -259,6 +264,49 @@ app.get('/api/historiales', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Listar historiales de NUTRICIÓN específicamente
+app.get('/api/historiales/nutricion', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM historiales_nutricion ORDER BY fecha_creacion DESC');
+    console.log(`✅ Consultados ${result.rows.length} historiales de NUTRICIÓN`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("❌ Error al obtener historiales de nutrición:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar historiales de FISIOTERAPIA específicamente
+app.get('/api/historiales/fisioterapia', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM historiales_fisioterapia ORDER BY fecha_creacion DESC');
+    console.log(`✅ Consultados ${result.rows.length} historiales de FISIOTERAPIA`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("❌ Error al obtener historiales de fisioterapia:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar TODOS los historiales combinados (para usuarios MASTER) - ESTE ENDPOINT YA NO SE USA
+// app.get('/api/historiales/todos', async (req, res) => {
+//   try {
+//     const resultNutricion = await pool.query('SELECT * FROM historiales_nutricion ORDER BY fecha_creacion DESC');
+//     const resultFisioterapia = await pool.query('SELECT * FROM historiales_fisioterapia ORDER BY fecha_creacion DESC');
+    
+//     const todosLosHistoriales = [
+//       ...resultNutricion.rows,
+//       ...resultFisioterapia.rows
+//     ].sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
+    
+//     console.log(`✅ Consultados ${todosLosHistoriales.length} historiales COMBINADOS (Nutrición + Fisioterapia)`);
+//     res.json(todosLosHistoriales);
+//   } catch (error) {
+//     console.error("❌ Error al obtener todos los historiales:", error.message);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 // Guardar nuevo historial clínico detallado (SOPORTE DUAL DINÁMICO)
 app.post('/api/historiales', async (req, res) => {
@@ -384,6 +432,9 @@ app.listen(PORT, () => {
   🔗 Endpoint Local: http://localhost:${PORT}
   🛠️  Modo: Gestión Extendida (BI + Comunicación)
   📂 Sincronización PostgreSQL: Activa (Render)
+  📋 Endpoints Historiales:
+     - /api/historiales/nutricion
+     - /api/historiales/fisioterapia
   ========================================================
   `);
 });
