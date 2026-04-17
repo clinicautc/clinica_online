@@ -22,6 +22,9 @@ interface PageProps {
 
 const NutritionMasterForm: React.FC = () => {
   // --- CONTROL DE PASOS ---
+  const navigate = useNavigate();
+  const { appointmentId } = useParams(); // <--- VA AQUÍ (Línea 30 aprox.)
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   
   // --- OBJETO MAESTRO DE DATOS (Persistencia Total) ---
@@ -33,28 +36,27 @@ const NutritionMasterForm: React.FC = () => {
   });
 
   const [isReadOnly, setIsReadOnly] = useState(false);
-
     // AGREGA ESTE BLOQUE AQUÍ:
   useEffect(() => {
     const cargarDatosGuardados = async () => {
-      if (!appointmentId) return;
+      // Ahora appointmentId ya está definido y no marcará error
+      if (!appointmentId) return; 
 
       try {
         const response = await fetch('http://localhost:3001/api/historiales');
         if (response.ok) {
           const todos: any[] = await response.json();
           
-          // Buscamos el historial de nutrición que coincida con la cita
           const encontrado = todos.find(h => 
             String(h.appointment_id) === String(appointmentId) && 
             h.tipo === 'nutricion'
           );
 
           if (encontrado) {
-            setFormData(encontrado.datos); // Inyecta los datos de la DB al formulario
-            setIsReadOnly(true);          // Activa el modo solo lectura
-            toast.info("Visualizando historial de nutrición guardado.");
-          }
+  console.log("Datos recuperados de la DB:", encontrado.datos); // Revisa esto en la consola (F12)
+  setFormData(encontrado.datos);
+  setIsReadOnly(true);
+}
         }
       } catch (error) {
         console.error("Error al recuperar datos:", error);
@@ -163,13 +165,13 @@ const NutritionMasterForm: React.FC = () => {
           <SectionBox title="Datos personales" marginTop="mt-2">
             <div className="flex items-end gap-1 mb-1 text-[10px] font-bold">
               <span className="shrink-0">Nombre completo</span>
-              <input 
-                type="text" 
-                id="nombre" 
-                value={formData.pagina_1.nombre || ''}
-                onChange={(e) => handleInputChange(e, 'nombre')} 
-                className="border-b border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent" 
-              />
+     <input 
+  type="text" 
+  value={formData.pagina_1?.nombre || ''} // CORRECTO: Lee del estado local inyectado
+  onChange={(e) => handleInputChange(e, 'nombre')}
+  disabled={isReadOnly}
+  className="border-b border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent"
+/>
               <span className="shrink-0">Expediente</span>
               <input 
                 type="text" 
@@ -289,11 +291,11 @@ const NutritionMasterForm: React.FC = () => {
                         {[...Array(6)].map((_, i) => (
                           <td key={i} className="border-r border-[#2c5392] last:border-r-0">
                             <input 
-                              type="checkbox" 
-                              checked={formData.pagina_1[`heredo-${item}-${i}`] || false}
-                              onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
-                              className="appearance-none w-2.5 h-2.5 border border-[#2c5392] checked:bg-[#2c5392] cursor-pointer" 
-                            />
+  type="checkbox" 
+  checked={formData.pagina_1[`heredo-${item}-${i}`] || false} // Usa formData aquí
+  onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
+  disabled={isReadOnly}
+/>
                           </td>
                         ))}
                       </tr>
@@ -1646,9 +1648,10 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
 
 function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const { appointmentId } = useParams();
+  
   const { user } = useAuth(); // Obtenemos el usuario autenticado
   const navigate = useNavigate();
+  const { appointmentId } = useParams()
 
   // --- LÓGICA DE GUARDADO REAL ---
 const handleFinalizar = async () => {
