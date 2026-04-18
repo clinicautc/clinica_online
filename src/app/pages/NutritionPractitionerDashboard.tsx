@@ -97,9 +97,11 @@ export default function NutritionPractitionerDashboard() {
  * MODIFICACIÓN: Redirección al Formulario Maestro Integrado
  * Ajustado a la ruta definida en routes.tsx: /forms/nutricion/:appointmentId
  */
-const handleAccessForms = (appointment: Appointment) => {
-  // El appointment.id se pasa como parámetro a la URL
-  navigate(`/forms/nutricion/${appointment.id}`);
+// En NutritionPractitionerDashboard.tsx
+const handleAccessForms = (appointment: any) => {
+  // appointment.paciente_id es el ID 5, 6, 7 etc. de la tabla usuarios
+  const idReal = appointment.paciente_id; 
+  navigate(`/forms/nutricion/${appointment.id}?pacienteId=${idReal}`);
 };
 
   if (authLoading) {
