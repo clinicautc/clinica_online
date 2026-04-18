@@ -5,7 +5,7 @@
  * ============================================================================
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Calendar, Clock, Activity, Loader2, AlertCircle } from 'lucide-react';
