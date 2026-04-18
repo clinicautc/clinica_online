@@ -298,22 +298,32 @@ export default function NutritionAdminDashboard() {
                         </div>
                         
                         {/* NUEVO BOTÓN DE ASIGNACIÓN ADAPTADO A NUTRICIÓN */}
-                        {!apt.practicante_id ? (
-                          <Button 
-                            size="sm" 
-                            className="bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2" 
-                            onClick={() => handleOpenAssignModal(apt)}
-                          >
-                            <UserPlus className="w-4 h-4" /> Asignar Practicante
-                          </Button>
-                        ) : (
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable:</span>
-                            <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
-                              <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-                            </span>
-                          </div>
-                        )}
+                       <div className="flex items-center gap-4">
+  {/* 1. Si ya hay un practicante, mostramos quién es */}
+  {apt.practicante_id && (
+    <div className="flex flex-col items-end mr-2">
+      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+        Responsable Actual:
+      </span>
+      <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
+        <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+      </span>
+    </div>
+  )}
+
+  {/* 2. El botón ahora es dinámico: cambia de texto y estilo si es re-asignación */}
+  <Button 
+    size="sm" 
+    variant={apt.practicante_id ? "outline" : "default"}
+    className={apt.practicante_id 
+      ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm" 
+      : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+    onClick={() => handleOpenAssignModal(apt)}
+  >
+    <UserPlus className="w-4 h-4" />
+    {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+  </Button>
+</div>
                       </div>
                     ))
                   )}
