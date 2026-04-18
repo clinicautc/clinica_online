@@ -294,55 +294,74 @@ export default function PhysiotherapyAdminDashboard() {
           </TabsList>
 
           <TabsContent value="today_appointments">
-            <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-              <CardHeader className="bg-slate-50/50 border-b p-6">
-                <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
-                <CardDescription className="font-medium italic">Sincronización en vivo con la base de datos de la clínica</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  {isLoadingCitas ? (
-                    <div className="flex flex-col items-center py-12 gap-3"><Loader2 className="animate-spin text-blue-900" /><p className="text-sm font-bold">Consultando agenda...</p></div>
-                  ) : todayAppointments.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">No se registran citas para el día de hoy.</div>
-                  ) : (
-                    todayAppointments.map((apt) => (
-                      <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 rounded-full bg-blue-50 text-blue-900"><Activity className="w-5 h-5"/></div>
-                          <div>
-                            <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                            <div className="flex gap-3 items-center">
-                              <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS</span>
-                              <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">{apt.estado}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* PASO 2: EL ADMIN YA NO VE EL BOTÓN DE EVALUACIÓN, VE EL DE ASIGNAR */}
-                        {!apt.practicante_id ? (
-                          <Button 
-                            size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl px-5 flex items-center gap-2" 
-                            onClick={() => handleOpenAssignModal(apt)}
-                          >
-                            <UserPlus className="w-4 h-4" /> Asignar Practicante
-                          </Button>
-                        ) : (
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable:</span>
-                            <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2">
-                              <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
+  <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
+    <CardHeader className="bg-slate-50/50 border-b p-6">
+      <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
+      <CardDescription className="font-medium italic">Sincronización en vivo con la base de datos de la clínica</CardDescription>
+    </CardHeader>
+    <CardContent className="p-6">
+      <div className="space-y-3">
+        {isLoadingCitas ? (
+          <div className="flex flex-col items-center py-12 gap-3">
+            <Loader2 className="animate-spin text-blue-900" />
+            <p className="text-sm font-bold">Consultando agenda...</p>
+          </div>
+        ) : todayAppointments.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
+            No se registran citas para el día de hoy.
+          </div>
+        ) : (
+          todayAppointments.map((apt) => (
+            <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-blue-50 text-blue-900">
+                  <Activity className="w-5 h-5"/>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <div>
+                  <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
+                  <div className="flex gap-3 items-center">
+                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
+                    </span>
+                    <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
+                      {apt.estado}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* LÓGICA DE ASIGNACIÓN Y RE-ASIGNACIÓN CORREGIDA */}
+              <div className="flex items-center gap-6">
+                {apt.practicante_id && (
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      Responsable:
+                    </span>
+                    <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
+                      <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                    </span>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={() => handleOpenAssignModal(apt)}
+                  className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
+                    apt.practicante_id 
+                      ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
 
           <TabsContent value="practitioners">
             <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
