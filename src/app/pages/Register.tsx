@@ -1,72 +1,120 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
-// Importamos el hook de autenticación para registrar al usuario
 import { useAuth } from '../contexts/AuthContext';
-// Componentes de la interfaz (Shadcn UI)
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-// Iconos: Círculo de alerta para errores y Flecha para navegar atrás
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
-  // --- ESTADOS LOCALES ---
-  // Guardamos cada campo del formulario de forma independiente
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState(''); // Para mostrar mensajes de error al usuario
+  const [code, setCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [error, setError] = useState('');
 
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  // --- LÓGICA DE ENVÍO ---
-  // Agregamos 'async' para manejar la espera de la base de datos
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(''); // Limpiamos errores previos al intentar registrar
+  // ===============================
+  // ENVIAR CÓDIGO
+  // ===============================
+  const handleSendCode = async () => {
+    setError('');
 
-    // 1. VALIDACIÓN: Las contraseñas deben ser idénticas
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
-
-    // 2. VALIDACIÓN: Longitud mínima por seguridad
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
+    if (!email) {
+      return setError('Ingresa un correo primero');
     }
 
     try {
-      // Intentamos el registro a través del Contexto usando 'await'
+      setSendingCode(true);
+
+      const res = await fetch('http://localhost:3001/api/usuarios/register-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error);
+      } else {
+        alert('Código enviado a tu correo 📧');
+      }
+
+    } catch {
+      setError('Error al enviar código');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  // ===============================
+  // REGISTRO
+  // ===============================
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (code.length !== 6) {
+      return setError('El código debe tener 6 dígitos');
+    }
+
+    if (password !== confirmPassword) {
+      return setError('Las contraseñas no coinciden');
+    }
+
+    if (password.length < 6) {
+      return setError('La contraseña debe tener al menos 6 caracteres');
+    }
+
+    try {
+      const verifyResponse = await fetch('http://localhost:3001/api/usuarios/verify-register-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        setError(verifyData.error || 'Código inválido');
+        return;
+      }
+
       const success = await register(name, email, password);
-      
+
       if (success) {
-        // Si todo sale bien, lo mandamos directo al dashboard
         navigate('/dashboard');
       } else {
-        // Si el correo ya existe en el sistema
-        setError('Este correo ya está registrado o hubo un problema');
+        setError('Error al registrar usuario');
       }
-    } catch (err) {
-      setError('Error al conectar con el servidor');
-      console.error(err);
+
+    } catch {
+      setError('Error de conexión con el servidor');
     }
   };
 
   return (
-    // Fondo con degradado que mantiene la estética de toda la app
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50 p-4">
       <Card className="w-full max-w-md border-blue-900/10 shadow-xl">
-        
-        {/* ENCABEZADO: Logo circular de la UTC */}
+
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center mb-2">
-            <span className="text-white text-2xl font-bold">UTC</span>
-          </div>
+<div className="mx-auto w-16 h-16 bg-blue-100 shadow-md rounded-full flex items-center justify-center mb-2">
+  <img 
+    src="/logo.png" 
+    alt="Logo UTC"
+    className="w-10 h-10 object-contain"
+  />
+</div>
           <CardTitle className="text-2xl font-bold text-blue-900">
             Crear Cuenta Nueva
           </CardTitle>
@@ -76,93 +124,133 @@ export default function Register() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* MENSAJE DE ERROR: Solo aparece si el estado 'error' tiene texto */}
+          <form autoComplete="off" onSubmit={handleSubmit} className="space-y-4">
+
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-sm animate-in fade-in zoom-in-95">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-sm">
                 <AlertCircle className="w-4 h-4" />
                 {error}
               </div>
             )}
-            
-            {/* CAMPO: NOMBRE */}
+
+            {/* NOMBRE */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-blue-900">Nombre completo</Label>
+              <Label>Nombre completo</Label>
               <Input
-                id="name"
-                type="text"
+                autoComplete="off"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Juan Pérez"
-                required
-                className="border-blue-900/20 focus:border-blue-900 focus:ring-blue-900"
               />
             </div>
-            
-            {/* CAMPO: CORREO */}
+
+            {/* EMAIL */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-blue-900">Correo electrónico</Label>
+              <Label>Correo electrónico</Label>
               <Input
-                id="email"
-                type="email"
+                autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@correo.com"
-                required
-                className="border-blue-900/20 focus:border-blue-900 focus:ring-blue-900"
               />
+
+              <Button
+                type="button"
+                onClick={handleSendCode}
+                disabled={sendingCode}
+                className={`w-full mt-2
+                  ${sendingCode
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-900 hover:bg-blue-800 cursor-pointer'
+                  }`}
+              >
+                {sendingCode ? 'Enviando...' : 'Enviar código'}
+              </Button>
             </div>
-            
-            {/* CAMPO: CONTRASEÑA */}
+
+            {/* PASSWORD */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-blue-900">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="border-blue-900/20 focus:border-blue-900 focus:ring-blue-900"
-              />
+              <Label>Contraseña</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
-            
-            {/* CAMPO: CONFIRMAR CONTRASEÑA */}
+
+            {/* CONFIRM PASSWORD */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-blue-900">Confirmar contraseña</Label>
+              <Label>Confirmar contraseña</Label>
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* CÓDIGO */}
+            <div className="space-y-2">
+              <Label>Código de verificación</Label>
               <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="border-blue-900/20 focus:border-blue-900 focus:ring-blue-900"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setCode(value);
+                }}
+                placeholder="Ingrese su codigo de 6 dígitos"
+                maxLength={6}
+                inputMode="numeric"
+                className="text-center tracking-widest"
               />
             </div>
-            
-            {/* BOTÓN DE ACCIÓN: Usamos el color naranja para diferenciarlo de los botones de navegación */}
+
+            {/* BOTÓN */}
             <Button 
-              type="submit" 
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white h-11"
+              type="submit"
+              disabled={code.length !== 6}
+              className={`w-full h-11 text-white
+                ${code.length !== 6
+                  ? 'bg-gray-400 cursor-not-allowed opacity-70'
+                  : 'bg-orange-600 hover:bg-orange-700 cursor-pointer'
+                }`}
             >
               Registrarse
             </Button>
 
-            {/* OPCIÓN PARA VOLVER: En caso de que ya tenga cuenta */}
             <div className="text-center pt-4 border-t border-blue-900/10">
               <Link to="/login">
                 <Button 
-                  type="button" 
+                  type="button"
                   variant="outline"
-                  className="w-full border-blue-900 text-blue-900 hover:bg-blue-50 h-11"
+                  className="w-full cursor-pointer border-blue-900 text-blue-900 hover:bg-blue-50 h-11"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Volver al inicio de sesión
                 </Button>
               </Link>
             </div>
+
           </form>
         </CardContent>
       </Card>
