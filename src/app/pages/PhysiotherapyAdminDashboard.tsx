@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * DASHBOARD DE DOCENTE/ADMINISTRADOR DE FISIOTERAPIA (Versión Comunicados)
- * Panel específico para el docente coordinador con sistema de notas en vivo.
+ * DASHBOARD DE DOCENTE/ADMINISTRADOR DE FISIOTERAPIA (Versión Paso 3)
+ * Panel específico para el docente coordinador con sistema de asignación de practicantes.
  * ============================================================================
  */
 
@@ -19,7 +19,7 @@ import {
 } from "../components/ui/dialog";
 import { 
   LogOut, Users, FileText, Calendar, Clock, Activity, BarChart3, 
-  Settings, UserPlus, Loader2, Send, FileEdit, Target 
+  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -37,7 +37,9 @@ interface Appointment {
   tipo: string;      
   fecha: string;
   hora: string;
-  estado: string;    
+  estado: string;
+  practicante_id?: number | null; // Agregado para el flujo de asignación [cite: 5]
+  practicante_nombre?: string | null;
 }
 
 export default function PhysiotherapyAdminDashboard() {
@@ -49,11 +51,17 @@ export default function PhysiotherapyAdminDashboard() {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
 
+  // --- PASO 3: ESTADOS PARA EL MODAL DE ASIGNACIÓN ---
+  const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el Modal
+  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null); // Estado para el Practicante Seleccionado
+  const [practicantesArea, setPracticantesArea] = useState<any[]>([]); // Lista de Practicantes
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   // ESTADOS PARA COMUNICADOS (VINCULADOS EN VIVO)
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [practicantesArea, setPracticantesArea] = useState<any[]>([]);
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
@@ -87,14 +95,14 @@ export default function PhysiotherapyAdminDashboard() {
 
     /**
      * CARGAR PRACTICANTES EN VIVO:
-     * Esta función consulta la base de datos para llenar el select del modal.
+     * El Admin solo debe ver a los practicantes de su misma área (Fisioterapia).
      */
     const cargarPracticantesEnVivo = async () => {
       try {
         const response = await fetch('http://localhost:3001/api/usuarios');
         if (response.ok) {
           const data = await response.json();
-          // Filtrado estricto por rol 'practicante' y área 'fisioterapia'
+          // Filtrado estricto por rol 'practicante' y área 'fisioterapia' [cite: 1, 9]
           const lista = data.filter((u: any) => 
             u.rol === 'practicante' && 
             u.area?.toLowerCase() === 'fisioterapia' &&
@@ -116,15 +124,65 @@ export default function PhysiotherapyAdminDashboard() {
     fetchTodayAppointments();
     cargarPracticantesEnVivo();
     
-    // Sincronización automática de la lista de practicantes cada 30 segundos
     const interval = setInterval(cargarPracticantesEnVivo, 30000);
     return () => clearInterval(interval);
   }, [user, authLoading, navigate]);
 
-  /**
-   * FUNCIÓN: handlePublicarNotaAdmin
-   * Guarda la nota en PostgreSQL forzando el área de Fisioterapia.
-   */
+  // --- FUNCIÓN PARA ABRIR EL MODAL DE ASIGNACIÓN ---
+  const handleOpenAssignModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setSelectedPractitioner(null); // Reseteamos selección previa
+    setIsModalOpen(true);
+  };
+
+  // --- FUNCIÓN PARA EJECUTAR LA ASIGNACIÓN EN DB ---
+  // --- FUNCIÓN PARA EJECUTAR LA ASIGNACIÓN EN DB CORREGIDA ---
+  const handleConfirmAssignment = async () => {
+    if (!selectedPractitioner || !selectedAppointment) return;
+
+    try {
+      setIsAssigning(true);
+      const response = await fetch(`http://localhost:3001/api/citas/${selectedAppointment.id}/asignar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          practicante_id: selectedPractitioner.id,
+          practicante_nombre: selectedPractitioner.nombre 
+        })
+      });
+
+      if (response.ok) {
+        toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
+        
+        // CORRECCIÓN 1: Cerrar el modal automáticamente
+        setIsModalOpen(false); 
+        
+        // CORRECCIÓN 2: Limpiar los estados de selección para la siguiente vez
+        setSelectedPractitioner(null);
+        setSelectedAppointment(null);
+
+        // CORRECCIÓN 3: Refrescar la lista de citas para que el Admin vea el cambio
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const res = await fetch(`http://localhost:3001/api/citas`);
+        if (res.ok) {
+          const all = await res.json();
+          const filtered = all.filter((a: any) => {
+            const cleanDate = a.fecha.split('T')[0];
+            return cleanDate === todayStr && a.tipo === 'fisioterapia' && a.estado === 'programada';
+          });
+          setTodayAppointments(filtered);
+        }
+      } else {
+        toast.error("El servidor no pudo procesar la asignación.");
+      }
+    } catch (error) {
+      console.error("Error al asignar:", error);
+      toast.error("Error de conexión con el servidor.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const handlePublicarNotaAdmin = async () => {
     if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
       toast.error("Por favor, complete todos los campos.");
@@ -152,7 +210,7 @@ export default function PhysiotherapyAdminDashboard() {
         toast.success("Comunicado emitido correctamente.");
         setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
         setIsNotaModalOpen(false);
-        setRefreshKey(prev => prev + 1); // Actualiza el visor inferior automáticamente
+        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       toast.error("Error al conectar con el servidor.");
@@ -260,7 +318,24 @@ export default function PhysiotherapyAdminDashboard() {
                             </div>
                           </div>
                         </div>
-                        <Button size="sm" className="bg-blue-900 hover:bg-black font-bold rounded-xl px-5" onClick={() => handleAccessForms(apt)}>Ver Evaluación</Button>
+                        
+                        {/* PASO 2: EL ADMIN YA NO VE EL BOTÓN DE EVALUACIÓN, VE EL DE ASIGNAR */}
+                        {!apt.practicante_id ? (
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl px-5 flex items-center gap-2" 
+                            onClick={() => handleOpenAssignModal(apt)}
+                          >
+                            <UserPlus className="w-4 h-4" /> Asignar Practicante
+                          </Button>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable:</span>
+                            <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2">
+                              <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -301,9 +376,12 @@ export default function PhysiotherapyAdminDashboard() {
                 </div>
 
                 <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
+                  {/* 1. Busca tu DialogTrigger */}
                   <DialogTrigger asChild>
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-14 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1">
-                      <Send className="w-5 h-5 mr-3 text-white" /> NUEVA NOTA
+  {/* 2. Verifica que el hijo sea un Button de Shadcn o un <button> estándar */}
+  <Button className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 h-12 rounded-xl">
+    <UserPlus className="w-4 h-4 mr-2" /> 
+    ASIGNAR PRACTICANTE
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
@@ -340,14 +418,6 @@ export default function PhysiotherapyAdminDashboard() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3">
-                        <Target className="w-5 h-5 text-blue-600 mt-0.5" />
-                        <p className="text-[11px] text-blue-800 font-bold leading-tight">
-                          {notaNueva.emailDestinatario === 'ninguno' 
-                            ? "PUBLICACIÓN GENERAL: Todos los practicantes activos de Fisioterapia podrán visualizar este aviso en su panel." 
-                            : `PUBLICACIÓN PRIVADA: Este mensaje se enviará exclusivamente al perfil seleccionado.`}
-                        </p>
-                      </div>
                     </div>
                     <DialogFooter className="gap-2">
                        <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
@@ -359,7 +429,6 @@ export default function PhysiotherapyAdminDashboard() {
                 </Dialog>
               </div>
 
-              {/* Visor de notas con filtro automático para el área de Fisioterapia */}
               <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-white shadow-2xl">
                 <NotesViewer key={refreshKey} readOnly={false} filterCategory="fisioterapia" />
               </div>
@@ -367,6 +436,65 @@ export default function PhysiotherapyAdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* --- PASO 3: MODAL DE ASIGNACIÓN (VENTANA EMERGENTE) --- */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
+          <DialogHeader>
+            <DialogTitle className="text-blue-950 text-2xl font-black flex items-center gap-3">
+              <UserPlus className="w-6 h-6 text-blue-600" /> Asignar Practicante
+            </DialogTitle>
+            <DialogDescription className="font-bold text-slate-500 italic">
+              Paciente: {selectedAppointment?.paciente_nombre}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1">Seleccionar alumno de Fisioterapia</Label>
+            <Select 
+              onValueChange={(val) => {
+                const p = practicantesArea.find(u => u.id.toString() === val);
+                setSelectedPractitioner(p);
+              }}
+            >
+              <SelectTrigger className="rounded-xl h-14 border-slate-200 font-bold">
+                <SelectValue placeholder="Buscar en la plantilla..." />
+              </SelectTrigger>
+              <SelectContent>
+                {practicantesArea.length > 0 ? (
+                  practicantesArea.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()} className="font-medium italic uppercase">
+                      {p.nombre || p.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-xs font-black text-slate-400">No hay practicantes activos en el área.</div>
+                )}
+              </SelectContent>
+            </Select>
+
+            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mt-2">
+              <p className="text-[11px] text-blue-800 font-bold leading-tight">
+                Una vez asignado, el practicante podrá visualizar la cita en su panel y proceder con la evaluación clínica.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            {/* BOTÓN DINÁMICO: Solo se activa si hay un usuario seleccionado */}
+            {selectedPractitioner && (
+              <Button 
+                onClick={handleConfirmAssignment} 
+                disabled={isAssigning}
+                className="w-full bg-blue-900 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+              >
+                {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
+                ASIGNAR AHORA
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

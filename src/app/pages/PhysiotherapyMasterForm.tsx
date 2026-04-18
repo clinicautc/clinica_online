@@ -71,6 +71,7 @@ const PhysiotherapyMasterForm: React.FC = () => {
 
   // --- LÓGICA DE GUARDADO FINAL (En el último paso) ---
   const handleFinalSave = async () => {
+    
     try {
       setIsSaving(true);
       const response = await fetch('http://localhost:3001/api/historiales', {
@@ -84,6 +85,7 @@ const PhysiotherapyMasterForm: React.FC = () => {
           appointment_id: appointmentId
         })
       });
+      
 
       if (response.ok) {
         toast.success('¡Historial clínico de fisioterapia guardado con éxito!');
@@ -1031,16 +1033,17 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
     const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || 1;
     const pNombre = accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre";
     const aId = appointmentId ? parseInt(appointmentId) : null;
+    const urlParams = new URLSearchParams(window.location.search);
+  const pIdReal = urlParams.get('pId');
 
     const payload = {
-      paciente_id: pId,
-      paciente_nombre: pNombre,
-      tipo: 'fisioterapia',
-      datos: accumulatedData, 
-      creado_por: user?.id || 2, 
-      creado_por_nombre: user?.nombre || user?.name || "Practicante UTC",
-      appointment_id: aId 
-    };
+  paciente_id: pIdReal || 5, 
+  paciente_nombre: accumulatedData.pagina_1?.nombre_completo || "Paciente",
+  tipo: 'fisioterapia',
+  datos: accumulatedData, // Aquí usas el nombre que ya traías
+  appointment_id: appointmentId,
+  creado_por: user?.id
+};
 
     const response = await fetch('http://localhost:3001/api/historiales', {
       method: 'POST',
@@ -1070,7 +1073,6 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
     setIsSaving(false);
   }
 };
-
   return (
     <>
       <style>{`

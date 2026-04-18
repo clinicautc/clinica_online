@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * DASHBOARD DE PRACTICANTE DE FISIOTERAPIA (Versión Sincronizada DB)
- * Panel específico para estudiantes con acceso a citas en vivo desde PostgreSQL.
+ * DASHBOARD DE PRACTICANTE DE FISIOTERAPIA (Versión Asignación Filtrada)
+ * Panel específico para estudiantes con acceso a citas asignadas por el Admin.
  * ============================================================================
  */
 
@@ -17,14 +17,15 @@ import PatientList from '../components/PatientList';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 
-// Interfaz sincronizada con el esquema de la base de datos PostgreSQL
+// Interfaz sincronizada: se agrega practicante_id para validar la asignación 
 interface Appointment {
   id: number;
   paciente_nombre: string; 
   tipo: string;      
   fecha: string;
   hora: string;
-  estado: string;    
+  estado: string;
+  practicante_id?: number | null; // ID del alumno responsable 
 }
 
 export default function PhysiotherapyPractitionerDashboard() {
@@ -35,7 +36,7 @@ export default function PhysiotherapyPractitionerDashboard() {
 
   /**
    * EFECTO: Sincronización con la DB Real
-   * Filtramos por fecha actual y área 'fisioterapia' directamente desde la API
+   * PASO 1 PRACTICANTE: Filtrado por fecha, área y ASIGNACIÓN DEL ADMIN.
    */
   useEffect(() => {
     const fetchTodayAppointments = async () => {
@@ -43,25 +44,25 @@ export default function PhysiotherapyPractitionerDashboard() {
         setIsLoadingCitas(true);
         const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-        // Petición al backend sincronizada
         const response = await fetch(`http://localhost:3001/api/citas`);
         
         if (response.ok) {
           const allAppointments: Appointment[] = await response.json();
           
           const filtered = allAppointments.filter((apt) => {
-            // Normalización de la fecha de la DB (YYYY-MM-DD)
             const cleanAptDate = apt.fecha.split('T')[0];
             
+            // CORRECCIÓN DE SINTAXIS: Validamos fecha, tipo, estados y asignación
             return (
               cleanAptDate === todayStr && 
               apt.tipo === 'fisioterapia' && 
-              apt.estado === 'programada'
+              (apt.estado === 'programada' || apt.estado === 'asignada' || apt.estado === 'pendiente') && 
+              String(apt.practicante_id) === String(user?.id)
             );
-          });
+          }); // <--- Aquí cerraba el filter
 
           setTodayAppointments(filtered);
-        }
+        } // <--- Aquí cerraba el if response.ok
       } catch (error) {
         console.error("❌ Error de conexión Practicante Fisio -> PostgreSQL:", error);
       } finally {
@@ -69,8 +70,10 @@ export default function PhysiotherapyPractitionerDashboard() {
       }
     };
 
-    fetchTodayAppointments();
-  }, []);
+    if (user?.id) {
+      fetchTodayAppointments();
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -79,15 +82,10 @@ export default function PhysiotherapyPractitionerDashboard() {
 
   /**
    * MODIFICACIÓN: Redirección al Formulario Maestro Unificado
-   * Apunta a la ruta del MasterForm pasando el ID de la cita.
    */
-  /**
- * MODIFICACIÓN: Redirección al Formulario Maestro Unificado
- */
-const handleAccessForms = (appointment: Appointment) => {
-  // Cambiamos 'physiotherapy-master-form' por 'forms/fisioterapia'
-  navigate(`/forms/fisioterapia/${appointment.id}`);
-};
+  const handleAccessForms = (appointment: Appointment) => {
+    navigate(`/forms/fisioterapia/${appointment.id}`);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
@@ -143,13 +141,13 @@ const handleAccessForms = (appointment: Appointment) => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Citas de Hoy - FISIOTERAPIA - SINCRONIZADO */}
+          {/* Citas de Hoy - FISIOTERAPIA - FILTRADO POR ASIGNACIÓN */}
           <TabsContent value="today_appointments">
             <Card className="border-blue-900/10 shadow-md">
               <CardHeader>
                 <CardTitle className="text-blue-900 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-blue-700" />
-                  Agenda Sincronizada - Hoy ({format(new Date(), 'dd/MM/yyyy')})
+                  Mis Citas Asignadas - Hoy ({format(new Date(), 'dd/MM/yyyy')})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -163,7 +161,7 @@ const handleAccessForms = (appointment: Appointment) => {
                     <div className="text-center py-12 border-2 border-dashed rounded-xl border-blue-100 bg-blue-50/20">
                       <Calendar className="w-12 h-12 text-blue-200 mx-auto mb-3" />
                       <p className="text-gray-500 font-medium italic text-sm">
-                        No tienes citas de fisioterapia programadas para hoy.
+                        No tienes citas asignadas por tu coordinador para el día de hoy.
                       </p>
                     </div>
                   ) : (
@@ -220,7 +218,7 @@ const handleAccessForms = (appointment: Appointment) => {
 
       <footer className="max-w-7xl mx-auto px-4 py-8 text-center text-slate-400 text-xs">
         <p>© 2026 Universidad Tres Culturas - Sistema de Gestión de Clínica Universitaria</p>
-        <p className="mt-1 font-serif italic text-[10px]">Sincronización de Base de Datos Activa</p>
+        <p className="mt-1 font-serif italic text-[10px]">Carga de trabajo controlada por Coordinación</p>
       </footer>
     </div>
   );

@@ -1,9 +1,8 @@
 /**
  * ============================================================================
- * ARCHIVO: MedicalHistoryViewer_v2.tsx - Dashboard de Historial Médico
- * PROPÓSITO: Vista de historiales médicos de paciente con navegación
- * DISEÑO: Colores dinámicos según área (Azul para Fisioterapia, Verde para Nutrición)
- * VERSIÓN 2: Con selector de área para usuarios MASTER
+ * ARCHIVO: MedicalHistoryViewer.tsx - Versión Final Blindada
+ * PROPÓSITO: Vista de historiales médicos con protección contra datos nulos
+ * CORRECCIÓN: Manejo de acentos y validación de strings para PostgreSQL
  * ============================================================================
  */
 
@@ -25,7 +24,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MedicalHistory {
-  [x: string]: string;
+  [x: string]: any;
   id: string | number;
   paciente_id: string | number;
   paciente_nombre: string;
@@ -42,241 +41,192 @@ export default function MedicalHistoryViewer() {
   const navigate = useNavigate();
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
 
+  // --- NORMALIZACIÓN DE ROLES Y ÁREAS ---
+  // Eliminamos acentos y convertimos a minúsculas para evitar fallos de concordancia (Nutrición vs nutricion)
+  const normalizeText = (text: string) => 
+    (text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const userRole = normalizeText(user?.rol || '');
+  const userArea = normalizeText(user?.area || '');
+  
+  const isMaster = userRole === 'master';
+  
   // --- ESTADOS ---
   const [histories, setHistories] = useState<MedicalHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedId, setExpandedId] = useState<string | number | null>(null);
   const [patientName, setPatientName] = useState('');
-  const [detectedArea, setDetectedArea] = useState<'fisioterapia' | 'nutricion'>('nutricion');
   
-  // NUEVO: Estado para que MASTER seleccione el área que quiere ver
-  const [selectedArea, setSelectedArea] = useState<'nutricion' | 'fisioterapia'>('nutricion');
+  // Estado inicial: Si es master empieza en nutricion, si no, en su área normalizada
+  const [selectedArea, setSelectedArea] = useState<'nutricion' | 'fisioterapia'>(
+    isMaster ? 'nutricion' : (userArea.includes('fisio') ? 'fisioterapia' : 'nutricion')
+  );
   
-  
-  /**
-   * CARGA DE DATOS: Sincronización con PostgreSQL
-   */
   useEffect(() => {
     const fetchHistories = async () => {
       try {
         setLoading(true);
         
-        // Determinar el ROL del usuario para cargar el endpoint correcto
-        const role = user?.rol?.toLowerCase() || user?.area?.toLowerCase() || '';
-        const isMaster = role === 'master' || role === 'admin';
-        
-        let endpoint = 'http://localhost:3001/api/historiales/nutricion'; // Default
-        let areaUsuario: 'fisioterapia' | 'nutricion' = 'nutricion'; // Default
-        
-        if (isMaster) {
-          // Si es MASTER, cargar según el área seleccionada
-          if (selectedArea === 'fisioterapia') {
-            endpoint = 'http://localhost:3001/api/historiales/fisioterapia';
-            areaUsuario = 'fisioterapia';
-          } else {
-            endpoint = 'http://localhost:3001/api/historiales/nutricion';
-            areaUsuario = 'nutricion';
-          }
-        } else if (role.includes('fisio')) {
-          // Si es de FISIOTERAPIA, cargar SOLO historiales de fisioterapia
-          endpoint = 'http://localhost:3001/api/historiales/fisioterapia';
-          areaUsuario = 'fisioterapia';
-        } else if (role.includes('nutri')) {
-          // Si es de NUTRICIÓN, cargar SOLO historiales de nutrición
-          endpoint = 'http://localhost:3001/api/historiales/nutricion';
-          areaUsuario = 'nutricion';
-        }
+        // Determinamos el endpoint basado en la selección o el área del usuario
+        const areaParam = isMaster ? selectedArea : (userArea.includes('fisio') ? 'fisioterapia' : 'nutricion');
+        const endpoint = `http://localhost:3001/api/historiales/${areaParam}`;
         
         const response = await fetch(endpoint);
         if (response.ok) {
           const data: MedicalHistory[] = await response.json();
           
-          // Filtrar solo los historiales del paciente actual
-          const patientHistories = data.filter(h => 
-            String(h.paciente_id) === String(patientId)
-          );
+          // FILTRO BLINDADO: 
+          // 1. Convertimos ambos a string para evitar fallos number vs string.
+          // 2. Si es MASTER, durante pruebas, podrías querer ver todo comentando el filtro, 
+          //    pero por ahora lo dejamos estricto al patientId de la URL.
+          const filtered = data.filter(h => String(h.paciente_id) === String(patientId));
+          setHistories(filtered);
 
-          setHistories(patientHistories);
-
-          // Establecer el nombre del paciente si hay historiales
-          if (patientHistories.length > 0) {
-           setPatientName(patientHistories[0]?.paciente_nombre || 'Paciente sin nombre');
+          if (filtered.length > 0) {
+            // Buscamos el nombre en cualquiera de los campos posibles (nombre o nombre_completo)
+            const firstEntry = filtered[0];
+            const nameFromData = firstEntry?.paciente_nombre || 
+                                firstEntry?.datos?.pagina_1?.nombre_completo || 
+                                firstEntry?.datos?.pagina_1?.nombre || 
+                                'Paciente Registrado';
+            setPatientName(nameFromData);
           }
-          
-          // Establecer el área detectada basándose en el ROL DEL USUARIO o selección MASTER
-          setDetectedArea(areaUsuario);
         }
       } catch (error) {
-        console.error("Error al cargar historiales:", error);
-        toast.error("Error al conectar con la base de datos");
+        console.error("Error en Fetch:", error);
+        toast.error("Error de comunicación con el servidor");
       } finally {
         setLoading(false);
       }
     };
 
-    if (patientId) {
-      fetchHistories();
-    }
-  }, [patientId, user, selectedArea]);
+    if (patientId) fetchHistories();
+  }, [patientId, selectedArea, isMaster, userArea]);
 
-  /**
-   * BÚSQUEDA DINÁMICA Y SEGURIDAD POR ROL
-   */
+  // Filtrado para la barra de búsqueda (con salvaguardas para nulos)
   const filteredHistories = histories.filter((h) => {
-    const searchLower = searchTerm.toLowerCase();
+    const search = searchTerm.toLowerCase();
+    const nombrePaciente = (h.paciente_nombre || '').toLowerCase();
+    const creadoPor = (h.creado_por_nombre || '').toLowerCase();
+    const tipo = (h.tipo || '').toLowerCase();
     
-    const paciente = (h.paciente_nombre || '').toLowerCase();
-    const profesional = (h.creado_por_nombre || '').toLowerCase();
-    const tipoArea = (h.tipo || '').toLowerCase();
-    const fechaStr = (h.fecha_creacion || '').toLowerCase();
-
-    const matchesSearch = 
-        paciente.includes(searchLower) ||
-        profesional.includes(searchLower) ||
-        tipoArea.includes(searchLower) ||
-        fechaStr.includes(searchLower);
-
-    return matchesSearch;
+    return nombrePaciente.includes(search) || creadoPor.includes(search) || tipo.includes(search);
   });
 
-  /**
-   * CONTROL DE EXPANSIÓN DE DETALLES
-   */
-  const toggleExpand = (id: string | number) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
-  /**
-   * CONFIGURACIÓN DINÁMICA DE COLORES (THEME)
-   * Se ajusta visualmente según el área detectada del paciente
-   */
+  // Configuración de Tema visual dinámico
+  const isFisioUI = selectedArea === 'fisioterapia';
   const theme = {
-    color: detectedArea === 'fisioterapia' ? 'text-blue-900' : 'text-green-700',
-    colorAlt: detectedArea === 'fisioterapia' ? 'text-blue-600' : 'text-green-600',
-    border: detectedArea === 'fisioterapia' ? 'border-blue-900/20' : 'border-green-600/20',
-    bgLight: detectedArea === 'fisioterapia' ? 'bg-blue-50' : 'bg-green-50',
-    bgGradient: detectedArea === 'fisioterapia' 
-      ? 'bg-gradient-to-br from-blue-50 to-blue-100' 
-      : 'bg-gradient-to-br from-green-50 to-green-100',
-    bgIcon: detectedArea === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100',
-    btn: detectedArea === 'fisioterapia' 
-      ? 'bg-blue-900 hover:bg-blue-800' 
-      : 'bg-green-700 hover:bg-green-800',
-    btnOutline: detectedArea === 'fisioterapia'
-      ? 'border-blue-900 text-blue-900 hover:bg-blue-900'
-      : 'border-green-700 text-green-700 hover:bg-green-700',
-    badge: detectedArea === 'fisioterapia'
-      ? 'bg-blue-900 text-white'
-      : 'bg-green-700 text-white',
-    header: detectedArea === 'fisioterapia'
-      ? 'from-blue-600 to-blue-400'
-      : 'from-green-600 to-green-400',
-    tabActive: detectedArea === 'fisioterapia'
-      ? 'data-[state=active]:bg-blue-900 data-[state=active]:text-white'
-      : 'data-[state=active]:bg-green-700 data-[state=active]:text-white'
+    color: isFisioUI ? 'text-blue-900' : 'text-green-700',
+    bgGradient: isFisioUI ? 'bg-gradient-to-br from-blue-50 to-blue-100' : 'bg-gradient-to-br from-green-50 to-green-100',
+    btn: isFisioUI ? 'bg-blue-900 hover:bg-blue-800' : 'bg-green-700 hover:bg-green-800',
+    header: isFisioUI ? 'from-blue-600 to-blue-400' : 'from-green-600 to-green-400',
+    tabActive: isFisioUI ? 'data-[state=active]:bg-blue-900 data-[state=active]:text-white' : 'data-[state=active]:bg-green-700 data-[state=active]:text-white'
   };
-
-  // Determinar si el usuario es MASTER
-  const role = user?.rol?.toLowerCase() || user?.area?.toLowerCase() || '';
-  const isMaster = role === 'master' || role === 'admin';
 
   return (
     <div className={`min-h-screen ${theme.bgGradient}`} style={arialStyle}>
-      {/* Header */}
       <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 bg-gradient-to-br ${theme.header} rounded-full flex items-center justify-center shadow-md`}>
-                {detectedArea === 'fisioterapia' ? (
-                  <Activity className="w-6 h-6 text-white" />
-                ) : (
-                  <Utensils className="w-6 h-6 text-white" />
-                )}
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 bg-gradient-to-br ${theme.header} rounded-full flex items-center justify-center shadow-md text-white`}>
+              {isFisioUI ? <Activity /> : <Utensils />}
+            </div>
+            
+            {isMaster ? (
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selector Master:</span>
+                <select 
+                  value={selectedArea} 
+                  onChange={(e) => setSelectedArea(e.target.value as any)}
+                  className="h-9 rounded-lg border-slate-200 px-2 bg-white font-bold text-xs text-slate-600 outline-none border focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="nutricion">🍎 ÁREA NUTRICIÓN</option>
+                  <option value="fisioterapia">♿ ÁREA FISIOTERAPIA</option>
+                </select>
               </div>
-              
-              {isMaster && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ver Historiales de:</span>
-                  <select 
-                    value={selectedArea} 
-                    onChange={(e) => setSelectedArea(e.target.value as 'nutricion' | 'fisioterapia')} 
-                    className="h-10 rounded-xl border-slate-200 px-3 bg-white font-bold text-xs text-slate-600 outline-none shadow-sm border"
-                  >
-                    <option value="nutricion">NUTRICIÓN</option>
-                    <option value="fisioterapia">FISIOTERAPIA</option>
-                  </select>
-                </div>
-              )}
-
+            ) : (
               <div>
                 <h1 className={`text-xl font-bold ${theme.color}`}>
-                  Expediente Médico - {detectedArea.toUpperCase()}
+                  EXPEDIENTE: {(patientName || 'Cargando...').toUpperCase()}
                 </h1>
-                <p className="text-sm text-gray-600 font-medium">
-                  Paciente: <span className="font-bold">{patientName || 'Cargando...'}</span>
-                </p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Área: {selectedArea}</p>
               </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="border-gray-200"><ArrowLeft className="w-4 h-4 mr-2" />Volver</Button>
+            )}
           </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="font-bold border-slate-200">
+            <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER
+          </Button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <Loader2 className={`w-12 h-12 animate-spin ${theme.colorAlt}`} />
-            <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Consultando PostgreSQL...</p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className={`w-10 h-10 animate-spin ${theme.color}`} />
+            <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-tighter">Sincronizando con PostgreSQL...</p>
           </div>
         ) : (
           <Tabs defaultValue="historiales" className="space-y-6">
-            <TabsList className="bg-white/80 border shadow-sm p-1 h-auto gap-1 rounded-xl">
-              <TabsTrigger value="historiales" className={`${theme.tabActive} font-bold`}><FileText className="w-4 h-4 mr-2" />Historial Médico</TabsTrigger>
-              <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Evolución</TabsTrigger>
+            <TabsList className="bg-white border p-1 h-auto rounded-xl shadow-sm">
+              <TabsTrigger value="historiales" className={theme.tabActive}>
+                <FileText className="w-4 h-4 mr-2" /> HISTORIALES
+              </TabsTrigger>
+              <TabsTrigger value="evolucion" className={theme.tabActive}>
+                <TrendingUp className="w-4 h-4 mr-2" /> LÍNEA DE EVOLUCIÓN
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="historiales">
-              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8">
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                      <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}><ClipboardList /> Historiales Registrados</CardTitle>
-                      <CardDescription className="font-bold italic text-slate-500">Lista completa de evaluaciones de {detectedArea}</CardDescription>
-                    </div>
-                    <div className="relative w-full md:w-96">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                      <Input placeholder="Buscar por fecha o profesional..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-14 rounded-2xl" />
+              <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white/90">
+                <CardHeader className="bg-slate-50/50 border-b p-6">
+                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <CardTitle className={`${theme.color} text-xl font-black uppercase tracking-tight`}>Registros Encontrados</CardTitle>
+                    <div className="relative w-full md:w-80">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input 
+                        placeholder="Buscar por fecha o encargado..." 
+                        value={searchTerm} 
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 rounded-xl bg-white border-slate-200"
+                      />
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-6">
                   {filteredHistories.length === 0 ? (
-                    <div className="text-center py-12">
-                      <BookOpen className="w-16 h-16 mx-auto text-slate-200 mb-4" />
-                      <p className="text-slate-500 font-medium">No hay historiales de {detectedArea} registrados para este paciente.</p>
+                    <div className="text-center py-20">
+                      <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <History className="text-slate-300 w-8 h-8" />
+                      </div>
+                      <p className="text-slate-400 font-bold text-sm uppercase italic">No se encontraron historiales clínicos</p>
+                      <p className="text-slate-400 text-[10px] mt-1 uppercase tracking-widest">Verifica el ID del paciente ({patientId})</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {filteredHistories.map((history) => (
-                        <div key={history.id} className={`group border ${history.tipo === 'fisioterapia' ? 'border-blue-100' : 'border-green-100'} rounded-2xl bg-white p-6 flex flex-col md:flex-row items-center justify-between gap-4`}>
-                          <div className="flex items-center gap-5 flex-1">
-                            <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${history.tipo === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                              {history.tipo === 'fisioterapia' ? <Activity className="text-blue-600" /> : <Utensils className="text-green-600" />}
+                    <div className="grid gap-4">
+                      {filteredHistories.map((h) => (
+                        <div key={h.id} className="flex flex-col md:flex-row items-center justify-between p-5 border rounded-2xl bg-white hover:shadow-md transition-all gap-4 border-slate-100">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div className={`p-4 rounded-2xl ${isFisioUI ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                              {isFisioUI ? <Activity className="w-6 h-6" /> : <Utensils className="w-6 h-6" />}
                             </div>
                             <div>
-                              <h3 className={`font-black text-lg uppercase ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>{history.tipo}</h3>
-                              <div className="flex gap-4 text-[11px] font-bold text-slate-500">
-                                <span><Calendar className="w-4 h-4 inline mr-1" />{format(parseISO(history.fecha_creacion), "PPP", { locale: es })}</span>
-                                <span><User className="w-4 h-4 inline mr-1" />{history.creado_por_nombre}</span>
+                              <p className="font-black text-slate-800 uppercase text-sm">Consulta de {h.tipo || 'General'}</p>
+                              <div className="flex flex-wrap gap-3 text-[11px] font-bold text-slate-400 uppercase mt-1">
+                                <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
+                                  <Calendar className="w-3 h-3"/> {h.fecha_creacion ? format(parseISO(h.fecha_creacion), "dd/MM/yyyy") : 'S/F'}
+                                </span>
+                                <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
+                                  <User className="w-3 h-3"/> {(h.creado_por_nombre || 'Sin nombre').toUpperCase()}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => toggleExpand(history.id)} className="font-bold rounded-xl">DETALLES</Button>
-                            <Button size="sm" className={`${history.tipo === 'fisioterapia' ? 'bg-blue-900' : 'bg-green-700'} text-white font-black`} onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)}>VER EXPEDIENTE</Button>
-                          </div>
+                          <Button 
+                            className={`${theme.btn} text-white font-black rounded-xl px-8 shadow-sm transition-transform active:scale-95`}
+                            onClick={() => navigate(`/forms/${h.tipo}/${h.appointment_id || h.id}`)}
+                          >
+                            ABRIR EXPEDIENTE
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -286,39 +236,67 @@ export default function MedicalHistoryViewer() {
             </TabsContent>
 
             <TabsContent value="evolucion">
-              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8"><CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle></CardHeader>
+              <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white/90">
                 <CardContent className="p-8">
-                  {filteredHistories.length === 0 ? (
-                    <div className="text-center py-12">
-                      <TrendingUp className="w-16 h-16 mx-auto text-slate-200 mb-4" />
-                      <p className="text-slate-500 font-medium">No hay datos de evolución para mostrar.</p>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      {filteredHistories.sort((a,b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime()).map((history, index) => {
-                        const d1 = history.datos?.pagina_1 || {};
-                        const motivo = history.tipo === 'fisioterapia' ? (d1.motivo_0 || 'Sin motivo') : (d1.motivos_y_qx?.motivos || 'Sin motivo');
+                  <div className="relative space-y-8">
+                    {filteredHistories.length === 0 ? (
+                      <p className="text-center text-slate-400 py-10 italic">Sin datos de evolución disponibles.</p>
+                    ) : (
+                      filteredHistories.map((h, idx) => {
+                        // Extracción segura del motivo para evitar crash si el JSON es null
+                        const d1 = h.datos?.pagina_1 || {};
+                        const motivoRaw = isFisioUI ? d1.motivo_0 : d1.motivos_y_qx?.motivos;
+                        const motivo = motivoRaw || "No se registró motivo de consulta en esta sesión.";
+
                         return (
-                          <div key={history.id} className="relative pl-8 pb-8 last:pb-0">
-                            <div className={`absolute left-3 top-8 bottom-0 w-0.5 ${history.tipo === 'fisioterapia' ? 'bg-blue-200' : 'bg-green-200'}`}></div>
-                            <div className={`absolute left-0 top-0 w-6 h-6 rounded-full ${history.tipo === 'fisioterapia' ? 'bg-blue-600' : 'bg-green-600'} border-4 border-white shadow-lg`}></div>
-                            <div className={`border ${history.tipo === 'fisioterapia' ? 'border-blue-200' : 'border-green-200'} rounded-2xl p-6 bg-white shadow-sm`}>
-                              <h4 className={`font-black text-lg ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>Consulta de {history.tipo}</h4>
-                              <p className="text-sm text-slate-700 mt-2">{motivo}</p>
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)} className="mt-4 font-bold border-slate-200">VER FORMULARIO COMPLETO</Button>
+                          <div key={h.id} className="relative pl-10">
+                            {idx !== filteredHistories.length - 1 && (
+                              <div className={`absolute left-[11px] top-8 bottom-0 w-0.5 ${isFisioUI ? 'bg-blue-100' : 'bg-green-100'}`} />
+                            )}
+                            <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white shadow-md ${isFisioUI ? 'bg-blue-600' : 'bg-green-600'}`} />
+                            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm hover:border-slate-300 transition-colors">
+                              <div className="flex justify-between items-start mb-4">
+                                <span className={`text-[10px] font-black px-4 py-1.5 rounded-full ${isFisioUI ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                                  {h.fecha_creacion ? format(parseISO(h.fecha_creacion), "PPP", { locale: es }) : 'Fecha no registrada'}
+                                </span>
+                                <Badge variant="outline" className="text-[9px] font-black border-slate-200">ID: {h.id}</Badge>
+                              </div>
+                              <p className="text-sm text-slate-600 italic leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200">
+                                "{motivo}"
+                              </p>
+                              <div className="mt-5 pt-4 border-t border-slate-50 flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  <User className="w-3 h-3" /> Por: {(h.creado_por_nombre || 'Sistema').toUpperCase()}
+                                </span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-[10px] font-black hover:bg-slate-50 uppercase tracking-tighter" 
+                                  onClick={() => navigate(`/forms/${h.tipo}/${h.appointment_id || h.id}`)}
+                                >
+                                  DETALLES COMPLETOS →
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         );
-                      })}
-                    </div>
-                  )}
+                      })
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         )}
       </main>
+
+      <footer className="py-12 text-center">
+        <div className="flex justify-center items-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base de datos PostgreSQL conectada</p>
+        </div>
+        <p className="text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">© 2026 Universidad Tres Culturas - Gestión de Clínica Universitaria</p>
+      </footer>
     </div>
   );
 }

@@ -250,6 +250,35 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
+// --- ENDPOINT AGREGADO PARA ASIGNACIÓN DE PRACTICANTES ---
+// Verifica que esta ruta esté ANTES de app.listen y DESPUÉS de las otras rutas de citas
+// --- COPIA Y PEGA ESTE BLOQUE EXACTO EN INDEX.JS ---
+app.patch('/api/citas/:id/asignar', async (req, res) => {
+  const { id } = req.params;
+  const { practicante_id, practicante_nombre } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE citas 
+       SET practicante_id = $1, 
+           practicante_nombre = $2, 
+           estado = 'programada' -- Cambiamos 'pendiente' por 'programada'
+       WHERE id = $3 
+       RETURNING *`,
+      [practicante_id, practicante_nombre, id]
+    );
+
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: "Cita no encontrada" });
+    }
+  } catch (error) {
+    console.error("❌ Error en DB:", error.message);
+    res.status(500).json({ error: "Error interno: " + error.message });
+  }
+});
+
 // ============================================================================
 // SECCIÓN: HISTORIALES MÉDICOS - ENDPOINTS ESPECÍFICOS POR ÁREA
 // ============================================================================
@@ -288,25 +317,6 @@ app.get('/api/historiales/fisioterapia', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Listar TODOS los historiales combinados (para usuarios MASTER) - ESTE ENDPOINT YA NO SE USA
-// app.get('/api/historiales/todos', async (req, res) => {
-//   try {
-//     const resultNutricion = await pool.query('SELECT * FROM historiales_nutricion ORDER BY fecha_creacion DESC');
-//     const resultFisioterapia = await pool.query('SELECT * FROM historiales_fisioterapia ORDER BY fecha_creacion DESC');
-    
-//     const todosLosHistoriales = [
-//       ...resultNutricion.rows,
-//       ...resultFisioterapia.rows
-//     ].sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
-    
-//     console.log(`✅ Consultados ${todosLosHistoriales.length} historiales COMBINADOS (Nutrición + Fisioterapia)`);
-//     res.json(todosLosHistoriales);
-//   } catch (error) {
-//     console.error("❌ Error al obtener todos los historiales:", error.message);
-//     res.status(500).json({ error: error.message });
-//   }
-// });
 
 // Guardar nuevo historial clínico detallado (SOPORTE DUAL DINÁMICO)
 app.post('/api/historiales', async (req, res) => {
