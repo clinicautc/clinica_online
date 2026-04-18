@@ -146,7 +146,10 @@ app.post('/api/usuarios/forgot-password', async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     // 3. Guardar código en memoria
-    recoveryCodes[email] = code;
+  recoveryCodes[email] = {
+  code,
+  expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutos de validez
+  };
 
     // 4. Enviar correo con Resend
     await resend.emails.send({
@@ -205,11 +208,28 @@ app.post('/api/usuarios/forgot-password', async (req, res) => {
 app.post('/api/usuarios/verify-code', (req, res) => {
   const { email, code } = req.body;
 
-  if (recoveryCodes[email] === code) {
-    return res.json({ valid: true });
+  const data = recoveryCodes[email];
+
+  // No existe código
+  if (!data) {
+    return res.status(400).json({ error: 'No existe código para este correo' });
   }
 
-  return res.status(400).json({ error: 'Código incorrecto' });
+  // Código expirado
+  if (Date.now() > data.expiresAt) {
+    delete recoveryCodes[email];
+    return res.status(400).json({ error: 'El código ha expirado' });
+  }
+
+  // Código incorrecto
+  if (data.code !== code) {
+    return res.status(400).json({ error: 'Código incorrecto' });
+  }
+  // eliminar código usado
+  delete recoveryCodes[email];
+
+  // Todo bien
+  return res.json({ valid: true });
 });
 
 // ===============================
@@ -224,8 +244,6 @@ app.post('/api/usuarios/reset-password', async (req, res) => {
       [newPassword, email]
     );
 
-    // eliminar código usado
-    delete recoveryCodes[email];
 
     res.json({ message: 'Contraseña actualizada correctamente' });
 
