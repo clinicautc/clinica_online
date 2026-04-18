@@ -178,7 +178,7 @@ export default function ForgotPassword() {
 
               {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
 
-              <Button type="submit" className="w-full bg-blue-900 hover:bg-blue-800">
+              <Button type="submit" className="w-full cursor-pointer bg-blue-900 hover:bg-blue-800">
                 Enviar código
               </Button>
             </form>
@@ -227,7 +227,7 @@ export default function ForgotPassword() {
 
               {codeError && <p className="text-red-500 text-sm">{codeError}</p>}
 
-              <Button type="submit" className="w-full bg-blue-900 hover:bg-blue-800">
+              <Button type="submit" className="w-full cursor-pointer bg-blue-900 hover:bg-blue-800">
                 Verificar
               </Button>
             </form>
@@ -291,7 +291,7 @@ export default function ForgotPassword() {
                 <p className="text-red-500 text-sm">{confirmPasswordError}</p>
               )}
 
-              <Button className="w-full bg-orange-500 hover:bg-orange-600">
+              <Button className="w-full cursor-pointer bg-orange-500 hover:bg-orange-600">
                 Guardar contraseña
               </Button>
             </form>
@@ -300,9 +300,10 @@ export default function ForgotPassword() {
           <div className="text-center">
             <button
               onClick={handleBackToLogin}
-              className="text-sm text-blue-900 underline"
+                className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity"
+
             >
-              Volver al login
+              Volver al inicio de sesión
             </button>
           </div>
 
