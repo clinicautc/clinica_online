@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
-import { AlertCircle, Check, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Mail, Lock} from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -24,7 +24,7 @@ export default function Login() {
     setError('');
 
     try {
-      const user = await login(email, password);
+      await login(email, password);
       navigate('/dashboard');
     } catch (error: any) {
       setError('Correo o contraseña incorrectos');
