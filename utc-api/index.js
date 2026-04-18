@@ -1,11 +1,10 @@
 /**
  * ============================================================================
- * ARCHIVO: index_v2.js (Servidor Backend UTC - Versión Flexibilidad Total)
+ * ARCHIVO: index.js (Servidor Backend UTC - Versión Master Integrada)
  * PROPÓSITO: API REST para gestión de clínica universitaria
  * CONEXIÓN: PostgreSQL (Render)
  * STATUS: Sincronizado con Triggers de Base de Datos
- * MODIFICACIÓN: Soporte para Comunicación Bidireccional (Emisor/Receptor)
- * VERSIÓN 2: Con endpoints específicos para historiales de nutrición y fisioterapia
+ * MODIFICACIÓN: Soporte Universal de Asignación (Nutrición y Fisioterapia)
  * ============================================================================
  */
 
@@ -47,11 +46,10 @@ app.get('/api/health', async (req, res) => {
 
 /**
  * ----------------------------------------------------------------------------
- * SECCIÓN: USUARIOS Y AUTENTICACIÓN (DINÁMICA)
+ * SECCIÓN: USUARIOS Y AUTENTICACIÓN
  * ----------------------------------------------------------------------------
  */
 
-// Obtener todos los usuarios registrados
 app.get('/api/usuarios', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM usuarios ORDER BY fecha_creacion DESC');
@@ -62,7 +60,6 @@ app.get('/api/usuarios', async (req, res) => {
   }
 });
 
-// ACTUALIZAR ESTATUS DE USUARIO (Para PractitionerManagement)
 app.put('/api/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
@@ -71,93 +68,58 @@ app.put('/api/usuarios/:id', async (req, res) => {
       'UPDATE usuarios SET status = $1 WHERE id = $2 RETURNING *',
       [estado, id]
     );
-    console.log(`✅ Usuario ${id} actualizado a status: ${estado}`);
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error en actualización de status:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ELIMINAR USUARIO PERMANENTE (Para PractitionerManagement)
 app.delete('/api/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
-    console.log(`🗑️ Usuario eliminado permanentemente ID: ${id}`);
-    res.json({ message: "Usuario eliminado de la base de datos" });
+    res.json({ message: "Usuario eliminado" });
   } catch (error) {
-    console.error("❌ Error al eliminar registro:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// LOGIN: Validación compatible con perfiles pre-autorizados y triggers
 app.post('/api/usuarios/login', async (req, res) => {
   const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email y contraseña requeridos" });
-  }
-
   try {
     const result = await pool.query(
       'SELECT * FROM usuarios WHERE email = $1 AND password = $2',
       [email.trim().toLowerCase(), password]
     );
-    
     if (result.rows.length > 0) {
-      console.log(`✅ Sesión iniciada exitosamente: ${email}`);
       res.json(result.rows[0]);
     } else {
-      res.status(401).json({ error: 'Credenciales incorrectas o usuario no registrado' });
+      res.status(401).json({ error: 'Credenciales incorrectas' });
     }
   } catch (error) {
-    console.error("❌ Error en Login:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// REGISTRO FLEXIBLE: El Trigger de PostgreSQL asigna el rol y área automáticamente
 app.post('/api/usuarios/register', async (req, res) => {
   const { nombre, email, password, rol, area } = req.body;
-  
   try {
-    /**
-     * IMPORTANTE: El Trigger 'trigger_blindaje_registro' intercepta este INSERT.
-     * Valida contra la tabla 'practicantes_autorizados'.
-     */
     const result = await pool.query(
       'INSERT INTO usuarios (nombre, email, password, rol, area, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [
-        nombre.trim(), 
-        email.trim().toLowerCase(), 
-        password, 
-        rol || 'paciente', 
-        area || null,
-        'activo'
-      ]
+      [nombre.trim(), email.trim().toLowerCase(), password, rol || 'paciente', area || null, 'activo']
     );
-
-    console.log(`👤 Nuevo registro procesado: ${email}`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    if (error.code === '23505') {
-      res.status(400).json({ error: 'Este correo electrónico ya está registrado' });
-    } else {
-      console.error("❌ Error en Registro:", error.message);
-      res.status(500).json({ error: "Error interno al procesar el registro" });
-    }
+    res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * ----------------------------------------------------------------------------
- * SECCIÓN: GESTIÓN DE PRACTICANTES (PRE-AUTORIZACIÓN / LISTA BLANCA)
+ * SECCIÓN: GESTIÓN DE PRACTICANTES (AUTORIZACIONES)
  * ----------------------------------------------------------------------------
  */
 
-// Listar practicantes autorizados
 app.get('/api/practicantes', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM practicantes_autorizados ORDER BY fecha_timestamp DESC');
@@ -167,29 +129,19 @@ app.get('/api/practicantes', async (req, res) => {
   }
 });
 
-// Autorizar nuevo practicante (Consola de Administración Master)
 app.post('/api/practicantes', async (req, res) => {
   const { nombre, email, area, estado, fecha_autorizacion } = req.body;
   try {
     const result = await pool.query(
       'INSERT INTO practicantes_autorizados (nombre, email, area, estado, fecha_autorizacion) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [
-        nombre.trim(), 
-        email.trim().toLowerCase(), 
-        area, 
-        estado || 'activo', 
-        fecha_autorizacion || new Date()
-      ]
+      [nombre.trim(), email.trim().toLowerCase(), area, estado || 'activo', fecha_autorizacion || new Date()]
     );
-    console.log(`✅ Pre-autorización guardada para: ${email}`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error en Autorización:", error.message);
-    res.status(500).json({ error: "Error al registrar en lista blanca" });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Actualizar estado en la lista blanca
 app.put('/api/practicantes/:id', async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
@@ -200,18 +152,15 @@ app.put('/api/practicantes/:id', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error en PUT practicantes:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Eliminar de la lista blanca
 app.delete('/api/practicantes/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM practicantes_autorizados WHERE id = $1', [id]);
-    console.log(`🗑️ Autorización removida para ID: ${id}`);
-    res.json({ message: "Autorización eliminada con éxito" });
+    res.json({ message: "Autorización eliminada" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -223,18 +172,15 @@ app.delete('/api/practicantes/:id', async (req, res) => {
  * ----------------------------------------------------------------------------
  */
 
-// Obtener todas las citas registradas en el sistema
 app.get('/api/citas', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM citas ORDER BY fecha DESC, hora DESC');
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al obtener citas:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Crear una nueva cita clínica
 app.post('/api/citas', async (req, res) => {
   const { paciente_id, paciente_nombre, tipo, fecha, hora, estado } = req.body;
   try {
@@ -242,17 +188,13 @@ app.post('/api/citas', async (req, res) => {
       'INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [paciente_id, paciente_nombre, tipo, fecha, hora, estado || 'programada']
     );
-    console.log(`📅 Cita agendada para: ${paciente_nombre}`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error al insertar cita:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// --- ENDPOINT AGREGADO PARA ASIGNACIÓN DE PRACTICANTES ---
-// Verifica que esta ruta esté ANTES de app.listen y DESPUÉS de las otras rutas de citas
-// --- COPIA Y PEGA ESTE BLOQUE EXACTO EN INDEX.JS ---
+// --- ENDPOINT CORREGIDO: ASIGNACIÓN UNIVERSAL ---
 app.patch('/api/citas/:id/asignar', async (req, res) => {
   const { id } = req.params;
   const { practicante_id, practicante_nombre } = req.body;
@@ -262,157 +204,107 @@ app.patch('/api/citas/:id/asignar', async (req, res) => {
       `UPDATE citas 
        SET practicante_id = $1, 
            practicante_nombre = $2, 
-           estado = 'programada' -- Cambiamos 'pendiente' por 'programada'
+           estado = 'programada' 
        WHERE id = $3 
        RETURNING *`,
       [practicante_id, practicante_nombre, id]
     );
 
     if (result.rows.length > 0) {
+      console.log(`✅ Cita ${id} asignada a: ${practicante_nombre}`);
       res.json(result.rows[0]);
     } else {
-      res.status(404).json({ error: "Cita no encontrada" });
+      res.status(404).json({ error: "No se encontró la cita." });
     }
   } catch (error) {
-    console.error("❌ Error en DB:", error.message);
+    console.error("❌ Error en DB al asignar:", error.message);
     res.status(500).json({ error: "Error interno: " + error.message });
   }
 });
 
-// ============================================================================
-// SECCIÓN: HISTORIALES MÉDICOS - ENDPOINTS ESPECÍFICOS POR ÁREA
-// ============================================================================
-
-// Listar historiales médicos GENERALES (tabla historiales_medicos)
 app.get('/api/historiales', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM historiales_medicos ORDER BY fecha_creacion DESC');
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al obtener historiales:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Listar historiales de NUTRICIÓN específicamente
 app.get('/api/historiales/nutricion', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM historiales_nutricion ORDER BY fecha_creacion DESC');
-    console.log(`✅ Consultados ${result.rows.length} historiales de NUTRICIÓN`);
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al obtener historiales de nutrición:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Listar historiales de FISIOTERAPIA específicamente
 app.get('/api/historiales/fisioterapia', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM historiales_fisioterapia ORDER BY fecha_creacion DESC');
-    console.log(`✅ Consultados ${result.rows.length} historiales de FISIOTERAPIA`);
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al obtener historiales de fisioterapia:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Guardar nuevo historial clínico detallado (SOPORTE DUAL DINÁMICO)
 app.post('/api/historiales', async (req, res) => {
   const { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id } = req.body;
-  
-  // --- CORRECCIÓN DE LÓGICA DE DESTINO ---
-  // Normalizamos el tipo para evitar errores por mayúsculas o espacios
   const tipoLimpio = tipo ? tipo.trim().toLowerCase() : 'medicos';
-
   let tablaDestino = 'historiales_medicos';
-  if (tipoLimpio === 'nutricion') {
-    tablaDestino = 'historiales_nutricion';
-  } else if (tipoLimpio === 'fisioterapia') {
-    tablaDestino = 'historiales_fisioterapia';
-  }
+  
+  if (tipoLimpio === 'nutricion') tablaDestino = 'historiales_nutricion';
+  else if (tipoLimpio === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
 
   try {
     const result = await pool.query(
       `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [paciente_id, paciente_nombre, tipoLimpio, JSON.stringify(datos), creado_por, creado_por_nombre, appointment_id]
     );
-    console.log(`📄 Historial generado en ${tablaDestino} para: ${paciente_nombre} (Tipo: ${tipoLimpio})`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error(`❌ Error al guardar historial en ${tablaDestino}:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * ----------------------------------------------------------------------------
- * SECCIÓN: COMUNICADOS (NOTAS) - ACTUALIZACIÓN COMUNICACIÓN MAESTRA
+ * SECCIÓN: COMUNICADOS (NOTAS)
  * ----------------------------------------------------------------------------
  */
 
-// LEER COMUNICADOS (Para el visor de notas del sistema)
 app.get('/api/notas', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM notas ORDER BY fecha_creacion DESC');
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al leer comunicados:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// PUBLICAR COMUNICADO (NUEVO: Soporte para filtrado de emisor 'creado_por_email')
 app.post('/api/notas', async (req, res) => {
-  const { 
-    titulo, 
-    contenido, 
-    destino, 
-    creado_por, 
-    creado_por_nombre, 
-    creado_por_email, 
-    destinatario_especifico 
-  } = req.body;
-
+  const { titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO notas 
-       (titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico, fecha_creacion) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
-       RETURNING *`,
-      [
-        titulo, 
-        contenido, 
-        destino, 
-        creado_por, 
-        creado_por_nombre || 'Coordinador UTC', 
-        creado_por_email, 
-        destinatario_especifico || null
-      ]
+      `INSERT INTO notas (titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico, fecha_creacion) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
+      [titulo, contenido, destino, creado_por, creado_por_nombre || 'Coordinador UTC', creado_por_email, destinatario_especifico || null]
     );
-    console.log(`📣 Comunicado publicado: ${titulo} por ${creado_por_nombre}`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error al publicar comunicado:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// RESPONDER A UN COMUNICADO (NUEVO: Para confirmación de recepción)
 app.put('/api/notas/:id/responder', async (req, res) => {
   const { id } = req.params;
   const { respuesta } = req.body;
-
   try {
     const result = await pool.query(
-      `UPDATE notas 
-       SET respuesta = $1, fecha_respuesta = NOW() 
-       WHERE id = $2 
-       RETURNING *`,
+      `UPDATE notas SET respuesta = $1, fecha_respuesta = NOW() WHERE id = $2 RETURNING *`,
       [respuesta, id]
     );
-
     if (result.rows.length > 0) {
       console.log(`💬 Respuesta registrada para la nota ID: ${id}`);
       res.json(result.rows[0]);
@@ -421,7 +313,7 @@ app.put('/api/notas/:id/responder', async (req, res) => {
     }
   } catch (error) {
     console.error("❌ Error al registrar respuesta:", error.message);
-    res.status(500).json({ error: "Error interno del servidor al procesar respuesta" });
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
@@ -440,11 +332,6 @@ app.listen(PORT, () => {
   ========================================================
   ✅ API DE LA CLÍNICA UTC EJECUTÁNDOSE EXITOSAMENTE
   🔗 Endpoint Local: http://localhost:${PORT}
-  🛠️  Modo: Gestión Extendida (BI + Comunicación)
-  📂 Sincronización PostgreSQL: Activa (Render)
-  📋 Endpoints Historiales:
-     - /api/historiales/nutricion
-     - /api/historiales/fisioterapia
   ========================================================
   `);
 });

@@ -25,7 +25,9 @@ interface Appointment {
   tipo: string;      
   fecha: string;
   hora: string;
-  estado: string;    
+  estado: string;
+  practicante_id?: number | null; // Campo necesario para la validación de asignación
+  paciente_id?: number;
 }
 
 export default function NutritionPractitionerDashboard() {
@@ -36,6 +38,7 @@ export default function NutritionPractitionerDashboard() {
 
   /**
    * EFECTO: Sincronización con la DB Real y Persistencia
+   * MODIFICACIÓN: Se añade validación estricta por asignación del practicante.
    */
   useEffect(() => {
     const fetchTodayAppointments = async () => {
@@ -58,10 +61,18 @@ export default function NutritionPractitionerDashboard() {
             // Limpiamos la fecha de la DB (formato ISO) para comparar solo YYYY-MM-DD
             const cleanAptDate = apt.fecha.split('T')[0];
             
+            /**
+             * FUNCIONALIDAD DE VALIDACIÓN:
+             * 1. Misma fecha (Hoy)
+             * 2. Tipo nutrición
+             * 3. Estados válidos
+             * 4. ASIGNADO AL ID DEL USUARIO ACTUAL (Seguridad de flujo)
+             */
             return (
               cleanAptDate === todayStr && 
               apt.tipo === 'nutricion' && 
-              apt.estado === 'programada'
+              (apt.estado === 'programada' || apt.estado === 'asignada' || apt.estado === 'pendiente') &&
+              String(apt.practicante_id) === String(user?.id)
             );
           });
 
@@ -82,7 +93,9 @@ export default function NutritionPractitionerDashboard() {
       return;
     }
 
-    fetchTodayAppointments();
+    if (user?.id) {
+      fetchTodayAppointments();
+    }
   }, [user, authLoading, navigate]);
 
   const handleLogout = () => {
@@ -92,17 +105,13 @@ export default function NutritionPractitionerDashboard() {
 
   /**
    * MODIFICACIÓN: Redirección al Formulario Maestro Integrado
+   * Ajustado a la ruta definida en routes.tsx: /forms/nutricion/:appointmentId
    */
-  /**
- * MODIFICACIÓN: Redirección al Formulario Maestro Integrado
- * Ajustado a la ruta definida en routes.tsx: /forms/nutricion/:appointmentId
- */
-// En NutritionPractitionerDashboard.tsx
-const handleAccessForms = (appointment: any) => {
-  // appointment.paciente_id es el ID 5, 6, 7 etc. de la tabla usuarios
-  const idReal = appointment.paciente_id; 
-  navigate(`/forms/nutricion/${appointment.id}?pacienteId=${idReal}`);
-};
+  const handleAccessForms = (appointment: any) => {
+    // appointment.paciente_id es el ID 5, 6, 7 etc. de la tabla usuarios
+    const idReal = appointment.paciente_id; 
+    navigate(`/forms/nutricion/${appointment.id}?pacienteId=${idReal}`);
+  };
 
   if (authLoading) {
     return (
@@ -182,7 +191,7 @@ const handleAccessForms = (appointment: any) => {
                   ) : todayAppointments.length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed rounded-lg border-orange-100 bg-orange-50/20">
                        <Calendar className="w-12 h-12 text-orange-200 mx-auto mb-3" />
-                       <p className="text-gray-500 font-medium italic">No se encontraron citas de nutrición programadas para hoy.</p>
+                       <p className="text-gray-500 font-medium italic">No se encontraron citas de nutrición asignadas para hoy.</p>
                     </div>
                   ) : (
                     todayAppointments.map((apt) => (

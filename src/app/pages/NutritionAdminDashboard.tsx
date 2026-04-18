@@ -1,9 +1,8 @@
 /**
  * ============================================================================
- * ARCHIVO: NutritionAdminDashboard.tsx - VERSIÓN MASTER INTEGRADA (FIXED COLOR)
- * PROPÓSITO: Panel de Coordinación de Nutrición con Sistema de Notas en Vivo.
- * CORRECCIÓN: Botones y elementos de notas cambiados a color naranja.
- * FORMATO: Arial - Estructura Extensa
+ * ARCHIVO: NutritionAdminDashboard.tsx - VERSIÓN MASTER INTEGRADA (EXTENSA)
+ * PROPÓSITO: Panel de Coordinación de Nutrición con Sistema de Notas y Asignación.
+ * COLOR TEMÁTICO: Naranja (#ea580c / orange-600)
  * ============================================================================
  */
 
@@ -21,7 +20,7 @@ import {
 } from "../components/ui/dialog";
 import { 
   LogOut, Users, FileText, Calendar, Clock, Utensils, BarChart3, 
-  Settings, UserPlus, Loader2, Send, FileEdit, Target 
+  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -32,6 +31,7 @@ import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
 import PractitionerManagement from '../components/PractitionerManagement';
+import { Badge } from '../components/ui/badge';
 
 // Interfaz sincronizada con PostgreSQL
 interface Appointment {
@@ -40,7 +40,9 @@ interface Appointment {
   tipo: string;      
   fecha: string;
   hora: string;
-  estado: string;    
+  estado: string;
+  practicante_id?: number | null; // Agregado para el flujo de asignación
+  practicante_nombre?: string | null;
 }
 
 export default function NutritionAdminDashboard() {
@@ -52,11 +54,17 @@ export default function NutritionAdminDashboard() {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
 
+  // --- NUEVOS ESTADOS PARA EL MODAL DE ASIGNACIÓN (NUTRICIÓN) ---
+  const [isModalOpen, setIsModalOpen] = useState(false); // Control de ventana emergente
+  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null); // Alumno seleccionado
+  const [practicantesArea, setPracticantesArea] = useState<any[]>([]); // Lista filtrada de Nutrición
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   // ESTADOS PARA COMUNICADOS (VINCULADOS EN VIVO)
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [practicantesArea, setPracticantesArea] = useState<any[]>([]);
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
@@ -79,8 +87,7 @@ export default function NutritionAdminDashboard() {
             const cleanAptDate = apt.fecha.split('T')[0];
             return (
               cleanAptDate === todayStr && 
-              apt.tipo === 'nutricion' && 
-              apt.estado === 'programada'
+              apt.tipo === 'nutricion'
             );
           });
           setTodayAppointments(filtered);
@@ -97,7 +104,7 @@ export default function NutritionAdminDashboard() {
         const response = await fetch('http://localhost:3001/api/usuarios');
         if (response.ok) {
           const data = await response.json();
-          // Filtrado por rol 'practicante' y área 'nutricion'
+          // Filtrado estricto por rol 'practicante' y área 'nutricion'
           const lista = data.filter((u: any) => 
             u.rol === 'practicante' && 
             u.area?.toLowerCase() === 'nutricion' &&
@@ -122,11 +129,47 @@ export default function NutritionAdminDashboard() {
     // Sincronización cada 30 segundos
     const interval = setInterval(cargarPracticantesEnVivo, 30000);
     return () => clearInterval(interval);
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, refreshKey]);
+
+  // --- FUNCIONES DE ASIGNACIÓN ---
+  const handleOpenAssignModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setSelectedPractitioner(null);
+    setIsModalOpen(true);
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedPractitioner || !selectedAppointment) return;
+
+    try {
+      setIsAssigning(true);
+      const response = await fetch(`http://localhost:3001/api/citas/${selectedAppointment.id}/asignar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          practicante_id: selectedPractitioner.id,
+          practicante_nombre: selectedPractitioner.nombre 
+        })
+      });
+
+      if (response.ok) {
+        toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
+        setIsModalOpen(false); // Cierre automático del modal
+        setSelectedPractitioner(null);
+        setSelectedAppointment(null);
+        setRefreshKey(prev => prev + 1); // Refrescar la lista de citas
+      } else {
+        toast.error("El servidor no pudo procesar la asignación.");
+      }
+    } catch (error) {
+      toast.error("Error de conexión con el servidor.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
 
   /**
    * FUNCIÓN: handlePublicarNotaAdmin
-   * Guarda el comunicado en PostgreSQL forzando el área de Nutrición.
    */
   const handlePublicarNotaAdmin = async () => {
     if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
@@ -155,7 +198,7 @@ export default function NutritionAdminDashboard() {
         toast.success("Comunicado emitido correctamente.");
         setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
         setIsNotaModalOpen(false);
-        setRefreshKey(prev => prev + 1); // Actualiza el NotesViewer
+        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       toast.error("Error al conectar con el servidor.");
@@ -167,10 +210,6 @@ export default function NutritionAdminDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
-  };
-
-  const handleAccessForms = (appointment: Appointment) => {
-    navigate(`/forms/nutricion/${appointment.id}`);
   };
 
   const handleGoToManagePractitioners = () => {
@@ -257,7 +296,24 @@ export default function NutritionAdminDashboard() {
                             </div>
                           </div>
                         </div>
-                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5" onClick={() => handleAccessForms(apt)}>Ver Evaluación</Button>
+                        
+                        {/* NUEVO BOTÓN DE ASIGNACIÓN ADAPTADO A NUTRICIÓN */}
+                        {!apt.practicante_id ? (
+                          <Button 
+                            size="sm" 
+                            className="bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2" 
+                            onClick={() => handleOpenAssignModal(apt)}
+                          >
+                            <UserPlus className="w-4 h-4" /> Asignar Practicante
+                          </Button>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable:</span>
+                            <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
+                              <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -273,7 +329,6 @@ export default function NutritionAdminDashboard() {
                   <CardTitle className="text-orange-900 font-extrabold text-xl">Plantilla de Practicantes</CardTitle>
                   <CardDescription className="font-medium italic">Gestión de accesos para el departamento de Nutrición</CardDescription>
                 </div>
-                {/* BOTÓN DAR DE ALTA: NARANJA */}
                 <Button onClick={handleGoToManagePractitioners} className="bg-orange-600 hover:bg-orange-700 font-bold shadow-lg"><UserPlus className="w-4 h-4 mr-2" /> Dar de Alta</Button>
               </CardHeader>
               <CardContent className="p-6">
@@ -300,7 +355,6 @@ export default function NutritionAdminDashboard() {
 
                 <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
                   <DialogTrigger asChild>
-                    {/* CORRECCIÓN: BOTÓN NUEVA NOTA AHORA ES NARANJA */}
                     <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-14 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1 active:scale-95">
                       <Send className="w-5 h-5 mr-3 text-white" /> NUEVA NOTA
                     </Button>
@@ -324,10 +378,8 @@ export default function NutritionAdminDashboard() {
                         <Textarea className="rounded-xl min-h-[130px] border-slate-200 resize-none" placeholder="Instrucciones del coordinador..." value={notaNueva.contenido} onChange={(e) => setNotaNueva({...notaNueva, contenido: e.target.value})} />
                       </div>
                       <div className="space-y-2">
-                        {/* CORRECCIÓN DE COLOR EN LABEL DE USUARIO ESPECÍFICO A NARANJA */}
                         <Label className="text-orange-600 font-black text-[11px] uppercase tracking-widest ml-1">Usuario Específico (Opcional)</Label>
                         <Select value={notaNueva.emailDestinatario} onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}>
-                          {/* CORRECCIÓN: BORDE DEL SELECT A NARANJA */}
                           <SelectTrigger className="rounded-xl h-12 border-orange-300 bg-orange-50/20 font-bold">
                             <SelectValue placeholder="Seleccionar Practicante" />
                           </SelectTrigger>
@@ -352,7 +404,6 @@ export default function NutritionAdminDashboard() {
                     </div>
                     <DialogFooter className="gap-2">
                        <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
-                       {/* CORRECCIÓN: BOTÓN PUBLICAR AHORA ES NARANJA */}
                        <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-8 h-12 rounded-xl shadow-lg flex-1 active:scale-95">
                         {isEnviando ? "ENVIANDO..." : "PUBLICAR AHORA"}
                       </Button>
@@ -361,7 +412,6 @@ export default function NutritionAdminDashboard() {
                 </Dialog>
               </div>
 
-              {/* Visor de notas sincronizado con el área de Nutrición */}
               <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-white shadow-2xl">
                 <NotesViewer key={refreshKey} readOnly={false} filterCategory="nutricion" />
               </div>
@@ -369,6 +419,64 @@ export default function NutritionAdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* --- PASO 3: MODAL DE ASIGNACIÓN (VENTANA EMERGENTE NARANJA) --- */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
+          <DialogHeader>
+            <DialogTitle className="text-orange-900 text-2xl font-black flex items-center gap-3">
+              <UserPlus className="w-6 h-6 text-orange-600" /> Asignar Practicante
+            </DialogTitle>
+            <DialogDescription className="font-bold text-slate-500 italic">
+              Paciente: {selectedAppointment?.paciente_nombre}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Seleccionar alumno de Nutrición</Label>
+            <Select 
+              onValueChange={(val) => {
+                const p = practicantesArea.find(u => u.id.toString() === val);
+                setSelectedPractitioner(p);
+              }}
+            >
+              <SelectTrigger className="rounded-xl h-14 border-orange-200 font-bold focus:ring-orange-500">
+                <SelectValue placeholder="Buscar en la plantilla..." />
+              </SelectTrigger>
+              <SelectContent>
+                {practicantesArea.length > 0 ? (
+                  practicantesArea.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()} className="font-medium italic uppercase">
+                      {p.nombre || p.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-xs font-black text-slate-400 uppercase">No hay alumnos de nutrición activos</div>
+                )}
+              </SelectContent>
+            </Select>
+
+            <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 mt-2">
+              <p className="text-[11px] text-orange-800 font-bold leading-tight uppercase tracking-tighter italic">
+                La asignación permitirá al alumno iniciar la evaluación nutricional inmediatamente.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            {selectedPractitioner && (
+              <Button 
+                onClick={handleConfirmAssignment} 
+                disabled={isAssigning}
+                className="w-full bg-orange-600 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+              >
+                {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
+                CONFIRMAR ASIGNACIÓN
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
