@@ -6,12 +6,20 @@
  * STATUS: Sincronizado con Triggers de Base de Datos
  * MODIFICACIÓN: Soporte Universal de Asignación (Nutrición y Fisioterapia)
  * ============================================================================
+ * 
+ * /api/usuarios/forgot-password   → genera y envía código
+  /api/usuarios/verify-code       → valida código
+  /api/usuarios/reset-password    → cambia contraseña
  */
+
 
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 require('dotenv').config();
+// --- CONFIGURACIÓN DE RESEND (ENVÍO DE CORREOS) ---
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +37,9 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   ssl: { rejectUnauthorized: false } 
 });
+
+// --- ALMACENAMIENTO TEMPORAL DE CÓDIGOS  crea una “memoria temporal---
+const recoveryCodes = {};
 
 // --- RUTA DE SALUD ---
 app.get('/api/health', async (req, res) => {
@@ -111,6 +122,116 @@ app.post('/api/usuarios/register', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ===============================
+// RECUPERAR CONTRASEÑA - ENVIAR CÓDIGO
+// ===============================
+app.post('/api/usuarios/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // 1. Verificar si el usuario existe en la base de datos
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'El correo no está registrado' });
+    }
+
+    // 2. Generar código de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. Guardar código en memoria
+    recoveryCodes[email] = code;
+
+    // 4. Enviar correo con Resend
+    await resend.emails.send({
+      from: 'UTC Clínica <noreply@clinicautc.qzz.io>',
+      to: [email],
+      subject: 'Recuperación de contraseña',
+      html: `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e5e7eb;">
+
+  <h1 style="color: #1e3a8a; text-align: center;">Clínica UTC</h1>
+
+  <p style="text-align: center; color: #6b7280; font-size: 12px;">
+    Sistema de Gestión Clínica
+  </p>
+
+  <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
+
+  <h2 style="color: #111827;">Recuperación de contraseña</h2>
+
+  <p style="color: #374151;">
+    Recibimos una solicitud para restablecer tu contraseña.
+  </p>
+
+  <div style="background: #f9fafb; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+    <p style="font-size: 14px; color: #6b7280;">Tu código de verificación es:</p>
+    <p style="font-size: 28px; font-weight: bold; color: #1e3a8a; letter-spacing: 4px;">
+      ${code}
+    </p>
+  </div>
+
+  <p style="color: #6b7280; font-size: 14px;">
+    Este código es temporal y solo puede usarse una vez.
+  </p>
+
+  <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; text-align: center;">
+    Si no solicitaste este cambio, puedes ignorar este correo.
+  </p>
+
+</div>
+`
+    });
+
+    console.log(`📧 Código enviado a ${email}: ${code}`);
+
+    res.json({ message: 'Código enviado al correo' });
+
+  } catch (error) {
+    console.error('❌ Error en forgot-password:', error.message);
+    res.status(500).json({ error: 'Error al enviar el código' });
+  }
+});
+
+// ===============================
+// VALIDAR CÓDIGO
+// ===============================
+app.post('/api/usuarios/verify-code', (req, res) => {
+  const { email, code } = req.body;
+
+  if (recoveryCodes[email] === code) {
+    return res.json({ valid: true });
+  }
+
+  return res.status(400).json({ error: 'Código incorrecto' });
+});
+
+// ===============================
+// RESET PASSWORD
+// ===============================
+app.post('/api/usuarios/reset-password', async (req, res) => {
+  const { email, newPassword } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE usuarios SET password = $1 WHERE email = $2',
+      [newPassword, email]
+    );
+
+    // eliminar código usado
+    delete recoveryCodes[email];
+
+    res.json({ message: 'Contraseña actualizada correctamente' });
+
+  } catch (error) {
+    console.error('❌ Error al actualizar contraseña:', error.message);
+    res.status(500).json({ error: 'Error al actualizar contraseña' });
   }
 });
 
