@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { mockNotes, Note } from '../lib/mockData';
 import { useAuth } from '../contexts/AuthContext';
-import { MessageSquare, Plus, Calendar, User, Trash2 } from 'lucide-react';
+import { Plus, Calendar, User, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -47,7 +47,7 @@ export default function NotesManager() {
       title: newNote.title,
       content: newNote.content,
       category: newNote.category,
-      createdBy: user?.name || 'Administrador UTC',
+      createdBy: user?.nombre || 'Administrador UTC',
       createdDate: new Date().toISOString().split('T')[0] 
     };
     const updated = [note, ...notes]; 

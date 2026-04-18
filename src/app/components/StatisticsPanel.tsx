@@ -5,10 +5,10 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Calendar, TrendingUp, Clock, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import { mockAppointments, Appointment } from '../lib/mockData';
 import { parseISO, getDay } from 'date-fns';
 import { 

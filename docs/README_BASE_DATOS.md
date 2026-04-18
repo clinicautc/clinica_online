@@ -8,31 +8,31 @@ Este proyecto incluye **documentación completa** para configurar y usar la base
 
 ### 📄 Documentos Disponibles
 
-1. **[DATABASE_SETUP.md](./DATABASE_SETUP.md)** ⭐ **COMIENZA AQUÍ**
+1. **[DATABASE_SETUP.md](DATABASE_SETUP.md)** ⭐ **COMIENZA AQUÍ**
    - Guía paso a paso para configurar Supabase desde cero
    - Instrucciones para ejecutar el schema SQL
    - Configuración de variables de entorno
    - Verificación de que todo funciona correctamente
 
-2. **[database-schema.sql](./database-schema.sql)** 📝 **ARCHIVO SQL**
+2. **[database-schema.sql](../database-schema.sql)** 📝 **ARCHIVO SQL**
    - Script SQL completo para crear toda la base de datos
    - Incluye tablas, tipos ENUM, índices, y políticas RLS
    - Datos de prueba iniciales (seed data)
    - Funciones y triggers automáticos
 
-3. **[VARIABLES_ENTORNO.md](./VARIABLES_ENTORNO.md)** 🔐 **CONFIGURACIÓN**
+3. **[VARIABLES_ENTORNO.md](VARIABLES_ENTORNO.md)** 🔐 **CONFIGURACIÓN**
    - Lista de todas las variables de entorno necesarias
    - Nombres exactos de los campos en cada tabla
    - Valores ENUM permitidos
    - Consultas SQL útiles
 
-4. **[DIAGRAMA_BASE_DATOS.md](./DIAGRAMA_BASE_DATOS.md)** 📊 **ARQUITECTURA**
+4. **[DIAGRAMA_BASE_DATOS.md](DIAGRAMA_BASE_DATOS.md)** 📊 **ARQUITECTURA**
    - Diagrama visual de todas las tablas
    - Relaciones entre tablas (Foreign Keys)
    - Políticas de seguridad (RLS) explicadas
    - Flujo de datos del sistema
 
-5. **[GUIA_USO_SUPABASE.md](./GUIA_USO_SUPABASE.md)** 💻 **CÓDIGO**
+5. **[GUIA_USO_SUPABASE.md](GUIA_USO_SUPABASE.md)** 💻 **CÓDIGO**
    - Ejemplos de código para usar Supabase
    - Operaciones CRUD completas
    - Hooks personalizados
