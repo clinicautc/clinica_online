@@ -37,7 +37,9 @@ export default function ForgotPassword() {
 
   const handleBackToLogin = () => navigate('/');
 
+  // ===============================
   // SUCCESS
+  // ===============================
   if (currentStep === 'success') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50">
@@ -69,10 +71,8 @@ export default function ForgotPassword() {
             {currentStep === 'password' && 'Crea una nueva contraseña segura.'}
           </p>
 
-          {/* PROGRESO */}
           <div className="flex items-center gap-4">
 
-            {/* 1 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 flex items-center justify-center rounded-full
                 ${currentStep !== 'email'
@@ -85,7 +85,6 @@ export default function ForgotPassword() {
 
             <div className="h-1 w-16 bg-gray-200" />
 
-            {/* 2 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 flex items-center justify-center rounded-full
                 ${currentStep === 'password' || currentStep === 'success'
@@ -100,7 +99,6 @@ export default function ForgotPassword() {
 
             <div className="h-1 w-16 bg-gray-200" />
 
-            {/* 3 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 flex items-center justify-center rounded-full
                 ${currentStep === 'success'
@@ -120,19 +118,6 @@ export default function ForgotPassword() {
       {/* DERECHA */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 lg:p-10">
         <div className="w-full max-w-sm sm:max-w-md bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
-
-          {/* MOBILE HEADER */}
-          <div className="lg:hidden text-center space-y-2 mb-4">
-            <h1 className="text-xl font-bold text-blue-900">
-              Recupera tu contraseña
-            </h1>
-
-            <p className="text-sm text-gray-600">
-              {currentStep === 'email' && 'Ingresa tu correo electrónico para recuperar tu cuenta.'}
-              {currentStep === 'code' && 'Te enviamos un código. Escríbelo para continuar.'}
-              {currentStep === 'password' && 'Crea una nueva contraseña segura.'}
-            </p>
-          </div>
 
           {/* EMAIL */}
           {currentStep === 'email' && (
@@ -170,7 +155,10 @@ export default function ForgotPassword() {
                 <Mail className="absolute left-3 top-3 w-4 h-4 opacity-50" />
                 <Input
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError('');
+                  }}
                   placeholder="tu@email.com"
                   className="pl-10"
                 />
@@ -189,6 +177,11 @@ export default function ForgotPassword() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+
+                if (verificationCode.length !== 6) {
+                  setCodeError('El código debe tener 6 dígitos');
+                  return;
+                }
 
                 try {
                   const response = await fetch('http://localhost:3001/api/usuarios/verify-code', {
@@ -219,15 +212,29 @@ export default function ForgotPassword() {
                 <KeyRound className="absolute left-3 top-3 w-4 h-4 opacity-50" />
                 <Input
                   value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setVerificationCode(value);
+                    setCodeError('');
+                  }}
                   placeholder="123456"
+                  maxLength={6}
+                  inputMode="numeric"
                   className="pl-10 text-center"
                 />
               </div>
 
               {codeError && <p className="text-red-500 text-sm">{codeError}</p>}
 
-              <Button type="submit" className="w-full cursor-pointer bg-blue-900 hover:bg-blue-800">
+              <Button 
+                type="submit"
+                disabled={verificationCode.length !== 6}
+                className={`w-full
+                  ${verificationCode.length !== 6
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-900 hover:bg-blue-800 cursor-pointer'
+                  }`}
+              >
                 Verificar
               </Button>
             </form>
@@ -274,7 +281,10 @@ export default function ForgotPassword() {
               <Input
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setPasswordError('');
+                }}
               />
 
               {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
@@ -284,7 +294,10 @@ export default function ForgotPassword() {
               <Input
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setConfirmPasswordError('');
+                }}
               />
 
               {confirmPasswordError && (
@@ -300,8 +313,7 @@ export default function ForgotPassword() {
           <div className="text-center">
             <button
               onClick={handleBackToLogin}
-                className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity"
-
+              className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity"
             >
               Volver al inicio de sesión
             </button>

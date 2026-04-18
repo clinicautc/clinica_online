@@ -38,8 +38,12 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } 
 });
 
-// --- ALMACENAMIENTO TEMPORAL DE CÓDIGOS  crea una “memoria temporal---
+// --- ALMACENAMIENTO TEMPORAL DE CÓDIGOS recuperacion crea una “memoria temporal---
 const recoveryCodes = {};
+// ===============================
+// CÓDIGOS PARA REGISTRO
+// ===============================
+const registerCodes = {};
 
 // --- RUTA DE SALUD ---
 app.get('/api/health', async (req, res) => {
@@ -126,6 +130,102 @@ app.post('/api/usuarios/register', async (req, res) => {
 });
 
 // ===============================
+// ENVIAR CÓDIGO PARA REGISTRO
+// ===============================
+app.post('/api/usuarios/register-code', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const existing = await pool.query(
+      'SELECT * FROM usuarios WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Este correo ya está registrado' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    registerCodes[email] = {
+      code,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    };
+
+    await resend.emails.send({
+      from: 'UTC Clínica <noreply@clinicautc.qzz.io>',
+      to: [email],
+      subject: 'Código de registro',
+      html: `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e5e7eb;">
+
+  <h1 style="color: #1e3a8a; text-align: center;">Clínica UTC</h1>
+
+  <p style="text-align: center; color: #6b7280; font-size: 12px;">
+    Sistema de Gestión Clínica
+  </p>
+
+  <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
+
+  <h2 style="color: #111827;">Verificación de correo</h2>
+
+  <p style="color: #374151;">
+    Recibimos una solicitud para crear una cuenta en Clínica UTC.
+  </p>
+
+  <div style="background: #f9fafb; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+    <p style="font-size: 14px; color: #6b7280;">Tu código de verificación es:</p>
+    <p style="font-size: 28px; font-weight: bold; color: #1e3a8a; letter-spacing: 4px;">
+      ${code}
+    </p>
+  </div>
+
+  <p style="color: #6b7280; font-size: 14px;">
+    Este código es temporal, válido por unos minutos y solo puede usarse una vez.
+  </p>
+
+  <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; text-align: center;">
+    Si no solicitaste este registro, puedes ignorar este correo.
+  </p>
+
+</div>
+`
+});
+
+    res.json({ message: 'Código enviado' });
+
+  } catch (error) {
+    res.status(500).json({ error: 'Error al enviar código' });
+  }
+});
+
+// ===============================
+// VALIDAR CÓDIGO DE REGISTRO
+// ===============================
+app.post('/api/usuarios/verify-register-code', (req, res) => {
+  const { email, code } = req.body;
+
+  const data = registerCodes[email];
+
+  if (!data) {
+    return res.status(400).json({ error: 'No hay código para este correo' });
+  }
+
+  if (Date.now() > data.expiresAt) {
+    delete registerCodes[email];
+    return res.status(400).json({ error: 'Código expirado' });
+  }
+
+  if (data.code !== code) {
+    return res.status(400).json({ error: 'Código incorrecto' });
+  }
+
+  delete registerCodes[email];
+
+  return res.json({ valid: true });
+});
+
+// ===============================
 // RECUPERAR CONTRASEÑA - ENVIAR CÓDIGO
 // ===============================
 app.post('/api/usuarios/forgot-password', async (req, res) => {
@@ -192,12 +292,12 @@ app.post('/api/usuarios/forgot-password', async (req, res) => {
 `
     });
 
-    console.log(`📧 Código enviado a ${email}: ${code}`);
+    console.log(` Código enviado a ${email}: ${code}`);
 
     res.json({ message: 'Código enviado al correo' });
 
   } catch (error) {
-    console.error('❌ Error en forgot-password:', error.message);
+    console.error(' Error en forgot-password:', error.message);
     res.status(500).json({ error: 'Error al enviar el código' });
   }
 });
