@@ -167,11 +167,10 @@ app.patch('/api/citas/:id/asignar', async (req, res) => {
 // Este endpoint es el que el frontend usa para "Buscar si ya existe un historial"
 app.get('/api/historiales', async (req, res) => {
   try {
-    // Consultamos las dos tablas principales de historiales
-    const fisio = await pool.query("SELECT id, paciente_id, paciente_nombre, 'fisioterapia' as tipo, datos, appointment_id FROM historiales_fisioterapia");
-    const nutri = await pool.query("SELECT id, paciente_id, paciente_nombre, 'nutricion' as tipo, datos, appointment_id FROM historiales_nutricion");
-
-    // Unimos los resultados en una sola lista para el frontend
+    // ¡AQUÍ AGREGAMOS fecha_creacion AL SELECT!
+    const fisio = await pool.query("SELECT id, paciente_id, paciente_nombre, 'fisioterapia' as tipo, datos, appointment_id, fecha_creacion FROM historiales_fisioterapia");
+    const nutri = await pool.query("SELECT id, paciente_id, paciente_nombre, 'nutricion' as tipo, datos, appointment_id, fecha_creacion FROM historiales_nutricion");
+    
     res.json([...fisio.rows, ...nutri.rows]);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener historiales unificados" });

@@ -1,399 +1,378 @@
-/**
- * ============================================================================
- * ARCHIVO: NutritionAdminDashboard.tsx - VERSIÓN MASTER INTEGRADA
- * PROPÓSITO: Panel de Coordinación de Nutrición con Sistema de Notas y Asignación.
- * COLOR TEMÁTICO: Naranja (#ea580c / orange-600)
- * ============================================================================
- */
-
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from "../components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
-} from "../components/ui/dialog";
-import {
-  LogOut, Users, Calendar, Clock, Utensils, BarChart3,
-  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck
-} from 'lucide-react'; // CORRECCIÓN: Se eliminó 'FileText'
-import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
-import { endpoints } from '../lib/api'; // Importamos la API centralizada
-
-import PatientList from '../components/PatientList';
-import NotesViewer from '../components/NotesViewer';
-import StatisticsPanel from '../components/StatisticsPanel';
-import PractitionerManagement from '../components/PractitionerManagement';
+import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Calendar as CalendarComponent } from '../components/ui/calendar';
+import { 
+  Calendar, Clock, LogOut, Loader2,
+  Utensils, Activity, ClipboardList, PlusCircle, AlertCircle
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { endpoints } from '../lib/api';
+import { toast } from 'sonner';
 
-// Interfaz sincronizada con PostgreSQL
 interface Appointment {
   id: number;
-  paciente_nombre: string;
+  paciente_id: number;
   tipo: string;
   fecha: string;
   hora: string;
   estado: string;
-  practicante_id?: number | null;
   practicante_nombre?: string | null;
 }
 
-export default function NutritionAdminDashboard() {
+export default function PatientDashboard() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const arialStyle = { fontFamily: 'Arial, sans-serif' };
 
-  // ESTADOS DE CITAS
-  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
-  const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  // Estados de Citas
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingCitas, setLoadingCitas] = useState(true);
+  const [errorCitas, setErrorCitas] = useState(false);
+  
+  // Estados para agendar
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [serviceType, setServiceType] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [isBooking, setIsBooking] = useState(false);
 
-  // ESTADOS PARA EL MODAL DE ASIGNACIÓN
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null);
-  const [practicantesArea, setPracticantesArea] = useState<any[]>([]);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isAssigning, setIsAssigning] = useState(false);
+  // Estados para Planes Médicos
+  const [activePlanTab, setActivePlanTab] = useState<'nutricion' | 'fisioterapia'>('nutricion');
 
-  // ESTADOS PARA COMUNICADOS
-  const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
-  const [isEnviando, setIsEnviando] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [notaNueva, setNotaNueva] = useState({
-    titulo: '',
-    contenido: '',
-    emailDestinatario: 'ninguno'
-  });
+  // Generador de horarios (00:00 a 17:00)
+  const timeSlots: string[] = [];
+  for (let i = 0; i <= 17; i++) {
+    const hour = i.toString().padStart(2, '0');
+    timeSlots.push(`${hour}:00`);
+    if (i !== 17) timeSlots.push(`${hour}:30`);
+  }
 
-  /**
-   * EFECTO INICIAL: Carga de Citas y Personal
-   */
+  // Carga de datos inicial
   useEffect(() => {
-    const fetchTodayAppointments = async () => {
-      try {
-        setIsLoadingCitas(true);
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const response = await fetch(endpoints.citas);
-
-        if (response.ok) {
-          const allAppointments: Appointment[] = await response.json();
-          const filtered = allAppointments.filter((apt) => {
-            const cleanAptDate = apt.fecha.split('T')[0];
-            return (
-                cleanAptDate === todayStr &&
-                apt.tipo === 'nutricion'
-            );
-          });
-          setTodayAppointments(filtered);
-        }
-      } catch (error) {
-        console.error("❌ Error Admin Nutrición -> PostgreSQL:", error);
-      } finally {
-        setIsLoadingCitas(false);
-      }
-    };
-
-    const cargarPracticantesEnVivo = async () => {
-      try {
-        const response = await fetch(endpoints.usuarios);
-        if (response.ok) {
-          const data = await response.json();
-          const lista = data.filter((u: any) =>
-              u.rol === 'practicante' &&
-              u.area?.toLowerCase() === 'nutricion' &&
-              (u.estado === 'activo' || u.status === 'activo')
-          );
-          setPracticantesArea(lista);
-        }
-      } catch (error) {
-        console.error("Error al cargar practicantes:", error);
-      }
-    };
-
-    const savedUser = localStorage.getItem('utc_current_user');
-    if (!user && !authLoading && !savedUser) {
+    if (!user && !authLoading) {
       navigate('/login');
       return;
     }
+    if (user) fetchAppointments();
+  }, [user, authLoading, navigate]);
 
-    // CORRECCIÓN: Manejo de promesas con void para el linter
-    void fetchTodayAppointments();
-    void cargarPracticantesEnVivo();
-
-    const interval = setInterval(() => {
-      void cargarPracticantesEnVivo();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [user, authLoading, navigate, refreshKey]);
-
-  // --- FUNCIONES DE ASIGNACIÓN ---
-  const handleOpenAssignModal = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-    setSelectedPractitioner(null);
-    setIsModalOpen(true);
+  const fetchAppointments = async () => {
+    try {
+      setLoadingCitas(true);
+      setErrorCitas(false);
+      const res = await fetch(endpoints.citas);
+      if (res.ok) {
+        const data: Appointment[] = await res.json();
+        setAppointments(data.filter(a => String(a.paciente_id) === String(user?.id)));
+      } else {
+        setErrorCitas(true);
+      }
+    } catch (err) {
+      setErrorCitas(true);
+    } finally {
+      setLoadingCitas(false);
+    }
   };
 
-  const handleConfirmAssignment = async () => {
-    if (!selectedPractitioner || !selectedAppointment) return;
+  // Validación: Deshabilitar horas pasadas si el día seleccionado es HOY
+  const isTimeDisabled = (time: string) => {
+    if (!selectedDate) return true;
+    const now = new Date();
+    
+    // Verificamos si la fecha seleccionada es hoy
+    const isToday = selectedDate.getDate() === now.getDate() &&
+                    selectedDate.getMonth() === now.getMonth() &&
+                    selectedDate.getFullYear() === now.getFullYear();
+    
+    if (!isToday) return false;
+
+    // Si es hoy, comparamos las horas
+    const [hours, minutes] = time.split(':').map(Number);
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+
+    if (hours < currentHours) return true;
+    if (hours === currentHours && minutes <= currentMinutes) return true;
+    return false;
+  };
+
+  const handleBookAppointment = async () => {
+    if (!serviceType || !selectedDate || !selectedTime) {
+      toast.error("Por favor selecciona servicio, fecha y horario.");
+      return;
+    }
 
     try {
-      setIsAssigning(true);
-      const response = await fetch(`${endpoints.citas}/${selectedAppointment.id}/asignar`, {
-        method: 'PATCH',
+      setIsBooking(true);
+      const response = await fetch(endpoints.citas, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          practicante_id: selectedPractitioner.id,
-          practicante_nombre: selectedPractitioner.nombre
+          paciente_id: user?.id,
+          paciente_nombre: user?.nombre,
+          tipo: serviceType,
+          fecha: format(selectedDate, 'yyyy-MM-dd'),
+          hora: `${selectedTime}:00`,
+          estado: 'programada'
         })
       });
 
       if (response.ok) {
-        toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
-        setIsModalOpen(false);
-        setSelectedPractitioner(null);
-        setSelectedAppointment(null);
-        setRefreshKey(prev => prev + 1);
-      } else {
-        toast.error("El servidor no pudo procesar la asignación.");
+        toast.success("¡Cita agendada con éxito!");
+        fetchAppointments();
+        setSelectedTime(""); // Limpiamos la hora tras agendar
       }
     } catch (error) {
-      toast.error("Error de conexión con el servidor.");
+      toast.error("Error al conectar con el servidor");
     } finally {
-      setIsAssigning(false);
+      setIsBooking(false);
     }
   };
 
-  const handlePublicarNotaAdmin = async () => {
-    if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
-      toast.error("Por favor, complete todos los campos requeridos.");
-      return;
-    }
-
-    try {
-      setIsEnviando(true);
-      const payload = {
-        titulo: notaNueva.titulo.trim(),
-        contenido: notaNueva.contenido.trim(),
-        destino: 'nutricion',
-        creado_por: user?.id,
-        // CORRECCIÓN: Se cambió 'name' por 'nombre'
-        creado_por_nombre: `Coordinador: ${user?.nombre || "Nutrición"}`,
-        destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
-      };
-
-      const response = await fetch(endpoints.notas, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        toast.success("Comunicado emitido correctamente.");
-        setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
-        setIsNotaModalOpen(false);
-        setRefreshKey(prev => prev + 1);
-      }
-    } catch (error) {
-      toast.error("Error al conectar con el servidor.");
-    } finally {
-      setIsEnviando(false);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50"><Loader2 className="animate-spin h-10 w-10 text-orange-600" /></div>;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-blue-900" /></div>;
 
   return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100" style={arialStyle}>
-        <header className="bg-white border-b border-orange-900/10 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-400 rounded-full flex items-center justify-center shadow-md">
-                  <Utensils className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-orange-900">Clínica UTC - Nutrición</h1>
-                  <p className="text-sm text-orange-900/60 font-medium">Panel de Coordinación Académica</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right hidden sm:block">
-                  {/* CORRECCIÓN: Se cambió 'name' por 'nombre' */}
-                  <p className="text-sm font-bold text-orange-900">{user?.nombre}</p>
-                  <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Docente Titular</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleLogout} className="border-red-100 text-red-600 hover:bg-red-50">
-                  <LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión
-                </Button>
-              </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* HEADER */}
+      <header className="bg-white border-b border-blue-900/10 shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white font-black">UTC</div>
+            <div>
+              <h1 className="text-lg font-bold text-blue-900 leading-tight">Clínica Universitaria</h1>
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Fisioterapia y Nutrición</p>
             </div>
           </div>
-        </header>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-800">{user?.nombre}</p>
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-tighter">PACIENTE</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/login'); }} className="rounded-xl border-slate-200">
+              <LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión
+            </Button>
+          </div>
+        </div>
+      </header>
 
-        <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-          <Tabs defaultValue="today_appointments" className="space-y-6">
-            <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
-              <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold"><Calendar className="w-4 h-4 mr-2" /> Agenda de Hoy</TabsTrigger>
-              <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold"><Settings className="w-4 h-4 mr-2" /> Personal</TabsTrigger>
-              <TabsTrigger value="statistics" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold"><BarChart3 className="w-4 h-4 mr-2" /> Métricas</TabsTrigger>
-              <TabsTrigger value="patients" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold"><Users className="w-4 h-4 mr-2" /> Pacientes</TabsTrigger>
-              <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black"><FileEdit className="w-4 h-4 mr-2" /> Comunicados</TabsTrigger>
-            </TabsList>
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h2 className="text-3xl font-black text-blue-950">¡Hola, {user?.nombre?.split(' ')[0]}!</h2>
+          <p className="text-slate-500 font-medium">Gestiona tus citas y consulta tus planes de tratamiento de forma sencilla.</p>
+        </div>
 
-            <TabsContent value="today_appointments">
-              <Card className="border-orange-200 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-orange-50/50 border-b p-6">
-                  <CardTitle className="text-orange-900 font-extrabold">Citas Programadas</CardTitle>
-                  <CardDescription className="font-medium italic text-orange-800/60">Consulta de hoy: {format(new Date(), 'dd/MM/yyyy')}</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    {isLoadingCitas ? (
-                        <div className="flex flex-col items-center py-12 gap-3"><Loader2 className="animate-spin text-orange-600" /><p className="text-sm font-bold text-orange-900/50">Sincronizando agenda...</p></div>
-                    ) : todayAppointments.length === 0 ? (
-                        <div className="text-center py-12 border-2 border-dashed rounded-3xl border-orange-100 italic text-slate-400">No se registran citas de nutrición para hoy.</div>
-                    ) : (
-                        todayAppointments.map((apt) => (
-                            <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-orange-300 transition-all shadow-sm">
-                              <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-full bg-orange-50 text-orange-600"><Utensils className="w-5 h-5"/></div>
-                                <div>
-                                  <p className="font-black text-orange-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                                  <div className="flex gap-3 items-center mt-1">
-                                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS</span>
-                                    {/* USO DEL COMPONENTE BADGE PARA QUITAR EL ERROR TS6133 */}
-                                    <Badge className="bg-green-50 text-green-700 border-green-200 uppercase text-[10px] font-black">{apt.estado}</Badge>
-                                  </div>
-                                </div>
-                              </div>
+        <Tabs defaultValue="agendar" className="space-y-6">
+          <TabsList className="bg-white border border-blue-100 p-1 h-14 rounded-2xl shadow-sm w-full grid grid-cols-3">
+            <TabsTrigger value="agendar" className="rounded-xl font-bold data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <PlusCircle className="w-4 h-4 mr-2" /> Agendar Cita
+            </TabsTrigger>
+            <TabsTrigger value="mis-citas" className="rounded-xl font-bold data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <Calendar className="w-4 h-4 mr-2" /> Mis Citas
+            </TabsTrigger>
+            <TabsTrigger value="planes" className="rounded-xl font-bold data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <ClipboardList className="w-4 h-4 mr-2" /> Planes Médicos
+            </TabsTrigger>
+          </TabsList>
 
-                              <div className="flex items-center gap-4">
-                                {apt.practicante_id && (
-                                    <div className="flex flex-col items-end mr-2">
-                                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
-                                      <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
-                                <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-                              </span>
-                                    </div>
-                                )}
-                                <Button
-                                    size="sm"
-                                    variant={apt.practicante_id ? "outline" : "default"}
-                                    className={apt.practicante_id
-                                        ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
-                                        : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
-                                    onClick={() => handleOpenAssignModal(apt)}
-                                >
-                                  <UserPlus className="w-4 h-4" />
-                                  {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-                                </Button>
-                              </div>
-                            </div>
-                        ))
-                    )}
+          {/* TAB 1: AGENDAR */}
+          <TabsContent value="agendar">
+            <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
+              <CardContent className="p-8 space-y-8">
+                
+                {/* Contenedor Superior: Servicio y Calendario */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-blue-900 uppercase tracking-widest">Tipo de Servicio</label>
+                    <Select onValueChange={setServiceType}>
+                      <SelectTrigger className="h-12 rounded-xl border-slate-200">
+                        <SelectValue placeholder="Selecciona un servicio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nutricion">Nutrición</SelectItem>
+                        <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="practitioners">
-              <Card className="border-orange-200 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="flex flex-row items-center justify-between border-b p-6">
-                  <div><CardTitle className="text-orange-900 font-extrabold text-xl">Plantilla de Practicantes</CardTitle><CardDescription className="font-medium italic">Gestión de accesos para el departamento de Nutrición</CardDescription></div>
-                  <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 font-bold shadow-lg"><UserPlus className="w-4 h-4 mr-2" /> Dar de Alta</Button>
-                </CardHeader>
-                <CardContent className="p-6"><PractitionerManagement area="nutricion" /></CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="statistics"><StatisticsPanel area="nutricion" /></TabsContent>
-            <TabsContent value="patients"><PatientList /></TabsContent>
-
-            <TabsContent value="notes">
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row items-center justify-between bg-white p-8 rounded-3xl border border-orange-200 shadow-xl gap-6">
-                  <div className="text-center md:text-left">
-                    <h3 className="text-2xl font-black text-orange-950 tracking-tight">Comunicación de Nutrición</h3>
-                    <p className="text-sm text-slate-500 font-medium">Difusión de avisos internos para el personal del área.</p>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                      <Calendar className="w-4 h-4" /> Selecciona una Fecha
+                    </label>
+                    <div className="flex justify-center p-2 border rounded-2xl border-slate-100 bg-slate-50/30">
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        className="rounded-md"
+                        locale={es}
+                        // 🔥 VALIDACIÓN: Deshabilita días anteriores a hoy
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      />
+                    </div>
                   </div>
-                  <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-14 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1 active:scale-95"><Send className="w-5 h-5 mr-3 text-white" /> NUEVA NOTA</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
-                      <DialogHeader>
-                        <DialogTitle className="text-orange-950 text-2xl font-black flex items-center gap-3"><FileEdit className="w-6 h-6 text-orange-500" /> EMITIR AVISO</DialogTitle>
-                        <DialogDescription className="font-bold italic text-orange-600/60">Destino: Departamento de Nutrición.</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-6 py-4">
-                        <div className="space-y-2"><Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Asunto</Label><Input className="rounded-xl h-12 border-slate-200" placeholder="Título..." value={notaNueva.titulo} onChange={(e) => setNotaNueva({...notaNueva, titulo: e.target.value})} /></div>
-                        <div className="space-y-2"><Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Contenido</Label><Textarea className="rounded-xl min-h-[130px] border-slate-200 resize-none" placeholder="Instrucciones del coordinador..." value={notaNueva.contenido} onChange={(e) => setNotaNueva({...notaNueva, contenido: e.target.value})} /></div>
-                        <div className="space-y-2">
-                          <Label className="text-orange-600 font-black text-[11px] uppercase tracking-widest ml-1">Usuario Específico (Opcional)</Label>
-                          <Select value={notaNueva.emailDestinatario} onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}>
-                            <SelectTrigger className="rounded-xl h-12 border-orange-300 bg-orange-50/20 font-bold"><SelectValue placeholder="Seleccionar Practicante" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ninguno" className="font-black text-orange-900">--- TODOS LOS PRACTICANTES ---</SelectItem>
-                              {practicantesArea.map((p) => (<SelectItem key={p.email} value={p.email} className="font-medium italic">{p.nombre || p.name}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
+                </div>
+
+                {/* Contenedor Inferior: Selector de Horas */}
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <label className="text-xs font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Horario Disponible (00:00 - 17:00)
+                  </label>
+                  
+                  <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto pr-2">
+                      {timeSlots.map((time) => {
+                        const disabled = isTimeDisabled(time);
+                        const isSelected = selectedTime === time;
+                        return (
+                          <Button
+                            key={time}
+                            type="button"
+                            variant={isSelected ? "default" : "outline"}
+                            disabled={disabled}
+                            onClick={() => setSelectedTime(time)}
+                            className={`h-10 text-sm font-bold rounded-lg transition-all ${
+                              isSelected 
+                                ? 'bg-blue-900 text-white shadow-md' 
+                                : disabled 
+                                  ? 'opacity-30 bg-slate-50 cursor-not-allowed' 
+                                  : 'text-blue-900 border-blue-100 hover:border-blue-300 hover:bg-blue-50'
+                            }`}
+                          >
+                            {time}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleBookAppointment} 
+                  disabled={isBooking || !selectedTime || !selectedDate || !serviceType}
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-800 text-white font-black rounded-2xl text-lg shadow-lg shadow-blue-900/20 disabled:opacity-50 transition-all"
+                >
+                  {isBooking ? <Loader2 className="animate-spin" /> : "Confirmar Cita Universitaria"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 2: MIS CITAS */}
+          <TabsContent value="mis-citas">
+            {errorCitas ? (
+              <div className="bg-red-50 border border-red-100 p-12 rounded-[2.5rem] flex flex-col items-center text-center gap-4">
+                <AlertCircle className="w-12 h-12 text-red-500" />
+                <h3 className="text-xl font-black text-red-900">No se pudieron cargar tus citas.</h3>
+                <Button onClick={fetchAppointments} variant="link" className="text-red-600 underline">Reintentar conexión</Button>
+              </div>
+            ) : loadingCitas ? (
+              <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-blue-900" /></div>
+            ) : appointments.length === 0 ? (
+              <div className="py-20 text-center text-slate-400 font-bold italic">No tienes citas programadas.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {appointments.map(cita => (
+                  <Card key={cita.id} className="rounded-2xl border-slate-100 shadow-md group hover:shadow-xl transition-all overflow-hidden">
+                    <div className={`h-2 w-full ${cita.tipo === 'fisioterapia' ? 'bg-blue-500' : 'bg-orange-500'}`} />
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <Badge className={`${cita.tipo === 'fisioterapia' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'} hover:bg-transparent border-none uppercase font-black text-[10px]`}>
+                          {cita.tipo}
+                        </Badge>
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-black text-[9px]">
+                          {cita.estado}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-lg font-black text-slate-800 mt-2">
+                        Consulta de {cita.tipo.charAt(0).toUpperCase() + cita.tipo.slice(1)}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 mt-4">
+                        <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <Calendar className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm font-bold capitalize">
+                            {cita.fecha.includes('T') ? format(new Date(cita.fecha), "EEEE, dd 'de' MMMM", { locale: es }) : cita.fecha}
+                          </span>
                         </div>
-                        <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3 shadow-sm">
-                          <Target className="w-5 h-5 text-orange-600 mt-0.5" />
-                          <p className="text-[11px] text-orange-800 font-bold leading-tight">
-                            {notaNueva.emailDestinatario === 'ninguno' ? "PUBLICACIÓN GENERAL: Todos los practicantes podrán visualizar este aviso." : `PUBLICACIÓN PRIVADA: Enviada directamente al perfil seleccionado.`}
+                        <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm font-bold">{cita.hora.substring(0, 5)} HRS</span>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-slate-100">
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Especialista Asignado</p>
+                          <p className="text-sm font-bold text-slate-700">
+                            {cita.practicante_nombre ? cita.practicante_nombre : 'Pendiente de asignación'}
                           </p>
                         </div>
                       </div>
-                      <DialogFooter className="gap-2">
-                        <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
-                        <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-8 h-12 rounded-xl shadow-lg flex-1 active:scale-95">{isEnviando ? "ENVIANDO..." : "PUBLICAR AHORA"}</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-white shadow-2xl"><NotesViewer key={refreshKey} readOnly={false} filterCategory="nutricion" /></div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </TabsContent>
-          </Tabs>
-        </main>
+            )}
+          </TabsContent>
 
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
-            <DialogHeader>
-              <DialogTitle className="text-orange-900 text-2xl font-black flex items-center gap-3"><UserPlus className="w-6 h-6 text-orange-600" /> Asignar Practicante</DialogTitle>
-              <DialogDescription className="font-bold text-slate-500 italic">Paciente: {selectedAppointment?.paciente_nombre}</DialogDescription>
-            </DialogHeader>
-            <div className="py-6 space-y-4">
-              <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Seleccionar alumno de Nutrición</Label>
-              <Select onValueChange={(val) => setSelectedPractitioner(practicantesArea.find(u => u.id.toString() === val))}>
-                <SelectTrigger className="rounded-xl h-14 border-orange-200 font-bold focus:ring-orange-500"><SelectValue placeholder="Buscar en la plantilla..." /></SelectTrigger>
-                <SelectContent>
-                  {practicantesArea.length > 0 ? practicantesArea.map((p) => (<SelectItem key={p.id} value={p.id.toString()} className="font-medium italic uppercase">{p.nombre || p.name}</SelectItem>)) : <div className="p-4 text-center text-xs font-black text-slate-400 uppercase">No hay alumnos activos</div>}
-                </SelectContent>
-              </Select>
-              <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 mt-2"><p className="text-[11px] text-orange-800 font-bold leading-tight uppercase tracking-tighter italic">La asignación permitirá al alumno iniciar la evaluación nutricional inmediatamente.</p></div>
-            </div>
-            <DialogFooter>
-              {selectedPractitioner && (
-                  <Button onClick={handleConfirmAssignment} disabled={isAssigning} className="w-full bg-orange-600 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95">
-                    {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />} CONFIRMAR ASIGNACIÓN
-                  </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          {/* TAB 3: PLANES MÉDICOS (SUB-PESTAÑAS RESTAURADAS) */}
+          <TabsContent value="planes">
+            <Card className="rounded-3xl border-slate-100 shadow-xl p-8 bg-white">
+              <div className="mb-8">
+                <CardTitle className="text-xl font-black text-blue-950 mb-1">Mis Planes de Tratamiento</CardTitle>
+                <CardDescription className="font-bold text-slate-500">Consulta tus planes de alimentación y ejercicios</CardDescription>
+              </div>
+
+              {/* Botones de sub-navegación tipo píldora */}
+              <div className="flex gap-3 mb-16">
+                <Button 
+                  variant={activePlanTab === 'nutricion' ? 'default' : 'outline'}
+                  onClick={() => setActivePlanTab('nutricion')}
+                  className={`rounded-full px-6 font-bold transition-all ${
+                    activePlanTab === 'nutricion' 
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md' 
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Utensils className="w-4 h-4 mr-2" /> Nutrición
+                </Button>
+
+                <Button 
+                  variant={activePlanTab === 'fisioterapia' ? 'default' : 'outline'}
+                  onClick={() => setActivePlanTab('fisioterapia')}
+                  className={`rounded-full px-6 font-bold transition-all ${
+                    activePlanTab === 'fisioterapia' 
+                      ? 'bg-blue-900 hover:bg-blue-950 text-white shadow-md' 
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Activity className="w-4 h-4 mr-2" /> Fisioterapia
+                </Button>
+              </div>
+              
+              {/* Contenido Dinámico de la Sub-pestaña */}
+              <div className="flex flex-col items-center justify-center py-10 min-h-[250px]">
+                {activePlanTab === 'nutricion' ? (
+                  <>
+                    <Utensils className="w-20 h-20 mb-6 text-orange-400/50" />
+                    <p className="font-medium text-slate-400 text-lg">No tienes planes de alimentación asignados</p>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-20 h-20 mb-6 text-blue-400/50" />
+                    <p className="font-medium text-slate-400 text-lg">No tienes planes de fisioterapia asignados</p>
+                  </>
+                )}
+              </div>
+
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
   );
 }

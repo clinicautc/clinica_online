@@ -145,7 +145,7 @@ export default function MedicalHistoryViewer({ filterType }: Props) {
                             <CardTitle className="text-blue-950 font-black uppercase text-sm">{history.paciente_nombre}</CardTitle>
                             <CardDescription className="flex items-center gap-2 font-bold text-[10px]">
                               <Calendar className="w-3 h-3" />
-                              {format(new Date(history.fecha_creacion), "dd 'de' MMMM, yyyy - HH:mm", { locale: es })}
+                              {history.fecha_creacion ? format(new Date(history.fecha_creacion), "dd 'de' MMMM, yyyy - HH:mm", { locale: es }) : 'Fecha no registrada'}
                             </CardDescription>
                           </div>
                         </div>
