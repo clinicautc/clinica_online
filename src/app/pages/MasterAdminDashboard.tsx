@@ -332,7 +332,7 @@ export default function ManageAdminPage() {
               </button>
 
               
-            </div>
+           </div>
           </div>
         </header>
 
