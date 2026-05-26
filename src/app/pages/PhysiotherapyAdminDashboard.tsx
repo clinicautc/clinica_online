@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * DASHBOARD DE DOCENTE/ADMINISTRADOR DE FISIOTERAPIA (Versión Paso 3)
+ * DASHBOARD DE DOCENTE/ADMINISTRADOR DE FISIOTERAPIA (Versión Paso 3 + Perfil)
  * Panel específico para el docente coordinador con sistema de asignación de practicantes.
  * ============================================================================
  */
@@ -19,7 +19,8 @@ import {
 } from "../components/ui/dialog";
 import { 
   LogOut, Users, FileText, Calendar, Clock, Activity, BarChart3, 
-  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck 
+  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
+  User, X, Edit2, Phone, Building, Trash2, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -38,7 +39,7 @@ interface Appointment {
   fecha: string;
   hora: string;
   estado: string;
-  practicante_id?: number | null; // Agregado para el flujo de asignación [cite: 5]
+  practicante_id?: number | null; 
   practicante_nombre?: string | null;
 }
 
@@ -52,9 +53,9 @@ export default function PhysiotherapyAdminDashboard() {
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
 
   // --- PASO 3: ESTADOS PARA EL MODAL DE ASIGNACIÓN ---
-  const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el Modal
-  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null); // Estado para el Practicante Seleccionado
-  const [practicantesArea, setPracticantesArea] = useState<any[]>([]); // Lista de Practicantes
+  const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null); 
+  const [practicantesArea, setPracticantesArea] = useState<any[]>([]); 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -67,6 +68,25 @@ export default function PhysiotherapyAdminDashboard() {
     contenido: '',
     emailDestinatario: 'ninguno'
   });
+
+  // ==========================================
+  // ESTADOS PARA LA BARRA LATERAL (PERFIL)
+  // ==========================================
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  const [profileData, setProfileData] = useState({
+    nombre: user?.nombre || 'Coordinador Fisioterapia',
+    telefono: user?.telefono || '',
+    matricula: user?.matricula || '',
+    rol: user?.rol || '',
+  });
+  const [backupProfile, setBackupProfile] = useState(profileData);
+
+  const partesNombre = profileData.nombre.trim().split(' ');
+  const inicialesAvatar = (partesNombre[0]?.[0] || '') + (partesNombre[1]?.[0] || '');
+  const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim();
 
   useEffect(() => {
     const fetchTodayAppointments = async () => {
@@ -93,16 +113,11 @@ export default function PhysiotherapyAdminDashboard() {
       }
     };
 
-    /**
-     * CARGAR PRACTICANTES EN VIVO:
-     * El Admin solo debe ver a los practicantes de su misma área (Fisioterapia).
-     */
     const cargarPracticantesEnVivo = async () => {
       try {
         const response = await fetch('http://localhost:3001/api/usuarios');
         if (response.ok) {
           const data = await response.json();
-          // Filtrado estricto por rol 'practicante' y área 'fisioterapia' [cite: 1, 9]
           const lista = data.filter((u: any) => 
             u.rol === 'practicante' && 
             u.area?.toLowerCase() === 'fisioterapia' &&
@@ -128,15 +143,26 @@ export default function PhysiotherapyAdminDashboard() {
     return () => clearInterval(interval);
   }, [user, authLoading, navigate]);
 
+  // Sincronizar datos del perfil si el objeto 'user' se actualiza
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        nombre: user.nombre || profileData.nombre,
+        telefono: user.telefono || profileData.telefono,
+        matricula: user.matricula || profileData.matricula,
+        rol: user.rol || profileData.rol
+      });
+    }
+  }, [user]);
+
   // --- FUNCIÓN PARA ABRIR EL MODAL DE ASIGNACIÓN ---
   const handleOpenAssignModal = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    setSelectedPractitioner(null); // Reseteamos selección previa
+    setSelectedPractitioner(null);
     setIsModalOpen(true);
   };
 
   // --- FUNCIÓN PARA EJECUTAR LA ASIGNACIÓN EN DB ---
-  // --- FUNCIÓN PARA EJECUTAR LA ASIGNACIÓN EN DB CORREGIDA ---
   const handleConfirmAssignment = async () => {
     if (!selectedPractitioner || !selectedAppointment) return;
 
@@ -153,15 +179,10 @@ export default function PhysiotherapyAdminDashboard() {
 
       if (response.ok) {
         toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
-        
-        // CORRECCIÓN 1: Cerrar el modal automáticamente
         setIsModalOpen(false); 
-        
-        // CORRECCIÓN 2: Limpiar los estados de selección para la siguiente vez
         setSelectedPractitioner(null);
         setSelectedAppointment(null);
 
-        // CORRECCIÓN 3: Refrescar la lista de citas para que el Admin vea el cambio
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const res = await fetch(`http://localhost:3001/api/citas`);
         if (res.ok) {
@@ -219,13 +240,59 @@ export default function PhysiotherapyAdminDashboard() {
     }
   };
 
+  // --- FUNCIONES DEL PERFIL ---
+  const handleEditProfileClick = () => {
+    setBackupProfile(profileData);
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setProfileData(backupProfile);
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id || !user?.email) {
+      toast.error("Error de sesión: No se pudo identificar al usuario.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'email': user.email 
+        },
+        body: JSON.stringify({
+          nombre: profileData.nombre,
+          telefono: profileData.telefono,
+          matricula: profileData.matricula
+        })
+      });
+
+      if (response.ok) {
+        setIsEditingProfile(false);
+        toast.success("Tu perfil se actualizó correctamente.");
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "Error al actualizar perfil.");
+      }
+    } catch (error) {
+      console.error("Error actualizando perfil:", error);
+      toast.error("Error de conexión con la base de datos.");
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const handleAccessForms = (appointment: Appointment) => {
-    navigate(`/forms/fisioterapia/${appointment.id}`);
+  const handleConfirmDeleteAccount = () => {
+    setIsDeleteModalOpen(false);
+    setIsDrawerOpen(false);
+    toast.error("Función deshabilitada temporalmente.");
   };
 
   const handleGoToManagePractitioners = () => {
@@ -244,8 +311,8 @@ export default function PhysiotherapyAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100" style={arialStyle}>
-      <header className="bg-white border-b border-blue-900/10 shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 overflow-x-hidden" style={arialStyle}>
+      <header className="bg-white border-b border-blue-900/10 shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -257,23 +324,25 @@ export default function PhysiotherapyAdminDashboard() {
                 <p className="text-sm text-blue-900/60">Panel de Coordinación Administrativa</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-blue-900">
-                   {(user as any)?.nombre || user?.name || "Coordinador"}
-                </p>
+            
+            {/* Perfil del Usuario Integrado (Botón que abre el Drawer) */}
+            <button 
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex items-center gap-4 text-right hidden sm:flex hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <div>
+                <p className="text-sm font-bold text-blue-900">{nombreCortoDisplay}</p>
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Coordinación de Área</p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleLogout} className="border-red-100 text-red-600 hover:bg-red-50 font-bold">
-                <LogOut className="w-4 h-4 mr-2" />
-                Cerrar Sesión
-              </Button>
-            </div>
+              <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
+                <User className="h-5 w-5 text-blue-600" />
+              </div>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
@@ -294,74 +363,73 @@ export default function PhysiotherapyAdminDashboard() {
           </TabsList>
 
           <TabsContent value="today_appointments">
-  <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-    <CardHeader className="bg-slate-50/50 border-b p-6">
-      <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
-      <CardDescription className="font-medium italic">Sincronización en vivo con la base de datos de la clínica</CardDescription>
-    </CardHeader>
-    <CardContent className="p-6">
-      <div className="space-y-3">
-        {isLoadingCitas ? (
-          <div className="flex flex-col items-center py-12 gap-3">
-            <Loader2 className="animate-spin text-blue-900" />
-            <p className="text-sm font-bold">Consultando agenda...</p>
-          </div>
-        ) : todayAppointments.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
-            No se registran citas para el día de hoy.
-          </div>
-        ) : (
-          todayAppointments.map((apt) => (
-            <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-blue-50 text-blue-900">
-                  <Activity className="w-5 h-5"/>
-                </div>
-                <div>
-                  <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                  <div className="flex gap-3 items-center">
-                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
-                    </span>
-                    <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
-                      {apt.estado}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* LÓGICA DE ASIGNACIÓN Y RE-ASIGNACIÓN CORREGIDA */}
-              <div className="flex items-center gap-6">
-                {apt.practicante_id && (
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                      Responsable:
-                    </span>
-                    <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
-                      <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-                    </span>
-                  </div>
-                )}
+            <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
+              <CardHeader className="bg-slate-50/50 border-b p-6">
+                <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
+                <CardDescription className="font-medium italic">Sincronización en vivo con la base de datos de la clínica</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {isLoadingCitas ? (
+                    <div className="flex flex-col items-center py-12 gap-3">
+                      <Loader2 className="animate-spin text-blue-900" />
+                      <p className="text-sm font-bold">Consultando agenda...</p>
+                    </div>
+                  ) : todayAppointments.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
+                      No se registran citas para el día de hoy.
+                    </div>
+                  ) : (
+                    todayAppointments.map((apt) => (
+                      <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 rounded-full bg-blue-50 text-blue-900">
+                            <Activity className="w-5 h-5"/>
+                          </div>
+                          <div>
+                            <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
+                            <div className="flex gap-3 items-center">
+                              <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
+                              </span>
+                              <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
+                                {apt.estado}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-6">
+                          {apt.practicante_id && (
+                            <div className="flex flex-col items-end">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                Responsable:
+                              </span>
+                              <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
+                                <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                              </span>
+                            </div>
+                          )}
 
-                <Button 
-                  onClick={() => handleOpenAssignModal(apt)}
-                  className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
-                    apt.practicante_id 
-                      ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                >
-                  <UserPlus className="w-4 h-4" />
-                  {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </CardContent>
-  </Card>
-</TabsContent>
+                          <Button 
+                            onClick={() => handleOpenAssignModal(apt)}
+                            className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
+                              apt.practicante_id 
+                                ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
+                                : "bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="practitioners">
             <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
@@ -395,12 +463,10 @@ export default function PhysiotherapyAdminDashboard() {
                 </div>
 
                 <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
-                  {/* 1. Busca tu DialogTrigger */}
                   <DialogTrigger asChild>
-  {/* 2. Verifica que el hijo sea un Button de Shadcn o un <button> estándar */}
-  <Button className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 h-12 rounded-xl">
-    <UserPlus className="w-4 h-4 mr-2" /> 
-    ASIGNAR PRACTICANTE
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 h-12 rounded-xl">
+                      <Send className="w-4 h-4 mr-2" /> 
+                      NUEVO AVISO
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
@@ -456,7 +522,7 @@ export default function PhysiotherapyAdminDashboard() {
         </Tabs>
       </main>
 
-      {/* --- PASO 3: MODAL DE ASIGNACIÓN (VENTANA EMERGENTE) --- */}
+      {/* MODAL DE ASIGNACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
           <DialogHeader>
@@ -500,7 +566,6 @@ export default function PhysiotherapyAdminDashboard() {
           </div>
 
           <DialogFooter>
-            {/* BOTÓN DINÁMICO: Solo se activa si hay un usuario seleccionado */}
             {selectedPractitioner && (
               <Button 
                 onClick={handleConfirmAssignment} 
@@ -514,6 +579,158 @@ export default function PhysiotherapyAdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ========================================== */}
+      {/* PANEL LATERAL DEL PERFIL (DRAWER)          */}
+      {/* ========================================== */}
+      
+      {/* Overlay Oscuro */}
+      <div 
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out ${isDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsDrawerOpen(false)}
+      ></div>
+
+      {/* Panel Lateral */}
+      <aside 
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col border-l border-blue-100 transition-transform duration-300 ease-in-out ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-blue-100 bg-blue-50/50">
+          <h2 className="text-lg font-black text-blue-950 flex items-center gap-2">
+            <User className="w-5 h-5 text-blue-600" /> Mi Perfil
+          </h2>
+          <button 
+            onClick={() => setIsDrawerOpen(false)}
+            className="text-slate-400 hover:text-blue-900 hover:bg-blue-100 p-2 rounded-full transition-colors focus:outline-none"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+          <div className="flex flex-col items-center mb-6">
+            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 border-4 border-white shadow-lg flex items-center justify-center mb-3">
+              <span className="text-3xl font-black text-blue-700">{inicialesAvatar.toUpperCase()}</span>
+            </div>
+            <h3 className="text-xl font-bold text-blue-950 text-center">{profileData.nombre}</h3>
+            <span className="bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mt-1">
+              Coordinador
+            </span>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</span>
+                {!isEditingProfile && (
+                  <button 
+                    onClick={handleEditProfileClick}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors focus:outline-none"
+                  >
+                    <Edit2 className="w-3 h-3" /> Editar Datos
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Nombre Completo</Label>
+                <div className="relative flex items-center">
+                  <User className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.nombre}
+                    onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Número Personal</Label>
+                <div className="relative flex items-center">
+                  <Phone className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.telefono}
+                    onChange={(e) => setProfileData({...profileData, telefono: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+
+              {(profileData.rol === 'practicante' || profileData.rol === 'paciente') && (
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Matrícula Institucional</Label>
+                  <div className="relative flex items-center">
+                    <FileText className="w-4 h-4 text-blue-400 absolute left-4" />
+                    <input 
+                      type="text" 
+                      value={profileData.matricula}
+                      onChange={(e) => setProfileData({...profileData, matricula: e.target.value})}
+                      disabled={!isEditingProfile}
+                      placeholder="Ej. UTC-12345"
+                      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Área Asignada</Label>
+                <div className="relative flex items-center">
+                  <Building className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input type="text" value="Fisioterapia Clínica" disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm text-slate-400 font-medium cursor-not-allowed" />
+                </div>
+              </div>
+
+              {isEditingProfile && (
+                <div className="flex gap-2 pt-2">
+                  <button onClick={handleCancelEditProfile} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveProfile} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors shadow-sm">
+                    Guardar Cambios
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!isEditingProfile && (
+              <div className="space-y-3 pt-6 border-t border-slate-100 mt-6">
+                <button onClick={handleLogout} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                </button>
+                <button onClick={() => setIsDeleteModalOpen(true)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-100">
+                  <Trash2 className="w-4 h-4" /> Eliminar Cuenta
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* MODAL ELIMINAR CUENTA */}
+      <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center transition-opacity duration-200 ${isDeleteModalOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`bg-white max-w-md w-full mx-4 rounded-3xl p-6 shadow-2xl transition-all duration-200 ${isDeleteModalOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-xl font-black text-center text-blue-950 mb-2">¿Deseas borrar tu cuenta?</h3>
+          <p className="text-sm text-slate-500 text-center mb-8">
+            Esta acción es permanente y no se puede deshacer. Se eliminarán todos tus datos, configuraciones y acceso al sistema clínico.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl transition-colors">
+              No, cancelar
+            </button>
+            <button onClick={handleConfirmDeleteAccount} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

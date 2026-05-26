@@ -3,6 +3,7 @@
  * ARCHIVO: MasterAdminDashboard.tsx - VERSIÓN MASTER CENTRALIZADA
  * PROPÓSITO: Gestión global de personal y difusión de comunicados segmentados.
  * MODIFICACIÓN: Inserción de columna ROL con diseño de bordes coloreados (Outline).
+ * NUEVO: Barra lateral (Drawer) del Perfil de Usuario con Edición y Matrícula.
  * ============================================================================
  */
 
@@ -34,8 +35,9 @@ import {
   Trash2, 
   UserCheck, 
   UserMinus, 
-  Shield, // Icono para identificar el Rol
-  Target
+  Shield, 
+  Target,
+  User, X, Edit2, Phone, Building, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,6 +68,23 @@ export default function ManageAdminPage() {
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
 
+  // ==========================================
+  // ESTADOS PARA LA BARRA LATERAL (PERFIL)
+  // ==========================================
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  const [profileData, setProfileData] = useState({
+    nombre: '',
+    telefono: '',
+    matricula: '',
+    email: '',
+    rol: '',
+    area: ''
+  });
+  const [backupProfile, setBackupProfile] = useState(profileData);
+
   // EFECTO DE CARGA INICIAL Y ACTUALIZACIÓN AUTOMÁTICA
   useEffect(() => {
     cargarPracticantes();
@@ -74,6 +93,20 @@ export default function ManageAdminPage() {
     }, 30000); 
     return () => clearInterval(interval);
   }, [user, areaFilter]);
+
+  // Inicializar datos del perfil cuando el usuario carga
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        nombre: user.nombre || 'Administrador Master',
+        telefono: user.telefono || '',
+        matricula: user.matricula || '',
+        email: user.email || '',
+        rol: user.rol || 'master',
+        area: user.area || ''
+      });
+    }
+  }, [user]);
 
   /**
    * CARGA DE DATOS DESDE LA API (POSTGRESQL)
@@ -199,11 +232,65 @@ export default function ManageAdminPage() {
     }
   };
 
+  // --- FUNCIONES DEL PERFIL ---
+  const handleEditProfileClick = () => {
+    setBackupProfile(profileData);
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setProfileData(backupProfile);
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id || !user?.email) {
+      toast.error("Error de sesión: No se pudo identificar al usuario.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'email': user.email 
+        },
+        body: JSON.stringify({
+          nombre: profileData.nombre,
+          telefono: profileData.telefono,
+          matricula: profileData.matricula
+        })
+      });
+
+      if (response.ok) {
+        setIsEditingProfile(false);
+        toast.success("Tu perfil se actualizó correctamente en el sistema.");
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "El servidor no pudo procesar la actualización.");
+      }
+    } catch (error) {
+      console.error("Error actualizando perfil:", error);
+      toast.error("Error de conexión con la base de datos.");
+    }
+  };
+
+  const handleConfirmDeleteAccount = () => {
+    toast.error("Función temporalmente deshabilitada.");
+    setIsDeleteModalOpen(false);
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
     toast.success('Sesión finalizada');
   };
+
+  // Generar iniciales para el Avatar
+  const partesNombre = profileData.nombre.trim().split(' ');
+  const inicialesAvatar = (partesNombre[0]?.[0] || '') + (partesNombre[1]?.[0] || '');
+  const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim() || 'Master';
 
   return (
     <div className="size-full min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
@@ -230,18 +317,21 @@ export default function ManageAdminPage() {
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-blue-900">{user?.nombre || user?.name || 'Administrador Master'}</p>
-                <p className="text-[10px] font-black uppercase tracking-wider text-orange-600">Gestión de Academias</p>
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={handleLogout} 
-                className="flex items-center gap-2 border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 transition-all shadow-sm"
+              {/* Perfil del Usuario Integrado (Botón que abre el Drawer) */}
+              <button 
+                onClick={() => setIsDrawerOpen(true)}
+                className="flex items-center gap-4 text-right hidden sm:flex hover:bg-slate-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="font-bold text-xs">Cerrar Sesión</span>
-              </Button>
+                <div>
+                  <p className="text-sm font-bold text-blue-900">{nombreCortoDisplay}</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-orange-600">Gestión de Academias</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
+                  <User className="h-5 w-5 text-blue-600" />
+                </div>
+              </button>
+
+              
             </div>
           </div>
         </header>
@@ -537,6 +627,158 @@ export default function ManageAdminPage() {
           </div>
         </footer>
       </div>
+
+      {/* ========================================== */}
+      {/* PANEL LATERAL DEL PERFIL (DRAWER)          */}
+      {/* ========================================== */}
+      
+      {/* Overlay Oscuro */}
+      <div 
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out ${isDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsDrawerOpen(false)}
+      ></div>
+
+      {/* Panel Lateral */}
+      <aside 
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col border-l border-blue-100 transition-transform duration-300 ease-in-out ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-blue-100 bg-blue-50/50">
+          <h2 className="text-lg font-black text-blue-950 flex items-center gap-2">
+            <User className="w-5 h-5 text-blue-600" /> Mi Perfil
+          </h2>
+          <button 
+            onClick={() => setIsDrawerOpen(false)}
+            className="text-slate-400 hover:text-blue-900 hover:bg-blue-100 p-2 rounded-full transition-colors focus:outline-none"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+          <div className="flex flex-col items-center mb-6">
+            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 border-4 border-white shadow-lg flex items-center justify-center mb-3">
+              <span className="text-3xl font-black text-blue-700">{inicialesAvatar.toUpperCase()}</span>
+            </div>
+            <h3 className="text-xl font-bold text-blue-950 text-center">{profileData.nombre}</h3>
+            <span className="bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mt-1">
+              Usuario Master
+            </span>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</span>
+                {!isEditingProfile && (
+                  <button 
+                    onClick={handleEditProfileClick}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors focus:outline-none"
+                  >
+                    <Edit2 className="w-3 h-3" /> Editar Datos
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Nombre Completo</Label>
+                <div className="relative flex items-center">
+                  <User className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.nombre}
+                    onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Número Personal</Label>
+                <div className="relative flex items-center">
+                  <Phone className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.telefono}
+                    onChange={(e) => setProfileData({...profileData, telefono: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+
+              {(profileData.rol === 'practicante' || profileData.rol === 'paciente') && (
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Matrícula Institucional</Label>
+                  <div className="relative flex items-center">
+                    <FileText className="w-4 h-4 text-blue-400 absolute left-4" />
+                    <input 
+                      type="text" 
+                      value={profileData.matricula}
+                      onChange={(e) => setProfileData({...profileData, matricula: e.target.value})}
+                      disabled={!isEditingProfile}
+                      placeholder="Ej. UTC-12345"
+                      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Área Asignada</Label>
+                <div className="relative flex items-center">
+                  <Building className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input type="text" value="Control Global" disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm text-slate-400 font-medium cursor-not-allowed" />
+                </div>
+              </div>
+
+              {isEditingProfile && (
+                <div className="flex gap-2 pt-2">
+                  <button onClick={handleCancelEditProfile} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveProfile} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors shadow-sm">
+                    Guardar Cambios
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!isEditingProfile && (
+              <div className="space-y-3 pt-6 border-t border-slate-100 mt-6">
+                <button onClick={handleLogout} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                </button>
+                <button onClick={() => setIsDeleteModalOpen(true)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-100">
+                  <Trash2 className="w-4 h-4" /> Eliminar Cuenta
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* MODAL ELIMINAR CUENTA */}
+      <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center transition-opacity duration-200 ${isDeleteModalOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`bg-white max-w-md w-full mx-4 rounded-3xl p-6 shadow-2xl transition-all duration-200 ${isDeleteModalOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-xl font-black text-center text-blue-950 mb-2">¿Deseas borrar tu cuenta?</h3>
+          <p className="text-sm text-slate-500 text-center mb-8">
+            Esta acción es permanente y no se puede deshacer. Se eliminarán todos tus datos, configuraciones y acceso al sistema clínico.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl transition-colors">
+              No, cancelar
+            </button>
+            <button onClick={handleConfirmDeleteAccount} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
