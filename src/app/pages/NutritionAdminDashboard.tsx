@@ -20,7 +20,8 @@ import {
 } from "../components/ui/dialog";
 import { 
   LogOut, Users, FileText, Calendar, Clock, Utensils, BarChart3, 
-  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck 
+  Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
+  X, User, Phone, Building, Trash2, AlertTriangle, Edit2 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -41,7 +42,7 @@ interface Appointment {
   fecha: string;
   hora: string;
   estado: string;
-  practicante_id?: number | null; // Agregado para el flujo de asignación
+  practicante_id?: number | null;
   practicante_nombre?: string | null;
 }
 
@@ -55,13 +56,13 @@ export default function NutritionAdminDashboard() {
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
 
   // --- NUEVOS ESTADOS PARA EL MODAL DE ASIGNACIÓN (NUTRICIÓN) ---
-  const [isModalOpen, setIsModalOpen] = useState(false); // Control de ventana emergente
-  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null); // Alumno seleccionado
-  const [practicantesArea, setPracticantesArea] = useState<any[]>([]); // Lista filtrada de Nutrición
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null);
+  const [practicantesArea, setPracticantesArea] = useState<any[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
-  // ESTADOS PARA COMUNICADOS (VINCULADOS EN VIVO)
+  // ESTADOS PARA COMUNICADOS
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -70,6 +71,25 @@ export default function NutritionAdminDashboard() {
     contenido: '',
     emailDestinatario: 'ninguno'
   });
+
+  // ==========================================
+  // ESTADOS PARA LA BARRA LATERAL (PERFIL)
+  // ==========================================
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  // Estado inicial dinámico: Unificado bajo 'nombre'
+  const [profileData, setProfileData] = useState({
+    nombre: user?.nombre || 'David Alejandro Velázquez Gutiérrez',
+    telefono: user?.telefono || '+52 55 1234 5678'
+  });
+  const [backupProfile, setBackupProfile] = useState(profileData);
+
+  // Extracción dinámica para el Header y el Avatar basada en la variable única 'nombre'
+  const partesNombre = profileData.nombre.trim().split(' ');
+  const inicialesAvatar = (partesNombre[0]?.[0] || '') + (partesNombre[1]?.[0] || '');
+  const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim();
 
   /**
    * EFECTO INICIAL: Carga de Citas y Personal
@@ -104,7 +124,6 @@ export default function NutritionAdminDashboard() {
         const response = await fetch('http://localhost:3001/api/usuarios');
         if (response.ok) {
           const data = await response.json();
-          // Filtrado estricto por rol 'practicante' y área 'nutricion'
           const lista = data.filter((u: any) => 
             u.rol === 'practicante' && 
             u.area?.toLowerCase() === 'nutricion' &&
@@ -126,10 +145,19 @@ export default function NutritionAdminDashboard() {
     fetchTodayAppointments();
     cargarPracticantesEnVivo();
 
-    // Sincronización cada 30 segundos
     const interval = setInterval(cargarPracticantesEnVivo, 30000);
     return () => clearInterval(interval);
   }, [user, authLoading, navigate, refreshKey]);
+
+  // Sincronizar datos del perfil si el objeto 'user' se actualiza desde el contexto
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        nombre: user.nombre || profileData.nombre,
+        telefono: user.telefono || profileData.telefono
+      });
+    }
+  }, [user]);
 
   // --- FUNCIONES DE ASIGNACIÓN ---
   const handleOpenAssignModal = (appointment: Appointment) => {
@@ -154,10 +182,10 @@ export default function NutritionAdminDashboard() {
 
       if (response.ok) {
         toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
-        setIsModalOpen(false); // Cierre automático del modal
+        setIsModalOpen(false);
         setSelectedPractitioner(null);
         setSelectedAppointment(null);
-        setRefreshKey(prev => prev + 1); // Refrescar la lista de citas
+        setRefreshKey(prev => prev + 1);
       } else {
         toast.error("El servidor no pudo procesar la asignación.");
       }
@@ -168,9 +196,6 @@ export default function NutritionAdminDashboard() {
     }
   };
 
-  /**
-   * FUNCIÓN: handlePublicarNotaAdmin
-   */
   const handlePublicarNotaAdmin = async () => {
     if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
       toast.error("Por favor, complete todos los campos requeridos.");
@@ -207,9 +232,63 @@ export default function NutritionAdminDashboard() {
     }
   };
 
+  // --- FUNCIONES DEL PERFIL ---
+  const handleEditProfileClick = () => {
+    setBackupProfile(profileData);
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setProfileData(backupProfile);
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id || !user?.email) {
+      toast.error("Error de sesión: No se pudo identificar al usuario.");
+      return;
+    }
+
+    try {
+      // Petición real al backend en index.js
+      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'email': user.email // <-- El guardia de seguridad requiere esto
+        },
+        body: JSON.stringify({
+          nombre: profileData.nombre,
+          telefono: profileData.telefono
+        })
+      });
+
+      if (response.ok) {
+        setIsEditingProfile(false);
+        toast.success("Tu perfil se actualizó correctamente en el sistema.");
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "El servidor no pudo procesar la actualización.");
+      }
+    } catch (error) {
+      console.error("Error actualizando perfil:", error);
+      toast.error("Error de conexión con la base de datos.");
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleConfirmDeleteAccount = () => {
+    setIsDeleteModalOpen(false);
+    setIsDrawerOpen(false);
+    toast.error("Cuenta eliminada (Simulación). Redirigiendo...");
+    setTimeout(() => {
+      logout();
+      navigate('/login');
+    }, 1500);
   };
 
   const handleGoToManagePractitioners = () => {
@@ -225,8 +304,10 @@ export default function NutritionAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100" style={arialStyle}>
-      <header className="bg-white border-b border-orange-900/10 shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 overflow-x-hidden" style={arialStyle}>
+      
+      {/* HEADER SUPERIOR */}
+      <header className="bg-white border-b border-orange-900/10 shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -238,20 +319,26 @@ export default function NutritionAdminDashboard() {
                 <p className="text-sm text-orange-900/60 font-medium">Panel de Coordinación Académica</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-orange-900">{(user as any)?.nombre || user?.name}</p>
-                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Docente Titular</p>
+            
+            {/* Perfil del Usuario Integrado (Botón que abre el Drawer) */}
+            <button 
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex items-center gap-4 text-right hidden sm:flex hover:bg-orange-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <div>
+                <p className="text-sm font-bold text-orange-900">{nombreCortoDisplay}</p>
+                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Coordinador</p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleLogout} className="border-red-100 text-red-600 hover:bg-red-50">
-                <LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión
-              </Button>
-            </div>
+              <div className="h-10 w-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center overflow-hidden">
+                <User className="h-5 w-5 text-orange-600" />
+              </div>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
@@ -297,33 +384,28 @@ export default function NutritionAdminDashboard() {
                           </div>
                         </div>
                         
-                        {/* NUEVO BOTÓN DE ASIGNACIÓN ADAPTADO A NUTRICIÓN */}
-                       <div className="flex items-center gap-4">
-  {/* 1. Si ya hay un practicante, mostramos quién es */}
-  {apt.practicante_id && (
-    <div className="flex flex-col items-end mr-2">
-      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-        Responsable Actual:
-      </span>
-      <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
-        <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-      </span>
-    </div>
-  )}
+                        <div className="flex items-center gap-4">
+                          {apt.practicante_id && (
+                            <div className="flex flex-col items-end mr-2">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
+                              <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
+                                <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                              </span>
+                            </div>
+                          )}
 
-  {/* 2. El botón ahora es dinámico: cambia de texto y estilo si es re-asignación */}
-  <Button 
-    size="sm" 
-    variant={apt.practicante_id ? "outline" : "default"}
-    className={apt.practicante_id 
-      ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm" 
-      : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
-    onClick={() => handleOpenAssignModal(apt)}
-  >
-    <UserPlus className="w-4 h-4" />
-    {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-  </Button>
-</div>
+                          <Button 
+                            size="sm" 
+                            variant={apt.practicante_id ? "outline" : "default"}
+                            className={apt.practicante_id 
+                              ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm" 
+                              : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+                            onClick={() => handleOpenAssignModal(apt)}
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                          </Button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -430,7 +512,7 @@ export default function NutritionAdminDashboard() {
         </Tabs>
       </main>
 
-      {/* --- PASO 3: MODAL DE ASIGNACIÓN (VENTANA EMERGENTE NARANJA) --- */}
+      {/* MODAL DE ASIGNACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
           <DialogHeader>
@@ -487,6 +569,151 @@ export default function NutritionAdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ========================================== */}
+      {/* PANEL LATERAL DEL PERFIL (DRAWER)          */}
+      {/* ========================================== */}
+      
+      {/* Overlay Oscuro */}
+      <div 
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out ${isDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsDrawerOpen(false)}
+      ></div>
+
+      {/* Panel Lateral */}
+      <aside 
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200 transition-transform duration-300 ease-in-out ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        {/* Header Drawer */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+          <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+            <User className="w-5 h-5 text-orange-600" /> Mi Perfil
+          </h2>
+          <button 
+            onClick={() => setIsDrawerOpen(false)}
+            className="text-gray-400 hover:text-gray-900 hover:bg-gray-200 p-2 rounded-full transition-colors focus:outline-none"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Contenido Drawer */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+          {/* Avatar Grande */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 border-4 border-white shadow-lg flex items-center justify-center mb-3">
+              <span className="text-3xl font-black text-orange-600">{inicialesAvatar.toUpperCase()}</span>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 text-center">{profileData.nombre}</h3>
+            <span className="bg-orange-100 text-orange-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mt-1">
+              Coordinador
+            </span>
+          </div>
+
+          {/* Sección de Campos */}
+          <div className="flex-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Información Personal</span>
+                {!isEditingProfile && (
+                  <button 
+                    onClick={handleEditProfileClick}
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 transition-colors focus:outline-none"
+                  >
+                    <Edit2 className="w-3 h-3" /> Editar Datos
+                  </button>
+                )}
+              </div>
+
+              {/* Input Único: Nombre */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo</Label>
+                <div className="relative flex items-center">
+                  <User className="w-4 h-4 text-gray-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.nombre}
+                    onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-orange-300 ring-2 ring-orange-500 border' : 'bg-gray-50 border border-gray-200 text-gray-800 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+
+              {/* Input: Teléfono */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Número Personal</Label>
+                <div className="relative flex items-center">
+                  <Phone className="w-4 h-4 text-gray-400 absolute left-4" />
+                  <input 
+                    type="text" 
+                    value={profileData.telefono}
+                    onChange={(e) => setProfileData({...profileData, telefono: e.target.value})}
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-orange-300 ring-2 ring-orange-500 border' : 'bg-gray-50 border border-gray-200 text-gray-800 disabled:cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Área Asignada</Label>
+                <div className="relative flex items-center">
+                  <Building className="w-4 h-4 text-gray-400 absolute left-4" />
+                  <input type="text" value="Nutrición Clínica" disabled className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm text-gray-400 font-medium cursor-not-allowed" />
+                </div>
+              </div>
+
+              {/* Botones de Edición */}
+              {isEditingProfile && (
+                <div className="flex gap-2 pt-2">
+                  <button onClick={handleCancelEditProfile} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveProfile} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors shadow-sm">
+                    Guardar Cambios
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Acciones de Sesión (Se ocultan al editar) */}
+            {!isEditingProfile && (
+              <div className="space-y-3 pt-6 border-t border-gray-100 mt-6">
+                <button onClick={handleLogout} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                </button>
+                <button onClick={() => setIsDeleteModalOpen(true)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-100">
+                  <Trash2 className="w-4 h-4" /> Eliminar Cuenta
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* ========================================== */}
+      {/* MODAL CONFIRMAR ELIMINACIÓN DE CUENTA      */}
+      {/* ========================================== */}
+      <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center transition-opacity duration-200 ${isDeleteModalOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`bg-white max-w-md w-full mx-4 rounded-3xl p-6 shadow-2xl transition-all duration-200 ${isDeleteModalOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-xl font-black text-center text-gray-900 mb-2">¿Deseas borrar tu cuenta?</h3>
+          <p className="text-sm text-gray-500 text-center mb-8">
+            Esta acción es permanente y no se puede deshacer. Se eliminarán todos tus datos, configuraciones y acceso al sistema clínico.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl transition-colors">
+              No, cancelar
+            </button>
+            <button onClick={handleConfirmDeleteAccount} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

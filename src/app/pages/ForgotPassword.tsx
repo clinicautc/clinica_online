@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Check, Mail, Lock, KeyRound } from 'lucide-react';
+import { Check,Mail,Lock,KeyRound,Eye,EyeOff} from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
+import { authAPI } from '../lib/api';
 
 type Step = 'email' | 'code' | 'password' | 'success';
 
@@ -16,11 +17,26 @@ export default function ForgotPassword() {
   const [verificationCode, setVerificationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);const [ showConfirmPassword,setShowConfirmPassword] = useState(false);
 
   const [emailError, setEmailError] = useState('');
   const [codeError, setCodeError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const passwordValidation = {
+  minLength: newPassword.length >= 8,
+  uppercase: /[A-Z]/.test(newPassword),
+  lowercase: /[a-z]/.test(newPassword),
+  number: /[0-9]/.test(newPassword),
+  special: /[^A-Za-z0-9]/.test(newPassword),
+};
+
+const isPasswordValid =
+  Object.values(passwordValidation)
+    .every(Boolean);
+
+const passwordsMatch =
+  newPassword === confirmPassword;
 
   const validateEmail = (value: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -71,6 +87,7 @@ export default function ForgotPassword() {
             {currentStep === 'password' && 'Crea una nueva contraseña segura.'}
           </p>
 
+
           <div className="flex items-center gap-4">
 
             <div className="flex flex-col items-center">
@@ -114,8 +131,66 @@ export default function ForgotPassword() {
           </div>
         </div>
       </div>
+      {
+  currentStep === 'password' && (
+    <div className="
+      hidden
+      xl:flex
+      flex-col
+      justify-center
+      px-10
+      text-sm
+      space-y-3
+      min-w-[260px]
+    ">
+      <h3 className="text-blue-900 font-bold ">Contraseña segura</h3>
+
+      <p className={
+        passwordValidation.minLength
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Mínimo 8 caracteres
+      </p>
+
+      <p className={
+        passwordValidation.uppercase
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Una letra mayúscula
+      </p>
+
+      <p className={
+        passwordValidation.lowercase
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Una letra minúscula
+      </p>
+
+      <p className={
+        passwordValidation.number
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Un número
+      </p>
+
+      <p className={
+        passwordValidation.special
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Un carácter especial
+      </p>
+
+    </div>
+  )
+}
 
       {/* DERECHA */}
+
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 lg:p-10">
         <div className="w-full max-w-sm sm:max-w-md bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
 
@@ -130,18 +205,9 @@ export default function ForgotPassword() {
                 if (err) return;
 
                 try {
-                  const response = await fetch('http://localhost:3001/api/usuarios/forgot-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                  });
+          await authAPI.forgotPassword(email);
 
-                  if (response.ok) {
-                    setCurrentStep('code');
-                  } else {
-                    const data = await response.json();
-                    setEmailError(data.error);
-                  }
+          setCurrentStep('code');
 
                 } catch {
                   setEmailError('Error de conexión');
@@ -184,21 +250,12 @@ export default function ForgotPassword() {
                 }
 
                 try {
-                  const response = await fetch('http://localhost:3001/api/usuarios/verify-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      email,
-                      code: verificationCode
-                    })
+                await authAPI.verifyResetCode({
+                  email,
+                  code: verificationCode
                   });
 
-                  if (response.ok) {
-                    setCurrentStep('password');
-                  } else {
-                    const data = await response.json();
-                    setCodeError(data.error);
-                  }
+setCurrentStep('password');
 
                 } catch {
                   setCodeError('Error de conexión');
@@ -255,20 +312,12 @@ export default function ForgotPassword() {
                 if (pErr || cErr) return;
 
                 try {
-                  const response = await fetch('http://localhost:3001/api/usuarios/reset-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      email,
-                      newPassword
-                    })
-                  });
+              await authAPI.resetPassword({
+                email,
+                newPassword
+               });
 
-                  if (response.ok) {
-                    setCurrentStep('success');
-                  } else {
-                    setPasswordError('Error al actualizar contraseña');
-                  }
+setCurrentStep('success');
 
                 } catch {
                   setPasswordError('Error de conexión');
@@ -276,35 +325,127 @@ export default function ForgotPassword() {
               }}
               className="space-y-4"
             >
-              <Label>Nueva contraseña</Label>
+<Label>Nueva contraseña</Label>
 
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => {
-                  setNewPassword(e.target.value);
-                  setPasswordError('');
-                }}
-              />
+<div className="relative">
 
-              {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+  <Input
+    type={
+      showPassword
+        ? 'text'
+        : 'password'
+    }
+    value={newPassword}
+    onChange={(e) => {
+      setNewPassword(e.target.value);
+      setPasswordError('');
+    }}
+    className="pr-10"
+  />
 
-              <Label>Confirmar contraseña</Label>
+  <button
+    type="button"
+    onClick={() =>
+      setShowPassword(!showPassword)
+    }
+    className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-slate-400
+      hover:text-blue-900
+    "
+  >
+    {
+      showPassword
+        ? (
+          <EyeOff className="w-4 h-4" />
+        )
+        : (
+          <Eye className="w-4 h-4" />
+        )
+    }
+  </button>
 
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  setConfirmPasswordError('');
-                }}
-              />
+</div>
 
-              {confirmPasswordError && (
-                <p className="text-red-500 text-sm">{confirmPasswordError}</p>
-              )}
+{
+  passwordError && (
+    <p className="text-red-500 text-sm">
+      {passwordError}
+    </p>
+  )
+}
 
-              <Button className="w-full cursor-pointer bg-orange-500 hover:bg-orange-600">
+<Label>
+  Confirmar contraseña
+</Label>
+
+<div className="relative">
+
+  <Input
+    type={
+      showConfirmPassword
+        ? 'text'
+        : 'password'
+    }
+    value={confirmPassword}
+    onChange={(e) => {
+      setConfirmPassword(e.target.value);
+      setConfirmPasswordError('');
+    }}
+    className="pr-10"
+  />
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowConfirmPassword(
+        !showConfirmPassword
+      )
+    }
+    className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-slate-400
+      hover:text-blue-900
+    "
+  >
+    {
+      showConfirmPassword
+        ? (
+          <EyeOff className="w-4 h-4" />
+        )
+        : (
+          <Eye className="w-4 h-4" />
+        )
+    }
+  </button>
+
+</div>
+
+{
+  confirmPassword &&
+  !passwordsMatch && (
+    <p className="text-red-500 text-sm">
+      Las contraseñas no coinciden
+    </p>
+  )
+}
+
+              <Button disabled={!isPasswordValid ||!passwordsMatch}
+  className={`w-full
+    ${
+      isPasswordValid &&
+      passwordsMatch
+        ? 'bg-orange-500 hover:bg-orange-600 cursor-pointer'
+        : 'bg-gray-400 cursor-not-allowed'
+    }
+  `}
+>
                 Guardar contraseña
               </Button>
             </form>

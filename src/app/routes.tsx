@@ -29,7 +29,7 @@ import StatisticsPage from './pages/StatisticsPage';
 import ManagePractitionersPage from './pages/ManagePractitionersPage';
 
 // --- NUEVA IMPORTACIÓN: VISOR DE HISTORIALES ---
-import MedicalHistoryViewer from './components/MedicalHistoryViewer';
+import MedicalHistoryViewer from './components/MedicalHistoryViewer'; 
 
 /**
  * COMPONENTE: ProtectedRoute
@@ -82,7 +82,6 @@ function DashboardRouter() {
   console.log("🕵️ Sherlock verificando acceso:", { currentRole, currentArea });
 
   switch (currentRole) {
-    // --- 2. AGREGAMOS EL CASO MASTER AL SWITCH ---
     case 'master':
       return <MasterAdminDashboard />;
 
@@ -126,9 +125,9 @@ export const router = createBrowserRouter([
     element: <Login />
   },
   {
-  path: '/forgot-password',
-  element: <ForgotPassword />
-},
+    path: '/forgot-password',
+    element: <ForgotPassword />
+  },
   {
     path: '/register',
     element: <Register />
@@ -146,7 +145,7 @@ export const router = createBrowserRouter([
    * RUTAS DE FORMULARIOS (Sincronizadas con la DB)
    */
   {
-    path: '/forms/nutricion/:appointmentId', // <--- Esta es la "dirección" real
+    path: '/forms/nutricion/:appointmentId', 
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <NutritionMasterForm />
@@ -163,17 +162,30 @@ export const router = createBrowserRouter([
   },
 
   /**
-   * RUTA: VISOR DE HISTORIAL CLÍNICO
-   * Esta ruta permite cargar la base de datos de un paciente específico.
+   * RUTA: VISOR DE HISTORIAL CLÍNICO (Sincronizada con Dashboards)
+   * Esta ruta permite cargar el historial por paciente e identificar el área.
    */
-  {
-    path: '/medical-history-viewer/:patientId',
-    element: (
-      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <MedicalHistoryViewer />
-      </ProtectedRoute>
-    )
-  },
+  /**
+ * RUTA: VISOR DE HISTORIAL CLÍNICO (Sincronizada con Dashboards)
+ * Esta es la pieza que falta para que el Login no te expulse.
+ */
+{
+  path: '/historial/:id/:area', // <--- Asegúrate de que coincida con el navigate del dashboard
+  element: (
+    <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+      <MedicalHistoryViewer />
+    </ProtectedRoute>
+  )
+},
+// Mantén esta también por si algún componente usa el nombre largo
+{
+  path: '/medical-history-viewer/:patientId',
+  element: (
+    <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+      <MedicalHistoryViewer />
+    </ProtectedRoute>
+  )
+},
 
   /**
    * RUTAS ADMINISTRATIVAS

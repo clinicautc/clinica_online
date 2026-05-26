@@ -95,18 +95,18 @@ export default function AppointmentForm({ patientId }: AppointmentFormProps) {
        * tipo: Nombre real en la tabla citas.
        * estado: Nombre real en la tabla citas.
        */
-      const response = await fetch('http://localhost:3001/api/citas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paciente_id: parseInt(patientId),
-          paciente_nombre: patientName,
-          tipo: type,
-          fecha: dateStr,
-          hora: time,
-          estado: 'programada'
-        })
-      });
+const response = await fetch('http://localhost:3001/api/citas',{
+    method: 'POST',
+    headers: {'Content-Type': 'application/json',
+      email: user?.email || ''},
+      body: JSON.stringify({
+      paciente_id: Number(patientId),
+      paciente_nombre: patientName,
+      tipo: type,
+      fecha: dateStr,
+      hora: time,
+      estado: 'programada' }) 
+    });
 
       const result = await response.json();
 

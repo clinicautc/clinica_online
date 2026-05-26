@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+//AppointmentManager.tsx
+import { useState, useEffect } from 'react';
 // UI: Componentes de tabla y tarjetas de Shadcn
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';

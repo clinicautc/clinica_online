@@ -1,7 +1,8 @@
 /**
  * ============================================================================
- * ARCHIVO: ManageAdminPage.tsx - VERSIÓN MASTER CENTRALIZADA
+ * ARCHIVO: MasterAdminDashboard.tsx - VERSIÓN MASTER CENTRALIZADA
  * PROPÓSITO: Gestión global de personal y difusión de comunicados segmentados.
+ * MODIFICACIÓN: Inserción de columna ROL con diseño de bordes coloreados (Outline).
  * ============================================================================
  */
 
@@ -33,7 +34,7 @@ import {
   Trash2, 
   UserCheck, 
   UserMinus, 
-  Mail,
+  Shield, // Icono para identificar el Rol
   Target
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -60,7 +61,7 @@ export default function ManageAdminPage() {
     titulo: '',
     contenido: '',
     destino: 'todos' as 'nutricion' | 'fisioterapia' | 'todos',
-    emailDestinatario: 'ninguno' // CORRECCIÓN: Se inicializa con "ninguno" para evitar error de Radix UI
+    emailDestinatario: 'ninguno' 
   });
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
@@ -92,7 +93,7 @@ export default function ManageAdminPage() {
             area: p.area ? p.area.toLowerCase() : 'fisioterapia',
             status: p.estado || p.status || 'activo', 
             dateAdded: p.fecha_creacion || new Date().toISOString(),
-            rol: p.rol // Se mantiene el rol para el filtro del select de notas
+            rol: p.rol // Sincronizado con la base de datos para mostrar el cargo
           }));
         
         setPracticantes(listaMapeada);
@@ -134,7 +135,7 @@ export default function ManageAdminPage() {
     try {
       const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify({ estado: nuevoEstado })
       });
       
@@ -152,7 +153,7 @@ export default function ManageAdminPage() {
   const handleEliminarPracticante = async (id: string) => {
     if (!window.confirm('¿Deseas eliminar permanentemente este registro de la base de datos?')) return;
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, { method: 'DELETE' });
+      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`,{method: 'DELETE',headers: {email: user?.email || ''}});
       if (response.ok) { 
         toast.success('Registro eliminado correctamente'); 
         cargarPracticantes(); 
@@ -311,7 +312,9 @@ export default function ManageAdminPage() {
                     <TableHeader className="bg-white sticky top-0 z-20 border-b">
                       <TableRow>
                         <TableHead className="pl-8 py-4 text-blue-900 font-black uppercase text-[11px] tracking-widest">Información del Docente</TableHead>
-                        <TableHead className="text-blue-900 font-black uppercase text-[11px] tracking-widest">Especialidad</TableHead>
+                        {/* NUEVA CABECERA ROL */}
+                        <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest px-4">Rol</TableHead>
+                        <TableHead className="text-blue-900 font-black uppercase text-[11px] tracking-widest text-center">Especialidad</TableHead>
                         <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest">Estado</TableHead>
                         <TableHead className="text-right pr-8 text-blue-900 font-black uppercase text-[11px] tracking-widest">Acciones</TableHead>
                       </TableRow>
@@ -330,7 +333,25 @@ export default function ManageAdminPage() {
                               <span className="text-xs text-gray-400 font-medium italic">{p.email}</span>
                             </div>
                           </TableCell>
-                          <TableCell>
+
+                          {/* COLUMNA ROL: DISEÑO DE BORDES COLOREADOS SIN FONDO (OUTLINE) */}
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Badge 
+                                variant="outline" 
+                                className={`bg-transparent px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-1.5 border-2 ${
+                                  p.rol === 'admin' 
+                                    ? "text-purple-700 border-purple-500/40" 
+                                    : "text-blue-500 border-blue-400/40"
+                                }`}
+                              >
+                                <Shield className="w-3 h-3" />
+                                {p.rol === 'admin' ? 'Docente Titular' : 'Practicante'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-center">
                             <Badge 
                               variant="outline" 
                               className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter shadow-sm ${

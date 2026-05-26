@@ -1,15 +1,9 @@
 /**
  * ============================================================================
  * ARCHIVO: StatisticsPage.tsx - VERSIÓN ANALÍTICA MASTER (DYNAMICO)
- * PROPÓSITO: Análisis avanzado de rendimiento clínico con alternancia de gráficos.
+ * PROPÓSITO: Análisis avanzado de rendimiento clínico con métricas de re-agendado.
  * UBICACIÓN: src/app/pages/StatisticsPage.tsx
  * ============================================================================
- *
- * FUNCIONALIDADES ADICIONALES:
- * - Alternancia entre gráfico de "Montaña Rusa" (AreaChart) y Barras.
- * - Análisis de Eficiencia de Asistencia (Citas completadas vs Totales).
- * - Mapa de Saturación Horaria (Horarios pico de la clínica).
- * - Seguimiento de Pacientes Únicos.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,11 +15,6 @@ import { Badge } from '../components/ui/badge';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -33,20 +22,24 @@ import {
   Legend,
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import { 
   ArrowLeft, 
   TrendingUp, 
   TrendingDown, 
-  Calendar, 
   Activity, 
   Utensils, 
   Users, 
   Clock, 
   CheckCircle2, 
   LayoutGrid, 
-  Mountain 
+  Mountain,
+  XCircle,
+  CalendarClock
 } from 'lucide-react';
 import { Appointment } from '../lib/mockData';
 import { format, parseISO, eachDayOfInterval, subDays } from 'date-fns';
@@ -61,7 +54,7 @@ export default function StatisticsPage() {
   const [citas, setCitas] = useState<Appointment[]>([]);
   const [chartType, setChartType] = useState<'mountain' | 'bars'>('mountain');
 
-  // ESTADO PARA ESTADÍSTICAS EXTENDIDAS
+  // ESTADO PARA ESTADÍSTICAS EXTENDIDAS (Sincronizado con index.js)
   const [estadisticas, setEstadisticas] = useState({
     totalCitas: 0,
     citasHoy: 0,
@@ -70,7 +63,9 @@ export default function StatisticsPage() {
     citasNutricion: 0,
     promedioDiario: 0,
     tasaAsistencia: 0,
-    pacientesUnicos: 0
+    pacientesUnicos: 0,
+    totalCanceladas: 0,      // Nuevo: Coherencia con borrado lógico
+    totalReagendadas: 0      // Nuevo: Coherencia con logs de sistema
   });
 
   /**
@@ -79,24 +74,26 @@ export default function StatisticsPage() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/citas');
-        let data: Appointment[] = [];
+        // Consultamos citas y logs simultáneamente para coherencia de re-agendados
+        const [resCitas, resLogs] = await Promise.all([
+          fetch('http://localhost:3001/api/citas'),
+          fetch('http://localhost:3001/api/logs')
+        ]);
         
-        if (response.ok) {
-          data = await response.json();
-        } else {
-          const stored = localStorage.getItem('utc_appointments');
-          data = stored ? JSON.parse(stored) : [];
-        }
+        let dataCitas: Appointment[] = [];
+        let dataLogs: any[] = [];
         
-        setCitas(data);
-        calcularEstadisticasExtendido(data);
+        if (resCitas.ok) dataCitas = await resCitas.json();
+        if (resLogs.ok) dataLogs = await resLogs.json();
+        
+        setCitas(dataCitas);
+        calcularEstadisticasExtendido(dataCitas, dataLogs);
       } catch (error) {
         console.error("Error al cargar datos:", error);
         const stored = localStorage.getItem('utc_appointments');
         const data = stored ? JSON.parse(stored) : [];
         setCitas(data);
-        calcularEstadisticasExtendido(data);
+        calcularEstadisticasExtendido(data, []);
       }
     };
     cargarDatos();
@@ -104,35 +101,42 @@ export default function StatisticsPage() {
 
   /**
    * FUNCIÓN: calcularEstadisticasExtendido
-   * Mantiene las funciones base y agrega cálculos de eficiencia
+   * Sincronizada con los estados 'cancelada' y logs de re-agendado
    */
-  const calcularEstadisticasExtendido = (todasLasCitas: Appointment[]) => {
+  const calcularEstadisticasExtendido = (todasLasCitas: Appointment[], logs: any[]) => {
     const hoy = new Date();
     const hoyStr = format(hoy, 'yyyy-MM-dd');
     const inicioDeSemana = subDays(hoy, 7);
 
-    const citasDeHoy = todasLasCitas.filter(cita =>
-      format(parseISO(cita.date), 'yyyy-MM-dd') === hoyStr
+    // Solo contamos como activas para métricas de hoy/semana las que NO están canceladas
+    const activas = todasLasCitas.filter(c => c.status !== 'cancelada');
+
+    const citasDeHoy = activas.filter(cita =>
+      format(parseISO(cita.date || (cita as any).fecha), 'yyyy-MM-dd') === hoyStr
     );
 
-    const fisio = todasLasCitas.filter(c => c.type === 'fisioterapia').length;
-    const nutri = todasLasCitas.filter(c => c.type === 'nutricion').length;
-    const completadas = todasLasCitas.filter(c => c.status === 'completada').length;
+    const fisio = activas.filter(c => c.type === 'fisioterapia').length;
+    const nutri = activas.filter(c => c.type === 'nutricion').length;
+    const completadas = activas.filter(c => c.status === 'completada').length;
+    const canceladas = todasLasCitas.filter(c => c.status === 'cancelada').length;
     
-    // Métrica de Tesis: Pacientes atendidos sin duplicados
-    const unicos = new Set(todasLasCitas.map(c => c.paciente_id || c.paciente_nombre)).size;
+    // Conteo desde logs para re-agendados
+    const reagendadas = logs.filter(l => l.tipo === 'cita_reagendada').length;
 
-    const promedio = todasLasCitas.length / 30;
+    const unicos = new Set(todasLasCitas.map(c => c.paciente_id || (c as any).paciente_nombre)).size;
+    const promedio = activas.length / 30;
 
     setEstadisticas({
       totalCitas: todasLasCitas.length,
       citasHoy: citasDeHoy.length,
-      citasEstaSemana: todasLasCitas.filter(c => parseISO(c.date) >= inicioDeSemana).length,
+      citasEstaSemana: activas.filter(c => parseISO(c.date || (c as any).fecha) >= inicioDeSemana).length,
       citasFisioterapia: fisio,
       citasNutricion: nutri,
       promedioDiario: Math.round(promedio * 10) / 10,
-      tasaAsistencia: todasLasCitas.length > 0 ? Math.round((completadas / todasLasCitas.length) * 100) : 0,
-      pacientesUnicos: unicos
+      tasaAsistencia: activas.length > 0 ? Math.round((completadas / activas.length) * 100) : 0,
+      pacientesUnicos: unicos,
+      totalCanceladas: canceladas,
+      totalReagendadas: reagendadas
     });
   };
 
@@ -144,11 +148,10 @@ export default function StatisticsPage() {
     const dias = eachDayOfInterval({ start: subDays(hoy, 14), end: hoy });
     return dias.map(dia => ({
       fecha: format(dia, 'dd MMM', { locale: es }),
-      cantidad: citas.filter(c => c.date === format(dia, 'yyyy-MM-dd')).length
+      cantidad: citas.filter(c => (c.date || (c as any).fecha) === format(dia, 'yyyy-MM-dd') && c.status !== 'cancelada').length
     }));
   };
 
-  // NUEVO: Generador de datos para horarios pico
   const obtenerDatosHorarios = () => {
     const franjas = [
       { h: '08', label: '8-10 AM' }, { h: '10', label: '10-12 PM' },
@@ -157,7 +160,7 @@ export default function StatisticsPage() {
     ];
     return franjas.map(f => ({
       rango: f.label,
-      citas: citas.filter(c => c.time && c.time.startsWith(f.h)).length
+      citas: citas.filter(c => c.time && c.time.startsWith(f.h) && c.status !== 'cancelada').length
     }));
   };
 
@@ -195,7 +198,6 @@ export default function StatisticsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50" style={arialStyle}>
-      {/* HEADER INSTITUCIONAL */}
       <header className="bg-white border-b border-blue-900/10 shadow-sm sticky top-0 z-50 p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -213,54 +215,58 @@ export default function StatisticsPage() {
 
       <main className="max-w-7xl mx-auto p-6 space-y-8">
         
-        {/* KPI SECTION: MÉTRICAS DE ALTO IMPACTO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* KPI SECTION: MODIFICADA PARA MOSTRAR CANCELADAS Y REAGENDADAS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Card className="border-none shadow-xl bg-white overflow-hidden">
-            <div className="h-1.5 bg-blue-900"></div>
-            <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-400">Volumen Total</CardDescription>
-              <CardTitle className="text-4xl font-black text-blue-900">{estadisticas.totalCitas}</CardTitle>
+            <div className="h-1 bg-blue-900"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Total</CardDescription>
+              <CardTitle className="text-2xl font-black text-blue-900">{estadisticas.totalCitas}</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <Activity className="w-4 h-4 text-blue-500" /> Citas en Sistema
-            </CardContent>
           </Card>
 
           <Card className="border-none shadow-xl bg-white overflow-hidden">
-            <div className="h-1.5 bg-green-500"></div>
-            <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-400">Eficiencia de Asistencia</CardDescription>
-              <CardTitle className="text-4xl font-black text-green-600">{estadisticas.tasaAsistencia}%</CardTitle>
+            <div className="h-1 bg-green-500"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Eficiencia</CardDescription>
+              <CardTitle className="text-2xl font-black text-green-600">{estadisticas.tasaAsistencia}%</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <CheckCircle2 className="w-4 h-4 text-green-500" /> Citas Completadas
-            </CardContent>
           </Card>
 
           <Card className="border-none shadow-xl bg-white overflow-hidden">
-            <div className="h-1.5 bg-orange-500"></div>
-            <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-400">Impacto en Pacientes</CardDescription>
-              <CardTitle className="text-4xl font-black text-orange-600">{estadisticas.pacientesUnicos}</CardTitle>
+            <div className="h-1 bg-red-500"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Canceladas</CardDescription>
+              <CardTitle className="text-2xl font-black text-red-600">{estadisticas.totalCanceladas}</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <Users className="w-4 h-4 text-orange-500" /> Usuarios Únicos
-            </CardContent>
           </Card>
 
           <Card className="border-none shadow-xl bg-white overflow-hidden">
-            <div className="h-1.5 bg-purple-500"></div>
-            <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-400">Promedio de Carga</CardDescription>
-              <CardTitle className="text-4xl font-black text-purple-600">{estadisticas.promedioDiario}</CardTitle>
+            <div className="h-1 bg-purple-500"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Movimientos</CardDescription>
+              <CardTitle className="text-2xl font-black text-purple-600">{estadisticas.totalReagendadas}</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <TrendingUp className="w-4 h-4 text-purple-500" /> Citas por día (30d)
-            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl bg-white overflow-hidden">
+            <div className="h-1 bg-orange-500"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Pacientes</CardDescription>
+              <CardTitle className="text-2xl font-black text-orange-600">{estadisticas.pacientesUnicos}</CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-none shadow-xl bg-white overflow-hidden">
+            <div className="h-1 bg-blue-400"></div>
+            <CardHeader className="pb-1 p-4">
+              <CardDescription className="text-[9px] font-black uppercase text-slate-400">Promedio</CardDescription>
+              <CardTitle className="text-2xl font-black text-blue-400">{estadisticas.promedioDiario}</CardTitle>
+            </CardHeader>
           </Card>
         </div>
 
-        {/* SECCIÓN DE GRÁFICO DINÁMICO (MONTAÑA RUSA / BARRAS) */}
+        {/* SECCIÓN DE GRÁFICO DINÁMICO */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-2 border-none shadow-2xl rounded-[2rem] bg-white p-6 relative">
             <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
@@ -269,10 +275,9 @@ export default function StatisticsPage() {
                   {chartType === 'mountain' ? <Mountain className="text-blue-600" /> : <LayoutGrid className="text-blue-600" />}
                   Tendencia de Flujo Clínico
                 </CardTitle>
-                <CardDescription className="font-medium italic">Análisis comparativo de los últimos 14 días</CardDescription>
+                <CardDescription className="font-medium italic">Análisis comparativo de los últimos 14 días (Excluye Canceladas)</CardDescription>
               </div>
               
-              {/* SELECTOR DE TIPO DE GRÁFICO */}
               <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
                 <Button 
                   variant={chartType === 'mountain' ? 'default' : 'ghost'} 
@@ -322,13 +327,12 @@ export default function StatisticsPage() {
             </CardContent>
           </Card>
 
-          {/* DISTRIBUCIÓN POR ÁREA */}
           <Card className="border-none shadow-2xl rounded-[2rem] bg-white p-6">
             <CardHeader>
               <CardTitle className="text-blue-950 font-black flex items-center gap-2">
                 <Activity className="text-orange-600" /> Especialidades
               </CardTitle>
-              <CardDescription className="font-medium italic">Participación en volumen</CardDescription>
+              <CardDescription className="font-medium italic">Participación en volumen total</CardDescription>
             </CardHeader>
             <CardContent className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -371,7 +375,7 @@ export default function StatisticsPage() {
         </Card>
 
         {/* RENDIMIENTO POR ÁREA (SOLO ADMINS) */}
-        {user?.role === 'admin' && (
+        {user?.rol === 'admin' && (
           <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
             <CardHeader className="bg-slate-50 p-6 border-b">
               <CardTitle className="text-blue-950 font-black">Eficiencia Comparativa por Departamento</CardTitle>

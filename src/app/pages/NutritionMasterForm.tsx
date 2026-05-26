@@ -4,7 +4,6 @@
  * PROPÓSITO: Formulario Multi-pasos con persistencia de datos local.
  * ============================================================================
  */
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router'; 
 import { useAuth } from '../contexts/AuthContext'; 
@@ -18,6 +17,7 @@ interface PageProps {
   onUpdate: (page: string, data: any) => void;
   onBack: () => void;
   onNext: () => void;
+  isReadOnly: boolean;
 }
 
 const NutritionMasterForm: React.FC = () => {
@@ -29,11 +29,11 @@ const NutritionMasterForm: React.FC = () => {
   
   // --- OBJETO MAESTRO DE DATOS (Persistencia Total) ---
   const [formData, setFormData] = useState<any>({
-    pagina_1: {},
-    pagina_2: {},
-    pagina_3: {},
-    pagina_4: {}
-  });
+  pagina_1: {},
+  pagina_2: {},
+  pagina_3: {},
+  pagina_4: {}
+});
 
   const [isReadOnly, setIsReadOnly] = useState(false);
     // AGREGA ESTE BLOQUE AQUÍ:
@@ -53,9 +53,9 @@ const NutritionMasterForm: React.FC = () => {
           );
 
           if (encontrado) {
-  console.log("Datos recuperados de la DB:", encontrado.datos); // Revisa esto en la consola (F12)
-  setFormData(encontrado.datos);
+  setFormData(encontrado.datos); // Inyecta el JSON completo
   setIsReadOnly(true);
+  toast.success("Expediente recuperado");
 }
         }
       } catch (error) {
@@ -92,6 +92,7 @@ const NutritionMasterForm: React.FC = () => {
           onUpdate={updateGlobalData} 
           onBack={handleBack} 
           onNext={() => setStep(3)} 
+          isReadOnly={isReadOnly}
         />
       )}
 
@@ -101,6 +102,7 @@ const NutritionMasterForm: React.FC = () => {
           onUpdate={updateGlobalData} 
           onBack={() => setStep(2)} 
           onNext={() => setStep(4)} 
+          isReadOnly={isReadOnly}
         />
       )}
 
@@ -110,6 +112,7 @@ const NutritionMasterForm: React.FC = () => {
           onUpdate={updateGlobalData} 
           onBack={() => setStep(3)} 
           onNext={() => {}} 
+          isReadOnly={isReadOnly}
         />
       )}
 
@@ -643,7 +646,7 @@ const CustomCheckbox: React.FC<{ label: string, checked?: boolean, onChange?: an
 /* --- DECLARACIONES DE FUNCIONES (Páginas 2, 3 y 4) --- */
 // Las llenaremos conforme me pases los códigos.
 
-function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: PageProps) {
+function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext, isReadOnly }: PageProps) {
   const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
@@ -1039,9 +1042,26 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
                   ].map((row, i) => (
                     <tr key={i}>
                       <td className="label-cell">{row.l}</td>
-                      <td><input type="number" step="0.01" name={`antrop_${row.n}_vo`} value={accumulatedData.pagina_2[`antrop_${row.n}_vo`] || ''} onChange={handleLocalChange} /></td>
+                      <td>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          name={`antrop_${row.n}_vo`} 
+                          value={accumulatedData.pagina_2?.[`antrop_${row.n}_vo`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
                       <td className={row.d ? "" : "dark-cell"}>
-                        {row.d && <input type="text" name={`antrop_${row.n}_int`} value={accumulatedData.pagina_2[`antrop_${row.n}_int`] || ''} onChange={handleLocalChange} />}
+                        {row.d && (
+                          <input 
+                            type="text" 
+                            name={`antrop_${row.n}_int`} 
+                            value={accumulatedData.pagina_2?.[`antrop_${row.n}_int`] || ''} 
+                            onChange={handleLocalChange} 
+                            disabled={isReadOnly}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1049,7 +1069,13 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
               </table>
               <div className="section-header" style={{ marginTop: '8px' }}>Interpretación antropométrica</div>
               <div className="interpret-box">
-                <textarea name="int_antrop" value={accumulatedData.pagina_2.int_antrop || ''} onChange={handleLocalChange} rows={2}></textarea>
+                <textarea 
+                  name="int_antrop" 
+                  value={accumulatedData.pagina_2?.int_antrop || ''} 
+                  onChange={handleLocalChange} 
+                  rows={2}
+                  disabled={isReadOnly}
+                ></textarea>
               </div>
 
               <div className="section-header">Signos Vitales</div>
@@ -1061,8 +1087,24 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
                   {["T. Arterial", "F. Resp (rpm)", "F. Card (lpm)", "Temp (°C)", "SO₂"].map((p, i) => (
                     <tr key={i}>
                       <td className="label-cell">{p}</td>
-                      <td><input type="text" name={`sv_${p}_vo`} value={accumulatedData.pagina_2[`sv_${p}_vo`] || ''} onChange={handleLocalChange} /></td>
-                      <td><input type="text" name={`sv_${p}_int`} value={accumulatedData.pagina_2[`sv_${p}_int`] || ''} onChange={handleLocalChange} /></td>
+                      <td>
+                        <input 
+                          type="text" 
+                          name={`sv_${p}_vo`} 
+                          value={accumulatedData.pagina_2?.[`sv_${p}_vo`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="text" 
+                          name={`sv_${p}_int`} 
+                          value={accumulatedData.pagina_2?.[`sv_${p}_int`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1077,16 +1119,46 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
                 <tbody>
                   {Array.from({ length: 28 }).map((_, i) => (
                     <tr key={i}>
-                      <td><input type="text" name={`bq_${i}_nom`} value={accumulatedData.pagina_2[`bq_${i}_nom`] || ''} onChange={handleLocalChange} /></td>
-                      <td><input type="text" name={`bq_${i}_vo`} value={accumulatedData.pagina_2[`bq_${i}_vo`] || ''} onChange={handleLocalChange} /></td>
-                      <td><input type="text" name={`bq_${i}_int`} value={accumulatedData.pagina_2[`bq_${i}_int`] || ''} onChange={handleLocalChange} /></td>
+                      <td>
+                        <input 
+                          type="text" 
+                          name={`bq_${i}_nom`} 
+                          value={accumulatedData.pagina_2?.[`bq_${i}_nom`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="text" 
+                          name={`bq_${i}_vo`} 
+                          value={accumulatedData.pagina_2?.[`bq_${i}_vo`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="text" 
+                          name={`bq_${i}_int`} 
+                          value={accumulatedData.pagina_2?.[`bq_${i}_int`] || ''} 
+                          onChange={handleLocalChange} 
+                          disabled={isReadOnly}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="section-header" style={{ marginTop: '8px' }}>Interpretación bioquímica</div>
               <div className="interpret-box">
-                <textarea name="int_bioq" value={accumulatedData.pagina_2.int_bioq || ''} onChange={handleLocalChange} rows={2}></textarea>
+                <textarea 
+                  name="int_bioq" 
+                  value={accumulatedData.pagina_2?.int_bioq || ''} 
+                  onChange={handleLocalChange} 
+                  rows={2}
+                  disabled={isReadOnly}
+                ></textarea>
               </div>
 
               <div className="solicitud-wrapper">
@@ -1094,13 +1166,31 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
                 <div className="solicitud-box">
                   {['Química Sanguínea', 'EGO', 'Biometría hemática'].map(s => (
                     <div className="sol-item" key={s}>
-                      <input type="checkbox" name={`sol_${s}`} checked={accumulatedData.pagina_2[`sol_${s}`] || false} onChange={handleLocalChange} /> {s}
+                      <input 
+                        type="checkbox" 
+                        name={`sol_${s}`} 
+                        checked={accumulatedData.pagina_2?.[`sol_${s}`] || false} 
+                        onChange={handleLocalChange} 
+                        disabled={isReadOnly}
+                      /> {s}
                     </div>
                   ))}
                   <div className="sol-item">
-                    <input type="checkbox" name="sol_otro" checked={accumulatedData.pagina_2.sol_otro || false} onChange={handleLocalChange} /> Otro: 
+                    <input 
+                      type="checkbox" 
+                      name="sol_otro" 
+                      checked={accumulatedData.pagina_2?.sol_otro || false} 
+                      onChange={handleLocalChange} 
+                      disabled={isReadOnly}
+                    /> Otro: 
                     <div className="sol-line">
-                      <input type="text" name="sol_otro_txt" value={accumulatedData.pagina_2.sol_otro_txt || ''} onChange={handleLocalChange} />
+                      <input 
+                        type="text" 
+                        name="sol_otro_txt" 
+                        value={accumulatedData.pagina_2?.sol_otro_txt || ''} 
+                        onChange={handleLocalChange} 
+                        disabled={isReadOnly}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1118,7 +1208,7 @@ function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext }: 
   );
 }
 
-function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: PageProps) {
+function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext, isReadOnly: _isReadOnly }: PageProps) {
   // --- LÓGICA DE NAVEGACIÓN POR TECLADO (FLECHAS) ---
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1133,6 +1223,14 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
         inputs[currentIndex - 1].focus();
       }
     }
+  };
+
+  const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+    const { name, value, type } = target;
+    const checked = (target as HTMLInputElement).checked;
+    const newValue = type === 'checkbox' ? checked : value;
+    onUpdate('pagina_3', { [name]: newValue });
   };
 
   const styles: { [key: string]: React.CSSProperties } = {
@@ -1464,7 +1562,7 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
                 </tbody>
               </table>
               <div style={{ fontSize: '9.5px' }}>
-                <b>Diagnóstico Matriz IMLO/IMG:</b> <input type="text" onKeyDown={handleKeyDown} style={{width: '60%', borderBottom: '1px solid #2c5697', textAlign: 'left'}} />
+                <b>Diagnóstico Matriz IMLO/IMG:</b> <input type="text" name="diag_matriz_imlo_img" value={accumulatedData.pagina_3?.diag_matriz_imlo_img || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '60%', borderBottom: '1px solid #2c5697', textAlign: 'left'}} />
               </div>
             </div>
 
@@ -1482,13 +1580,16 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
                     "Respiratorio", "Digestivo", "Edema", "Extremidades",
                     "Ojos", "Pelo", "Cabeza", "Manos y uñas", "Boca / Lengua",
                     "Cuello / Piel", "Dientes", "Garganta"
-                  ].map((item, idx) => (
+                  ].map((item, idx) => {
+                    const itemKey = item.replace(/\s+/g, '_').replace(/\//g, '_').toLowerCase();
+                    return (
                     <tr key={idx}>
                       <td className="celda-hallazgo-compacta" style={{ ...styles.thTd, ...styles.alignLeftPadding, width: '40%' }}>{item}</td>
-                      <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" onKeyDown={handleKeyDown} style={{textAlign: 'left', fontSize: '7.2px'}} /></td>
-                      <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" onKeyDown={handleKeyDown} style={{fontSize: '7.2px'}} /></td>
+                      <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" name={`hallazgo_${itemKey}_desc`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_desc`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{textAlign: 'left', fontSize: '7.2px'}} /></td>
+                      <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" name={`hallazgo_${itemKey}_den`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_den`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{fontSize: '7.2px'}} /></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1499,8 +1600,8 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
           <div style={styles.layoutFilaMediaRecortada}>
             <div style={styles.cajaRecordatorioPrincipalRecortada}>
               <div style={styles.headerDatosRecordatorio}>
-                <span><b>Fecha:</b> <input type="text" onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
-                <span><b>Hora:</b> <input type="text" onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
+                <span><b>Fecha:</b> <input type="text" name="rec_fecha" value={accumulatedData.pagina_3?.rec_fecha || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
+                <span><b>Hora:</b> <input type="text" name="rec_hora" value={accumulatedData.pagina_3?.rec_hora || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
               </div>
               <div style={{ display: 'flex', backgroundColor: '#f2f5f9', borderBottom: '1.5px solid #2c5697' }}>
                 <div style={{ width: '20%', padding: '4px', borderRight: '1.5px solid #2c5697', textAlign: 'center', fontWeight: 'bold', fontSize: '8.5px' }}>Hora</div>
@@ -1512,8 +1613,8 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} style={{ display: 'flex' }}>
-                    <div style={{ width: '20%', borderRight: '1.5px solid #2c5697' }}><input onKeyDown={handleKeyDown} className="linea-escritura" style={{textAlign: 'center'}} /></div>
-                    <div style={{ width: '80%' }}><input onKeyDown={handleKeyDown} className="linea-escritura" /></div>
+                    <div style={{ width: '20%', borderRight: '1.5px solid #2c5697' }}><input name={`rec_hora_${i}`} value={accumulatedData.pagina_3?.[`rec_hora_${i}`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} className="linea-escritura" style={{textAlign: 'center'}} /></div>
+                    <div style={{ width: '80%' }}><input name={`rec_contenido_${i}`} value={accumulatedData.pagina_3?.[`rec_contenido_${i}`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} className="linea-escritura" /></div>
                   </div>
                 ))}
               </div>
@@ -1541,23 +1642,26 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
                     <th style={{ ...styles.thTd, width: '30%' }}>Grupo alimentario</th>
                     <th style={styles.thTd}>Porciones</th><th style={styles.thTd}>Energía</th><th style={styles.thTd}>Proteína</th><th style={styles.thTd}>Lípidos</th><th style={styles.thTd}>HCO</th>
                   </tr>
-                  {["Verduras", "Frutas", "Cereales s/g", "Leguminosas", "POA ___", "Lácteo ___", "Aceites s/p", "Aceites c/p", "Azúcares"].map((grupo, idx) => (
+                  {["Verduras", "Frutas", "Cereales s/g", "Leguminosas", "POA ___", "Lácteo ___", "Aceites s/p", "Aceites c/p", "Azúcares"].map((grupo, idx) => {
+                    const grupoKey = grupo.replace(/\s+/g, '_').replace(/___/g, '').toLowerCase();
+                    return (
                     <tr key={idx}>
                       <td style={{ ...styles.thTd, ...styles.alignLeftPadding }}>{grupo}</td>
-                      <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                      <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                      <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                      <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                      <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
+                      <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_porciones`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_porciones`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
+                      <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_energia`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_energia`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
+                      <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_proteina`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_proteina`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
+                      <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_lipidos`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_lipidos`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
+                      <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_hco`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_hco`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   <tr style={styles.celdaEnfasisGris}>
                     <td style={styles.thTd}>Total</td>
-                    <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                    <td style={styles.thTd}><div className="input-unidad"><input type="number" onKeyDown={handleKeyDown} /><input type="text" placeholder="kcal" style={{fontSize: '7px'}} /></div></td>
-                    <td style={styles.thTd}><div className="input-unidad"><input type="number" onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
-                    <td style={styles.thTd}><div className="input-unidad"><input type="number" onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
-                    <td style={styles.thTd}><div className="input-unidad"><input type="number" onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
+                    <td style={styles.thTd}><input type="number" name="porcion_total_porciones" value={accumulatedData.pagina_3?.porcion_total_porciones || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
+                    <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_energia" value={accumulatedData.pagina_3?.porcion_total_energia || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="kcal" style={{fontSize: '7px'}} /></div></td>
+                    <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_proteina" value={accumulatedData.pagina_3?.porcion_total_proteina || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
+                    <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_lipidos" value={accumulatedData.pagina_3?.porcion_total_lipidos || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
+                    <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_hco" value={accumulatedData.pagina_3?.porcion_total_hco || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
                   </tr>
                 </tbody>
               </table>
@@ -1646,56 +1750,69 @@ function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext }: 
  * ============================================================================
  */
 
-function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProps) {
+function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
   
   const { user } = useAuth(); // Obtenemos el usuario autenticado
   const navigate = useNavigate();
   const { appointmentId } = useParams()
 
+  const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+    const { name, value, type } = target;
+    const checked = (target as HTMLInputElement).checked;
+    const newValue = type === 'checkbox' ? checked : value;
+    onUpdate('pagina_4', { [name]: newValue });
+  };
+
+  // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
   // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
   const handleFinalizar = async () => {
-  try {
-    setIsSaving(true);
+    try {
+      setIsSaving(true);
 
-    // ✅ USAMOS 'accumulatedData' PORQUE 'formData' NO EXISTE AQUÍ
-    const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || 1;
-    const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
-    const aId = appointmentId ? parseInt(appointmentId) : null;
+      // Extraemos el ID del paciente asegurando que provenga de la identificación de la página 1
+      // Esto es vital para que la tabla 'metricas' y 'historiales' coincidan
+      const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
+      const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
+      const aId = appointmentId ? parseInt(appointmentId) : null;
 
-    const payload = {
-      paciente_id: pId, // Esto resuelve el error de Foreign Key si el ID es válido
-      paciente_nombre: pNombre,
-      tipo: 'nutricion',
-      datos: accumulatedData, // Pasamos todo el objeto acumulado
-      creado_por: user?.id || 1, 
-      creado_por_nombre: user?.nombre || "Practicante Nutrición",
-      appointment_id: aId 
-    };
+      const payload = {
+        paciente_id: pId, 
+        paciente_nombre: pNombre,
+        tipo: 'nutricion',
+        datos: accumulatedData, 
+        creado_por: user?.id || (user as any)?.id || 1, 
+        creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Nutrición",
+        appointment_id: aId 
+      };
 
-    // ... (resto del código del fetch)
+      const response = await fetch('http://localhost:3001/api/historiales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    const response = await fetch('http://localhost:3001/api/historiales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      // Esto te mostrará en la consola exactamente qué ID está fallando
-      console.error("Detalle del error:", errorData);
-      toast.error("Error de integridad: El ID del paciente no es válido.");
-    } else {
-      toast.success("Historial guardado exitosamente");
-      navigate('/dashboard');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Detalle del error en servidor:", errorData);
+        toast.error("Error al guardar: Verifique la conexión con el servidor.");
+      } else {
+        // Registro exitoso: El paciente ahora será detectado como 'Recurrente'
+        toast.success("Historial clínico guardado exitosamente");
+        
+        // Redirección inmediata al dashboard sincronizado
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Error crítico en el proceso de guardado:", error);
+      toast.error("Error de conexión. Intente más tarde.");
+    } finally {
+      setIsSaving(false);
     }
-  } catch (error) {
-    console.error("Error crítico:", error);
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
   const styles: { [key: string]: React.CSSProperties } = {
     bodyWrapper: {
       fontFamily: 'Segoe UI, Arial, sans-serif',
@@ -1978,10 +2095,10 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
           <div style={styles.colHeader}>Educación Nutricia</div>
           <div style={{...styles.colHeader, borderRight: 'none'}}>Consejería Nutricia</div>
 
-          <div style={styles.cellContent}><textarea name="diag" style={styles.inputInvisible}></textarea></div>
+          <div style={styles.cellContent}><textarea name="diag" value={accumulatedData.pagina_4?.diag || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
           
           <div style={styles.cellContent}>
-            <textarea className="objetivo-textarea" style={{...styles.inputInvisible, height: '140px'}}></textarea>
+            <textarea className="objetivo-textarea" name="objetivo" value={accumulatedData.pagina_4?.objetivo || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, height: '140px'}}></textarea>
             <ul style={styles.smartList}>
               <li style={{listStyle: 'none', marginLeft: '-10px', marginBottom: '4px', color: '#1a428a'}}>En formato SMART (por sus siglas en inglés):</li>
               <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Specific:</strong> Definición del fenómeno</li>
@@ -1993,13 +2110,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
           </div>
 
           <div style={{...styles.cellContent, padding: 0}}>
-            <div style={styles.subCell}><span style={styles.labelBlue}>Contenido (E-1.<input type="text" className="edu-cont-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
-            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Aplicación (E-2.<input type="text" className="edu-app-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={styles.subCell}><span style={styles.labelBlue}>Contenido (E-1.<input type="text" className="edu-cont-input" name="edu_cont_num" value={accumulatedData.pagina_4?.edu_cont_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="edu_contenido" value={accumulatedData.pagina_4?.edu_contenido || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
+            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Aplicación (E-2.<input type="text" className="edu-app-input" name="edu_app_num" value={accumulatedData.pagina_4?.edu_app_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="edu_aplicacion" value={accumulatedData.pagina_4?.edu_aplicacion || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
           </div>
 
           <div style={{...styles.cellContent, padding: 0, borderRight: 'none'}}>
-            <div style={styles.subCell}><span style={styles.labelBlue}>Bases/Acercamiento Teórico (C-1.<input type="text" className="cons-bases-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
-            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Estrategias (C-2.<input type="text" className="cons-est-input" style={styles.inputHeaderInline} />)</span><textarea style={styles.inputInvisible}></textarea></div>
+            <div style={styles.subCell}><span style={styles.labelBlue}>Bases/Acercamiento Teórico (C-1.<input type="text" className="cons-bases-input" name="cons_bases_num" value={accumulatedData.pagina_4?.cons_bases_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="cons_bases" value={accumulatedData.pagina_4?.cons_bases || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
+            <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Estrategias (C-2.<input type="text" className="cons-est-input" name="cons_est_num" value={accumulatedData.pagina_4?.cons_est_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="cons_estrategias" value={accumulatedData.pagina_4?.cons_estrategias || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
           </div>
         </div>
 
@@ -2010,10 +2127,10 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
             <div style={styles.card}>
               <div style={styles.cardHeader}>Indicación de Alimentos/Nutrimentos</div>
               <div style={{padding: '5px'}}>
-                <input type="text" style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                <input type="text" style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                <input type="text" style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                <input type="text" style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
+                <input type="text" name="indicacion_1" value={accumulatedData.pagina_4?.indicacion_1 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
+                <input type="text" name="indicacion_2" value={accumulatedData.pagina_4?.indicacion_2 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
+                <input type="text" name="indicacion_3" value={accumulatedData.pagina_4?.indicacion_3 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
+                <input type="text" name="indicacion_4" value={accumulatedData.pagina_4?.indicacion_4 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
               </div>
             </div>
 
@@ -2021,19 +2138,19 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
               <div style={styles.cardHeader}>Requerimiento calórico</div>
               <div style={{padding: '3px 8px', color: '#1a428a', fontSize: '9px'}}>
                 <div style={{display: 'flex', marginBottom: '2px'}}>
-                  <input type="checkbox" style={{marginRight: '6px', width: '11px', height: '11px'}} />
+                  <input type="checkbox" name="req_ec_pred" checked={accumulatedData.pagina_4?.req_ec_pred || false} onChange={handleLocalChange} style={{marginRight: '6px', width: '11px', height: '11px'}} />
                   <div style={{flexGrow: 1}}><span style={{fontSize: '9px'}}>Ecuación predictiva</span>
-                    <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Nombre:</span><input type="text" style={styles.inputLine} /></div>
+                    <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Nombre:</span><input type="text" name="req_ec_pred_nombre" value={accumulatedData.pagina_4?.req_ec_pred_nombre || ''} onChange={handleLocalChange} style={styles.inputLine} /></div>
                   </div>
                 </div>
                 <div style={{display: 'flex', marginBottom: '2px'}}>
-                  <input type="checkbox" style={{marginRight: '6px', width: '11px', height: '11px'}} />
+                  <input type="checkbox" name="req_ec_rapida" checked={accumulatedData.pagina_4?.req_ec_rapida || false} onChange={handleLocalChange} style={{marginRight: '6px', width: '11px', height: '11px'}} />
                   <div style={{flexGrow: 1}}><span style={{fontSize: '9px'}}>Ecuación rápida</span>
-                    <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Peso:</span><input type="text" style={{...styles.inputLine, width:'30px'}} /><span style={{fontSize: '7px'}}>kg</span> <span style={{fontSize: '7px', marginLeft:'5px'}}>kcal/kg:</span><input type="text" style={styles.inputLine} /></div>
+                    <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Peso:</span><input type="text" name="req_ec_rapida_peso" value={accumulatedData.pagina_4?.req_ec_rapida_peso || ''} onChange={handleLocalChange} style={{...styles.inputLine, width:'30px'}} /><span style={{fontSize: '7px'}}>kg</span> <span style={{fontSize: '7px', marginLeft:'5px'}}>kcal/kg:</span><input type="text" name="req_ec_rapida_kcal_kg" value={accumulatedData.pagina_4?.req_ec_rapida_kcal_kg || ''} onChange={handleLocalChange} style={styles.inputLine} /></div>
                   </div>
                 </div>
                 <div style={{marginTop: '3px', display: 'flex', alignItems: 'baseline', fontWeight: 'bold'}}>
-                  <span style={{fontSize: '9px'}}>Total</span><input type="text" style={{...styles.inputLine, fontWeight: 'bold', textAlign: 'center'}} /><span style={{fontSize: '9px'}}>kcal</span>
+                  <span style={{fontSize: '9px'}}>Total</span><input type="text" name="req_total_kcal" value={accumulatedData.pagina_4?.req_total_kcal || ''} onChange={handleLocalChange} style={{...styles.inputLine, fontWeight: 'bold', textAlign: 'center'}} /><span style={{fontSize: '9px'}}>kcal</span>
                 </div>
               </div>
             </div>
@@ -2051,20 +2168,23 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
                   </tr>
                 </thead>
                 <tbody style={{fontSize: '8px'}}>
-                  {["Proteína", "HCO", "Lípidos"].map(m => (
+                  {["Proteína", "HCO", "Lípidos"].map(m => {
+                    const macroKey = m.toLowerCase().replace('í', 'i');
+                    return (
                     <tr key={m}>
                       <td style={{fontWeight: 'bold', color: '#1a428a', border: '1px solid #1a428a', padding: '1px 2px'}}>{m}</td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
+                      <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_porc`} value={accumulatedData.pagina_4?.[`${macroKey}_porc`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
+                      <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_kcal`} value={accumulatedData.pagina_4?.[`${macroKey}_kcal`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
+                      <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_g`} value={accumulatedData.pagina_4?.[`${macroKey}_g`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
+                      <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_g_kg`} value={accumulatedData.pagina_4?.[`${macroKey}_g_kg`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   <tr style={{backgroundColor: '#f0f4fa'}}>
                     <td style={{fontWeight: 'bold', color: '#1a428a', border: '1px solid #1a428a', padding: '1px 2px'}}>Tot.</td>
                     <td style={{textAlign: 'center', fontWeight: 'bold', border: '1px solid #1a428a'}}>100%</td>
-                    <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
-                    <td style={{border: '1px solid #1a428a'}}><input type="text" style={styles.inputInvisible} /></td>
+                    <td style={{border: '1px solid #1a428a'}}><input type="text" name="total_kcal" value={accumulatedData.pagina_4?.total_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
+                    <td style={{border: '1px solid #1a428a'}}><input type="text" name="total_g" value={accumulatedData.pagina_4?.total_g || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
                     <td style={{fontSize: '5px', textAlign: 'right', border: '1px solid #1a428a'}}>kcal/kg/d</td>
                   </tr>
                 </tbody>
@@ -2087,27 +2207,31 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
               </tr>
             </thead>
             <tbody style={{fontSize: '7.5px'}}>
-              {['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA', 'Lácteo', 'Aceites s/p', 'Aceites c/p', 'Azúcares'].map(grupo => (
+              {['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA', 'Lácteo', 'Aceites s/p', 'Aceites c/p', 'Azúcares'].map(grupo => {
+                const grupoKey = grupo.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_');
+                const cols = ['des', 'cm', 'com', 'cv', 'cena', 'rac', 'kcal', 'prot', 'lip', 'hco'];
+                return (
                 <tr key={grupo}>
                   <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>{grupo}</td>
-                  {[...Array(10)].map((_, i) => <td key={i} style={styles.tablaPorcionesTd}><input type="text" style={styles.inputInvisible} /></td>)}
+                  {cols.map(col => <td key={col} style={styles.tablaPorcionesTd}><input type="text" name={`calc_${grupoKey}_${col}`} value={accumulatedData.pagina_4?.[`calc_${grupoKey}_${col}`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>)}
                 </tr>
-              ))}
+                );
+              })}
               <tr style={{backgroundColor: '#f2f5f9'}}>
                 <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>Total</td>
                 <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>kcal</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_kcal" value={accumulatedData.pagina_4?.calc_total_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>kcal</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_prot" value={accumulatedData.pagina_4?.calc_total_prot || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_lip" value={accumulatedData.pagina_4?.calc_total_lip || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_hco" value={accumulatedData.pagina_4?.calc_total_hco || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
               </tr>
               <tr style={{backgroundColor: '#f2f5f9'}}>
                 <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>% Adecuación</td>
                 <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_kcal" value={accumulatedData.pagina_4?.calc_adec_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_prot" value={accumulatedData.pagina_4?.calc_adec_prot || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_lip" value={accumulatedData.pagina_4?.calc_adec_lip || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
+                <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_hco" value={accumulatedData.pagina_4?.calc_adec_hco || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
               </tr>
             </tbody>
           </table>
@@ -2126,9 +2250,9 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack }: PageProp
           </thead>
           <tbody>
             <tr>
-              {[...Array(5)].map((_, i) => (
-                <td key={i} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}>
-                  <textarea style={{...styles.inputInvisible, fontSize: '9px'}}></textarea>
+              {['desayuno', 'cm', 'comida', 'cv', 'cena'].map(meal => (
+                <td key={meal} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}>
+                  <textarea name={`menu_${meal}`} value={accumulatedData.pagina_4?.[`menu_${meal}`] || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, fontSize: '9px'}}></textarea>
                 </td>
               ))}
             </tr>
