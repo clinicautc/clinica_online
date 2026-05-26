@@ -5,252 +5,395 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff} from 'lucide-react';
+import { toast } from 'sonner';
+import { authAPI } from '../lib/api';
 
 export default function Register() {
-  const [name, setName] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [sendingCode, setSendingCode] = useState(false);
-
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword,setShowConfirmPassword] = useState(false);
+  const passwordValidation = {
+    minLength: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
 
+  const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+  const passwordsMatch =password === confirmPassword;
+  const [verificationCode, setVerificationCode] = useState('');
+  
+  // ESTADOS DE FLUJO DE VERIFICACIÓN
   const [error, setError] = useState('');
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
-  const { register } = useAuth();
   const navigate = useNavigate();
 
-  // ===============================
-  // ENVIAR CÓDIGO
-  // ===============================
-  const handleSendCode = async () => {
-    setError('');
-
-    if (!email) {
-      return setError('Ingresa un correo primero');
+  // --- 1. LÓGICA PARA ENVIAR CÓDIGO VÍA RESEND ---
+  // Reemplaza la función handleSendCode en Register.tsx
+// Modificación en Register.tsx para el "Filtro de Retención"
+const handleSendCode = async () => {
+    // Validamos que no falte nada antes de "retenerlo" en la DB temporal
+    if (!nombre || !apellido || !email || !password) {
+      setError('Llena todos los campos para recibir tu código.');
+      return;
     }
 
     try {
-      setSendingCode(true);
+      setIsSendingCode(true);
+      
+      // Enviamos TODO al backend para que lo guarde en registro_temporal
+await authAPI.sendRegisterCode({
+  name: `${nombre} ${apellido}`,
+  email,
+  password
+});
 
-      const res = await fetch('http://localhost:3001/api/usuarios/register-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      
 
-      const data = await res.json();
+      toast.success('Datos retenidos. Código enviado a tu Gmail.');
+      setCodeSent(true);
 
-      if (!res.ok) {
-        setError(data.error);
-      } else {
-        alert('Código enviado a tu correo 📧');
-      }
-
-    } catch {
-      setError('Error al enviar código');
+    } catch (err: any) {
+      setError(err.message);
     } finally {
-      setSendingCode(false);
+      setIsSendingCode(false);
     }
-  };
+};
+  // --- 2. LÓGICA DE REGISTRO FINAL ---
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
 
-  // ===============================
-  // REGISTRO
-  // ===============================
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  if (password !== confirmPassword) {
+    setError('Las contraseñas no coinciden');
+    return;
+  }
+  if (!isPasswordValid) {
+  setError('La contraseña no cumple los requisitos de seguridad.');
+  return;
+  }
 
-    if (code.length !== 6) {
-      return setError('El código debe tener 6 dígitos');
-    }
+  try {
+await authAPI.verifyRegister({
+  email,
+  code: verificationCode
+});
 
-    if (password !== confirmPassword) {
-      return setError('Las contraseñas no coinciden');
-    }
+    toast.success('Cuenta creada exitosamente');
+    navigate('/login');
 
-    if (password.length < 6) {
-      return setError('La contraseña debe tener al menos 6 caracteres');
-    }
-
-    try {
-      const verifyResponse = await fetch('http://localhost:3001/api/usuarios/verify-register-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
-      });
-
-      const verifyData = await verifyResponse.json();
-
-      if (!verifyResponse.ok) {
-        setError(verifyData.error || 'Código inválido');
-        return;
-      }
-
-      const success = await register(name, email, password);
-
-      if (success) {
-        navigate('/dashboard');
-      } else {
-        setError('Error al registrar usuario');
-      }
-
-    } catch {
-      setError('Error de conexión con el servidor');
-    }
-  };
+  } catch (err: any) {
+    setError(err.message);
+  }
+};
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50 p-4">
-      <Card className="w-full max-w-md border-blue-900/10 shadow-xl">
-
-        <CardHeader className="space-y-3 text-center">
-<div className="mx-auto w-16 h-16 bg-blue-100 shadow-md rounded-full flex items-center justify-center mb-2">
-  <img 
-    src="/logo.png" 
-    alt="Logo UTC"
-    className="w-10 h-10 object-contain"
-  />
-</div>
-          <CardTitle className="text-2xl font-bold text-blue-900">
-            Crear Cuenta Nueva
-          </CardTitle>
-          <CardDescription className="text-blue-900/70">
-            Regístrate como paciente para agendar tus citas
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl border-t-4 border-t-blue-900 rounded-3xl">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-black text-blue-900 text-center">Registro UTC</CardTitle>
+          <CardDescription className="text-center font-medium">
+            Crea tu perfil clínico universitario
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <form autoComplete="off" onSubmit={handleSubmit} className="space-y-4">
-
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-sm">
-                <AlertCircle className="w-4 h-4" />
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-center text-sm font-bold">
+                <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
                 {error}
               </div>
             )}
 
-            {/* NOMBRE */}
+
+<div className="grid grid-cols-2 gap-3">
+
+  <div className="space-y-2">
+    <Label htmlFor="nombre" className="text-blue-900 font-bold">
+      Nombre
+    </Label>
+
+    <Input
+      id="nombre"
+      placeholder="Nombre"
+      value={nombre}
+      onChange={(e) => setNombre(e.target.value)}
+      required
+      className="rounded-xl border-slate-200 focus:border-blue-900"
+    />
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="apellido" className="text-blue-900 font-bold">
+      Apellido
+    </Label>
+
+    <Input
+      id="apellido"
+      placeholder="Apellido"
+      value={apellido}
+      onChange={(e) => setApellido(e.target.value)}
+      required
+      className="rounded-xl border-slate-200 focus:border-blue-900"
+    />
+  </div>
+
+</div>
+
+
             <div className="space-y-2">
-              <Label>Nombre completo</Label>
-              <Input
-                autoComplete="off"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <Label htmlFor="email" className="text-blue-900 font-bold">Correo electrónico</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="usuario@utc.mx"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={codeSent}
+                  required
+                  className="rounded-xl border-slate-200"
+                />
+              </div>
             </div>
+          <div className="space-y-2">
 
-            {/* EMAIL */}
-            <div className="space-y-2">
-              <Label>Correo electrónico</Label>
+            <Label
+              htmlFor="password"
+              className="text-blue-900 font-bold"
+            >
+              Contraseña
+            </Label>
+
+            <div className="relative">
+
               <Input
-                autoComplete="off"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="rounded-xl pr-10"
               />
 
-              <Button
+              <button
                 type="button"
-                onClick={handleSendCode}
-                disabled={sendingCode}
-                className={`w-full mt-2
-                  ${sendingCode
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-900 hover:bg-blue-800 cursor-pointer'
-                  }`}
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+                className="
+                  absolute
+                  right-3
+                  top-1/2
+                  -translate-y-1/2
+                  text-slate-400
+                  hover:text-blue-900
+                  transition-colors
+                "
               >
-                {sendingCode ? 'Enviando...' : 'Enviar código'}
-              </Button>
+                {
+                  showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />
+                }
+              </button>
+
             </div>
 
-            {/* PASSWORD */}
             <div className="space-y-2">
-              <Label>Contraseña</Label>
+              <Label htmlFor="confirmPassword" className="text-blue-900 font-bold">Confirmar contraseña</Label>
               <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+
+  <Input
+    id="confirmPassword"
+    type={
+      showConfirmPassword
+        ? 'text'
+        : 'password'
+    }
+    value={confirmPassword}
+    onChange={(e) =>
+      setConfirmPassword(e.target.value)
+    }
+    placeholder="••••••••"
+    required
+    className="rounded-xl pr-10"
+  />
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowConfirmPassword(
+        !showConfirmPassword
+      )
+    }
+    className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-slate-400
+      hover:text-blue-900
+      transition-colors
+    "
+  >
+    {
+      showConfirmPassword
+        ? (
+          <EyeOff className="w-4 h-4" />
+        )
+        : (
+          <Eye className="w-4 h-4" />
+        )
+    }
+  </button>
+
+</div>
+                  {
+                    confirmPassword &&
+                    !passwordsMatch && (
+                      <p className="text-red-500 text-xs font-bold">
+                        Las contraseñas no coinciden
+                      </p>
+                    )
+                  }
+                            <div className="space-y-1 text-xs mt-2">
+
+                 <p className={passwordValidation.minLength ? 'text-green-600' : 'text-slate-400'}>
+                   • Mínimo 8 caracteres
+                   </p>
+
+                 <p className={passwordValidation.uppercase ? 'text-green-600' : 'text-slate-400'}>
+                    • Una letra mayúscula
+                     </p>
+
+                 <p className={passwordValidation.lowercase ? 'text-green-600' : 'text-slate-400'}>
+                    • Una letra minúscula
+                     </p>
+
+                 <p className={passwordValidation.number ? 'text-green-600' : 'text-slate-400'}>
+                    • Un número
+               </p>
+
+              <p className={passwordValidation.special ? 'text-green-600' : 'text-slate-400'}>
+                  • Un carácter especial
+             </p>
+
+            </div>
+            </div>
             </div>
 
-            {/* CONFIRM PASSWORD */}
-            <div className="space-y-2">
-              <Label>Confirmar contraseña</Label>
-              <div className="relative">
+            {/* CAMPO DINÁMICO: CÓDIGO DE VERIFICACIÓN */}
+            {codeSent && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <Label htmlFor="code" className="text-orange-600 font-black flex items-center">
+                  <ShieldCheck className="w-4 h-4 mr-1" /> Código de Verificación
+                </Label>
                 <Input
-                  type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
-                >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {/* CÓDIGO */}
-            <div className="space-y-2">
-              <Label>Código de verificación</Label>
-              <Input
-                autoComplete="one-time-code"
-                value={code}
+                 id="code"
+                 placeholder="123456"
+                 value={verificationCode}
+                 maxLength={6}
+                 inputMode="numeric"
+                 pattern="[0-9]*"
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setCode(value);
-                }}
-                placeholder="Ingrese su codigo de 6 dígitos"
-                maxLength={6}
-                inputMode="numeric"
-                className="text-center tracking-widest"
-              />
-            </div>
+                  const value = e.target.value.replace(/\D/g, '');
+                  setVerificationCode(value);
+                  }}
+                  required
+                  className="border-orange-500 focus:ring-orange-500 rounded-xl font-mono text-center text-lg tracking-widest"
+                />
+              </div>
+            )}
+            
+            {/* --- BOTÓN DE ENVIAR CÓDIGO (UBICACIÓN SOLICITADA) --- */}
+            {!codeSent ? (
+              <Button 
+                type="button" 
+                onClick={handleSendCode}
+                disabled={isSendingCode ||!isPasswordValid ||!passwordsMatch}
+                className={
+                  `w-full
+                  h-11
+                  rounded-xl
+                  font-bold
+                  transition-all
+                  duration-300
+                  active:scale-[0.98]
 
-            {/* BOTÓN */}
+                  ${
+                    isPasswordValid && passwordsMatch
+
+                      ? 'bg-blue-900 hover:bg-blue-800 text-white hover:scale-[1.008] hover:shadow-lg transform-gpu cursor-pointer'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }
+                `}
+              >
+                {isSendingCode ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> ENVIANDO...</>
+                ) : (
+                  <><Mail className="w-4 h-4 mr-2" /> ENVIAR CÓDIGO AL CORREO</>
+                )}
+              </Button>
+            ) : (
+              <div className="text-center">
+                <button 
+                  type="button" 
+                  onClick={() => setCodeSent(false)} 
+                  className="text-xs font-black text-slate-500 hover:text-blue-900 tracking-wide cursor-pointer transition-colors duration-200"
+                >
+                  ¿No recibiste el codigo?   <br /> 
+                   intenta con otro correo
+                </button>
+              </div>
+            )}
+
+            {/* BOTÓN DE REGISTRO FINAL */}
             <Button 
               type="submit"
-              disabled={code.length !== 6}
-              className={`w-full h-11 text-white
-                ${code.length !== 6
-                  ? 'bg-gray-400 cursor-not-allowed opacity-70'
-                  : 'bg-orange-600 hover:bg-orange-700 cursor-pointer'
-                }`}
-            >
-              Registrarse
+              disabled={verificationCode.length !== 6 ||!isPasswordValid ||!passwordsMatch}
+              className={`
+                w-full
+                h-11
+                rounded-xl
+                font-black
+                transition-all
+                duration-300
+                active:scale-[0.98]
+
+                ${
+                  verificationCode.length === 6 && isPasswordValid && passwordsMatch
+                   ? 'bg-orange-500 hover:bg-orange-600 text-white hover:scale-[1.008] transform-gpu hover:shadow-lg cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }
+                      `}
+                  >
+               REGISTRARSE EN LA CLÍNICA
             </Button>
 
-            <div className="text-center pt-4 border-t border-blue-900/10">
+            <div className="text-center pt-4 border-t border-slate-100">
               <Link to="/login">
                 <Button 
-                  type="button"
-                  variant="outline"
-                  className="w-full cursor-pointer border-blue-900 text-blue-900 hover:bg-blue-50 h-11"
+                  type="button" 
+                  variant="ghost"
+                  className="w-full text-blue-900 font-bold hover:bg-blue-50  transform-gpu transition-all duration-300 cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Volver al inicio de sesión
                 </Button>
               </Link>
             </div>
-
           </form>
         </CardContent>
       </Card>

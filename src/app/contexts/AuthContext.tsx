@@ -1,12 +1,22 @@
 /**
  * ============================================================================
- * ARCHIVO: AuthContext.tsx (Versión PRO - API Centralizada)
+ * ARCHIVO: AuthContext.tsx
+ * PROPÓSITO: Gestión global de autenticación profesional
  * ============================================================================
  */
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { endpoints } from '../lib/api'; // <-- IMPORTACIÓN DE TU API CENTRALIZADA
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode
+} from 'react';
+
+import { authAPI } from '../lib/api';
 
 export interface User {
+  telefono: string;
   id: string | number;
   nombre: string;
   email: string;
@@ -19,119 +29,286 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (nombre: string, email: string, password: string, rol?: string, area?: string) => Promise<boolean>;
+
+  login: (
+    email: string,
+    password: string
+  ) => Promise<User>;
+
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext =
+  createContext<AuthContextType | undefined>(
+    undefined
+  );
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({
+  children
+}: {
+  children: ReactNode;
+}) {
 
+  const [user, setUser] =
+    useState<User | null>(null);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  /**
+   * ============================================================================
+   * DURACIÓN DE SESIÓN
+   * 24 horas
+   * ============================================================================
+   */
+  const SESSION_DURATION =
+    1000 * 60 * 60 * 24;
+
+  /**
+   * ============================================================================
+   * VALIDAR SESIÓN GUARDADA
+   * ============================================================================
+   */
   useEffect(() => {
-    const loadStoredUser = () => {
+
+    const loadStoredUser = async () => {
+
       try {
-        const storedUser = localStorage.getItem('utc_current_user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+
+        const storedUser =
+          localStorage.getItem(
+            'utc_current_user'
+          );
+
+        /**
+         * ============================================================================
+         * NO HAY SESIÓN
+         * ============================================================================
+         */
+        if (!storedUser) {
+
+          setIsLoading(false);
+          return;
         }
+
+        const parsedUser =
+          JSON.parse(storedUser);
+
+        /**
+         * ============================================================================
+         * VALIDAR ESTRUCTURA
+         * ============================================================================
+         */
+        const isValidUser =
+          parsedUser &&
+          typeof parsedUser === 'object' &&
+          parsedUser.id &&
+          parsedUser.nombre &&
+          parsedUser.email &&
+          parsedUser.rol;
+
+        if (!isValidUser) {
+
+          localStorage.removeItem(
+            'utc_current_user'
+          );
+
+          setIsLoading(false);
+          return;
+        }
+
+        /**
+         * ============================================================================
+         * VALIDAR SESIÓN EN BACKEND
+         * ============================================================================
+         */
+        const sessionValidation =
+          await authAPI.validateSession(
+            parsedUser.email
+          );
+
+        if (!sessionValidation.valid) {
+
+          localStorage.removeItem(
+            'utc_current_user'
+          );
+
+          setIsLoading(false);
+          return;
+        }
+
+        /**
+         * ============================================================================
+         * VALIDAR EXPIRACIÓN
+         * ============================================================================
+         */
+        const now = Date.now();
+
+        const sessionAge =
+          now -
+          (parsedUser.sessionCreatedAt || 0);
+
+        const isExpired =
+          sessionAge > SESSION_DURATION;
+
+        if (isExpired) {
+
+          localStorage.removeItem(
+            'utc_current_user'
+          );
+
+          setIsLoading(false);
+          return;
+        }
+
+        /**
+         * ============================================================================
+         * SESIÓN CORRECTA
+         * ============================================================================
+         */
+        setUser(sessionValidation.user);
+
+      console.log(
+      '✅ Usuario validado desde backend:',
+      sessionValidation.user
+);
+        
       } catch (error) {
-        localStorage.removeItem('utc_current_user');
+
+        console.error(
+          'Error validando sesión:',
+          error
+        );
+
+        localStorage.removeItem(
+          'utc_current_user'
+        );
+
       } finally {
+
         setIsLoading(false);
       }
     };
+
     loadStoredUser();
+
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
+  /**
+   * ============================================================================
+   * LOGIN
+   * ============================================================================
+   */
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<User> => {
+
     try {
-      // USO DE LA API CENTRALIZADA
-      const response = await fetch(`${endpoints.usuarios}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
-      });
 
-      const data = await response.json();
+      const data =
+        await authAPI.login({
+          email,
+          password
+        });
 
-      if (response.ok) {
-        const foundUser: User = {
-          id: data.id,
-          nombre: data.nombre,
-          email: data.email,
-          rol: data.rol,
-          area: data.area,
-          estado: data.estado || 'activo'
-        };
+      const foundUser: User = {
+        id: data.id,
+        nombre: data.nombre,
+        email: data.email,
+        rol: data.rol,
+        area: data.area,
+        estado: data.estado || 'activo'
+      };
 
-        localStorage.setItem('utc_current_user', JSON.stringify(foundUser));
-        setUser(foundUser);
-        return foundUser;
-      } else {
-        throw new Error(data.error || 'Credenciales no válidas');
-      }
-    } catch (error: any) {
-      throw error;
-    }
-  };
-
-  const register = async (nombre: string, email: string, password: string, providedRole?: string, providedArea?: string): Promise<boolean> => {
-    try {
-      // USO DE LA API CENTRALIZADA
-      const response = await fetch(`${endpoints.usuarios}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre,
-          email: email.trim().toLowerCase(),
-          password,
-          rol: providedRole,
-          area: providedArea
+      /**
+       * ============================================================================
+       * GUARDAR SESIÓN
+       * ============================================================================
+       */
+      localStorage.setItem(
+        'utc_current_user',
+        JSON.stringify({
+          ...foundUser,
+          sessionCreatedAt: Date.now(),
+          sessionVersion: 1
         })
-      });
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        const newUser: User = {
-          id: data.id,
-          nombre: data.nombre,
-          email: data.email,
-          rol: data.rol,
-          area: data.area,
-          estado: data.estado || 'activo'
-        };
-        localStorage.setItem('utc_current_user', JSON.stringify(newUser));
-        setUser(newUser);
-        return true;
-      }
-    } catch (error) {
-      console.error("Error de registro:", error);
+      setUser(foundUser);
+
+      return foundUser;
+
+    } catch (error: any) {
+
+      console.error(
+        'Fallo detallado en login:',
+        error.message
+      );
+
+      return Promise.reject(error);
     }
-    return false;
   };
 
+  /**
+   * ============================================================================
+   * LOGOUT
+   * ============================================================================
+   */
   const logout = () => {
+
     setUser(null);
-    localStorage.removeItem('utc_current_user');
+
+    localStorage.removeItem(
+      'utc_current_user'
+    );
   };
 
   return (
-      <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout }}>
-        {isLoading ? (
-            <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-4"></div>
-              <p className="text-blue-900 font-serif animate-pulse">Sincronizando con Clínica UTC...</p>
-            </div>
-        ) : children}
-      </AuthContext.Provider>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout
+      }}
+    >
+
+      {isLoading ? (
+
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
+
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-4"></div>
+
+          <p className="text-blue-900 font-serif animate-pulse">
+            Sincronizando con Clínica UTC...
+          </p>
+
+        </div>
+
+      ) : children}
+
+    </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuth debe usarse dentro de un AuthProvider');
+/**
+ * ============================================================================
+ * HOOK GLOBAL
+ * ============================================================================
+ */
+export const useAuth = () => {
+
+  const context =
+    useContext(AuthContext);
+
+  if (context === undefined) {
+
+    throw new Error(
+      'useAuth debe ser usado dentro de un AuthProvider'
+    );
+  }
+
   return context;
-}
+};

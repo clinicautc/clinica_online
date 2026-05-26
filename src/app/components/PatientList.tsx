@@ -1,15 +1,24 @@
+/**
+ * ============================================================================
+ * ARCHIVO: PatientList.tsx
+ * PROPÓSITO: Gestión de expedientes de pacientes.
+ * MODIFICACIÓN: Sincronización de ruta de historial con parámetro de área dinámico.
+ * ============================================================================
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // Importado para validar el rol
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Users, Mail, Search, Loader2, UserCircle, BookOpen } from 'lucide-react';
+import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { endpoints } from '../lib/api'; // <-- TU API CENTRALIZADA
+import { endpoints } from '../lib/api';
 
-// Adiós a mockData! Tipado 100% SQL
+// Tipado sincronizado con PostgreSQL
 interface Patient {
   id: number | string;
   nombre: string;
@@ -22,31 +31,65 @@ export default function PatientList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const { user } = useAuth(); // Obtenemos el usuario actual del contexto
 
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(endpoints.usuarios); // <-- API
-
-        if (response.ok) {
-          const allUsers: Patient[] = await response.json();
-          // Filtramos estrictamente a los pacientes
-          const patientUsers = allUsers.filter(user => user.rol === 'paciente');
-          setPatients(patientUsers);
-        }
-      } catch (error) {
-        toast.error("Error al sincronizar lista de pacientes");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPatients();
   }, []);
 
+  /**
+   * CARGA DE PACIENTES DESDE LA API
+   */
+  const fetchPatients = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(endpoints.usuarios);
+
+      if (response.ok) {
+        const allUsers: Patient[] = await response.json();
+        // Filtramos estrictamente a los pacientes
+        const patientUsers = allUsers.filter(user => user.rol === 'paciente');
+        setPatients(patientUsers);
+      }
+    } catch (error) {
+      toast.error("Error al sincronizar lista de pacientes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * ELIMINAR PACIENTE (SOLO ADMINS)
+   */
+  const handleEliminarPaciente = async (id: string | number) => {
+    if (!window.confirm('¿Deseas eliminar permanentemente este expediente? Esta acción no se puede deshacer.')) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, { 
+        method: 'DELETE' 
+      });
+      
+      if (response.ok) { 
+        toast.success('Expediente eliminado correctamente'); 
+        fetchPatients(); 
+      }
+    } catch (error) { 
+      toast.error('Error al intentar eliminar el registro'); 
+    }
+  };
+
+  /**
+   * MODIFICACIÓN: handleViewHistory
+   * Ahora detecta el área del practicante/admin actual para redirigir 
+   * correctamente a /historial/:id/:area y evitar errores de carga.
+   */
   const handleViewHistory = (patientId: string | number) => {
-    navigate(`/medical-history-viewer/${patientId}`);
+    // Obtenemos el área actual del usuario (nutricion o fisioterapia)
+    const areaActual = user?.area || 'nutricion';
+    
+    // Navegamos a la ruta protegida sincronizada en el router.tsx
+    toast.info("Accediendo al expediente clínico...");
+    navigate(`/historial/${patientId}/${areaActual}`);
   };
 
   const filteredPatients = patients.filter(patient =>
@@ -56,6 +99,7 @@ export default function PatientList() {
   );
 
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
+  const esAdminDeArea = user?.rol === 'admin' || user?.rol === 'master'; // Validación extendida
 
   return (
       <Card className="border-blue-900/10 w-full bg-white shadow-lg overflow-hidden" style={arialStyle}>
@@ -69,11 +113,11 @@ export default function PatientList() {
             </div>
             <div className="relative w-full md:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
+              <input
                   placeholder="Buscar por nombre o ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-blue-900/20 focus:border-blue-900 rounded-full bg-white"
+                  className="w-full pl-10 pr-4 py-2 border border-blue-900/20 focus:outline-none focus:border-blue-900 rounded-full bg-white text-sm"
               />
             </div>
           </div>
@@ -91,12 +135,20 @@ export default function PatientList() {
               </div>
           ) : (
               <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-blue-900/20">
+                {/* VISTA MÓVIL */}
                 <div className="block md:hidden divide-y divide-blue-900/10">
                   {filteredPatients.map((patient) => (
                       <div key={patient.id} className="p-4 bg-white space-y-3">
                         <div className="flex justify-between items-start">
                           <span className="text-xs font-mono font-bold text-blue-900/40">ID: {patient.id}</span>
-                          <Badge className="bg-green-100 text-green-700 border-green-200 font-bold uppercase text-[9px]">REGISTRADO</Badge>
+                          <div className="flex gap-2">
+                            <Badge className="bg-green-100 text-green-700 border-green-200 font-bold uppercase text-[9px]">REGISTRADO</Badge>
+                            {esAdminDeArea && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={() => handleEliminarPaciente(patient.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <p className="font-black text-blue-950 uppercase">{patient.nombre}</p>
                         <p className="text-xs text-slate-500 flex items-center gap-2"><Mail className="w-3 h-3" /> {patient.email}</p>
@@ -106,6 +158,8 @@ export default function PatientList() {
                       </div>
                   ))}
                 </div>
+
+                {/* VISTA ESCRITORIO */}
                 <div className="hidden md:block">
                   <Table>
                     <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
@@ -115,6 +169,10 @@ export default function PatientList() {
                         <TableHead className="text-blue-900 font-bold">Email Institucional</TableHead>
                         <TableHead className="text-blue-900 font-bold text-center">Estado</TableHead>
                         <TableHead className="text-blue-900 font-bold text-right">Expediente</TableHead>
+                        {/* CABECERA ACCIONES */}
+                        {esAdminDeArea && (
+                          <TableHead className="text-blue-900 font-bold text-center">Acciones</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -131,6 +189,19 @@ export default function PatientList() {
                                 <BookOpen className="w-4 h-4" /> Historiales
                               </Button>
                             </TableCell>
+                            {/* COLUMNA ACCIONES: Solo Admin de Área */}
+                            {esAdminDeArea && (
+                              <TableCell className="text-center">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl"
+                                  onClick={() => handleEliminarPaciente(patient.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            )}
                           </TableRow>
                       ))}
                     </TableBody>

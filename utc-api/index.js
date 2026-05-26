@@ -1,9 +1,10 @@
 /**
  * ============================================================================
- * ARCHIVO: index.js (Servidor Backend UTC - Versión Master de Producción)
+ * ARCHIVO: index.js (Servidor Backend UTC - Versión Master con Estadísticas)
  * PROPÓSITO: API REST para gestión de clínica universitaria
  * CONEXIÓN: PostgreSQL (Render)
- * STATUS: Sincronizado con Dashboards de Nutrición y Fisioterapia
+ * STATUS: Sincronizado con Triggers y Métricas de Inteligencia Operativa
+ * MODIFICACIÓN: Auto-completado de citas al guardar historial y soporte al visor.
  * ============================================================================
  */
 
@@ -12,6 +13,10 @@ const cors = require('cors');
 const { Pool } = require('pg');
 require('dotenv').config();
 const { Resend } = require('resend');
+const bcrypt = require('bcrypt');
+const authRoutes = require('./routes/authRoutes');
+
+const {requireAuth,requireRole,requireSameArea,canModifyAppointment} = require('./middleware/authMiddleware');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const app = express();
@@ -20,34 +25,318 @@ const PORT = process.env.PORT || 3001;
 // --- MIDDLEWARES ---
 app.use(cors());
 app.use(express.json());
+app.use('/api/auth', authRoutes);
 
-// --- CONFIGURACIÓN DE POSTGRESQL ---
+// --- CONFIGURACIÓN DE POSTGRESQL (RENDER) ---
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false } 
 });
 
-// MEMORIA TEMPORAL PARA CÓDIGOS (En producción usar Redis, para el proyecto esto es perfecto)
-const recoveryCodes = {};
-const registerCodes = {};
-
-// --- RUTA DE SALUD ---
+// --- RUTA DE SALUD (ACTUALIZADA PARA MONITOREO) ---
 app.get('/api/health', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
-    res.json({
-      status: "✅ Conexión con PostgreSQL Activa",
+    res.json({ 
+      status: "✅ Conectado a Render", 
       serverTime: result.rows[0],
-      database: process.env.DB_NAME
+      database: process.env.DB_NAME 
     });
   } catch (error) {
-    res.status(500).json({ error: "Fallo de conexión a la DB" });
+    await pool.query(
+      'INSERT INTO logs_sistema (tipo, descripcion) VALUES ($1, $2)',
+      ['error_api', `Fallo en health check: ${error.message}`]
+    );
+    res.status(500).json({ error: error.message });
   }
 });
+
+
+/**
+ * ----------------------------------------------------------------------------
+ * ENDPOINT: PRE-REGISTRO Y ENVÍO DE CÓDIGO (Blindado)
+ * ----------------------------------------------------------------------------
+ */
+app.post('/api/auth/pre-register', async (req, res) => {
+  const { name, email, password } = req.body;
+  const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+// =========================
+// VERIFICAR SI EMAIL YA EXISTE
+// =========================
+
+const existingUser = await pool.query(
+  'SELECT id FROM usuarios WHERE email = $1',
+  [email.trim().toLowerCase()]
+);
+
+if (existingUser.rows.length > 0) {
+
+  return res.status(400).json({
+    error: 'Este correo ya está registrado.'
+  });
+}
+    // PASO 1: Inserción en la tabla de retención (Ya verificada)
+    await pool.query(
+      `INSERT INTO registro_temporal (nombre, email, password_hash, codigo_verificacion, expira_en) 
+       VALUES ($1, $2, $3, $4, NOW() + interval '15 minutes')
+       ON CONFLICT (email) DO UPDATE SET 
+       nombre = $1, password_hash = $3, codigo_verificacion = $4, expira_en = NOW() + interval '15 minutes'`,
+      [name, email.trim().toLowerCase(), hashedPassword, codigo]
+    );
+
+    // PASO 2: Envío por Resend con manejo de errores específico
+    const { data, error } = await resend.emails.send({
+      from: 'Clinica UTC <notificaciones@clinicautc.com>',
+      to: [email.trim().toLowerCase()],
+      subject: 'Código de Verificación - Clínica UTC',
+html: `
+<div style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 10px;background:#ffffff;">
+    <tr>
+      <td align="center">
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="
+          max-width:600px;
+          background:#ffffff;
+          border-radius:18px;
+          overflow:hidden;
+          box-shadow:0 2px 10px rgba(0,0,0,0.05);
+          border:1px solid #e5e7eb;
+        ">
+
+          <!-- HEADER -->
+          <tr>
+            <td align="center" style="
+              background:linear-gradient(135deg,#dbeafe,#eff6ff);
+              padding:35px 20px;
+            ">
+
+              <h1 style="
+                margin:0;
+                font-size:34px;
+                font-weight:900;
+                color:#1e3a8a;
+              ">
+                Clínica UTC
+              </h1>
+
+              <p style="
+                margin-top:10px;
+                font-size:14px;
+                color:#475569;
+              ">
+                Sistema Clínico Universitario
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:35px 25px;">
+
+              <h2 style="
+                margin-top:0;
+                color:#111827;
+                font-size:28px;
+                line-height:1.3;
+              ">
+                Hola, ${name} 👋
+              </h2>
+
+              <p style="
+                color:#4b5563;
+                font-size:16px;
+                line-height:1.8;
+                margin-bottom:30px;
+              ">
+                Recibimos una solicitud para crear una cuenta dentro del sistema clínico de la Universidad Tres Culturas (UTC).
+              </p>
+
+              <!-- CAJA CODIGO -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+
+                    <div style="
+                      background:#eff6ff;
+                      border:2px solid #2563eb;
+                      border-radius:18px;
+                      padding:30px 15px;
+                    ">
+
+                      <p style="
+                        margin:0;
+                        color:#64748b;
+                        font-size:14px;
+                      ">
+                        Tu código de verificación es:
+                      </p>
+
+                      <div style="
+                        margin-top:15px;
+                        font-size:48px;
+                        font-weight:900;
+                        letter-spacing:10px;
+                        color:#1e3a8a;
+                        line-height:1.1;
+                        word-break:break-word;
+                      ">
+                        ${codigo}
+                      </div>
+
+                    </div>
+
+                  </td>
+                </tr>
+              </table>
+
+              <p style="
+                color:#6b7280;
+                font-size:14px;
+                line-height:1.7;
+                margin-top:30px;
+              ">
+                Este código expirará en 15 minutos por motivos de seguridad.
+              </p>
+
+              <p style="
+                color:#6b7280;
+                font-size:14px;
+                line-height:1.7;
+              ">
+                Si tú no realizaste esta solicitud, puedes ignorar este correo.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td align="center" style="
+              background:#ffffff;
+              border-top:1px solid #e5e7eb;
+              padding:20px;
+            ">
+
+              <p style="
+                margin:0;
+                color:#94a3b8;
+                font-size:12px;
+              ">
+                Clínica UTC · Sistema Institucional
+              </p>
+
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</div>
+`
+    });
+
+    // Si Resend falla por el tema del correo no autorizado
+    if (error) {
+      console.error("⚠️ Resend bloqueó el envío:", error.message);
+      return res.status(403).json({ 
+        error: "Restricción de Resend: Solo puedes enviar códigos al correo registrado en la API Key mientras estés en modo prueba." 
+      });
+    }
+
+    res.status(200).json({ message: "Código enviado con éxito." });
+  } catch (error) {
+    console.error("❌ Error interno en Pre-Registro:", error.message);
+    res.status(500).json({ error: "Error en el servidor al procesar el registro." });
+  }
+});
+
+/**
+ * ----------------------------------------------------------------------------
+ * ENDPOINT: VALIDACIÓN Y REGISTRO DEFINITIVO
+ * Lógica: Verifica el código y mueve al usuario a la tabla principal.
+ * ----------------------------------------------------------------------------
+ */
+app.post('/api/auth/verify-and-register', async (req, res) => {
+  const { email, code } = req.body;
+
+  try {
+    // 1. Buscamos en la tabla de retención
+    const tempUser = await pool.query(
+      "SELECT * FROM registro_temporal WHERE email = $1 AND codigo_verificacion = $2 AND expira_en > NOW()",
+      [email.trim().toLowerCase(), code]
+    );
+
+    if (tempUser.rows.length === 0) {
+      return res.status(400).json({ error: "Código incorrecto o expirado." });
+    }
+
+    const { nombre, password_hash } = tempUser.rows[0];
+
+    // 2. Movimiento a la tabla final de USUARIOS
+    const newUser = await pool.query(
+      "INSERT INTO usuarios (nombre, email, password, rol, status) VALUES ($1, $2, $3, 'paciente', 'activo') RETURNING *",
+      [nombre, email.trim().toLowerCase(), password_hash]
+    );
+
+    // 3. Limpiamos la tabla temporal para no dejar basura
+    // Asegúrate de que tu INSERT se vea así para que coincida con tu tabla:
+await pool.query(
+  'DELETE FROM registro_temporal WHERE email = $1',
+  [email.trim().toLowerCase()]
+);
+    res.status(201).json(newUser.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+/**
+ * ----------------------------------------------------------------------------
+ * LÓGICA DE DESACTIVACIÓN AUTOMÁTICA (MODO PRECISIÓN HH:mm)
+ * ----------------------------------------------------------------------------
+ */
+const verificarYDesactivarPracticantes = async () => {
+  try {
+    const ahora = new Date().toLocaleTimeString("en-GB", { 
+      timeZone: "America/Mexico_City", 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+    
+    const HORA_DESACTIVACION = "00:38"; 
+
+    if (ahora === HORA_DESACTIVACION) {
+      const result = await pool.query(
+        "UPDATE usuarios SET status = 'inactivo' WHERE rol = 'practicante' AND status = 'activo'"
+      );
+      
+      if (result.rowCount > 0) {
+        console.log(`🕒 [AUTO-CIERRE] Hora alcanzada (${ahora}). Se desactivaron ${result.rowCount} practicantes.`);
+        await pool.query(
+          "INSERT INTO logs_sistema (tipo, descripcion, metadata) VALUES ($1, $2, $3)",
+          ['cierre_automatico', `Cierre de las 00:38 ejecutado`, JSON.stringify({ afectados: result.rowCount })]
+        );
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error en la desactivación automática:", error.message);
+  }
+};
+
+setInterval(verificarYDesactivarPracticantes, 60000);
 
 /**
  * ----------------------------------------------------------------------------
@@ -55,186 +344,814 @@ app.get('/api/health', async (req, res) => {
  * ----------------------------------------------------------------------------
  */
 
+/**
+ * ----------------------------------------------------------------------------
+ * FORGOT PASSWORD — ENVIAR CÓDIGO
+ * ----------------------------------------------------------------------------
+ */
+app.post('/api/auth/forgot-password', async (req, res) => {
+
+  const { email } = req.body;
+
+  try {
+
+    // 1. Verificar si usuario existe
+    const userResult = await pool.query(
+      'SELECT * FROM usuarios WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'No existe una cuenta con ese correo.'
+      });
+    }
+
+    // 2. Generar código
+    const codigo = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    // 3. Guardar o actualizar código temporal
+    await pool.query(
+      `
+      INSERT INTO password_resets (
+        email,
+        codigo_verificacion,
+        expira_en
+      )
+      VALUES (
+        $1,
+        $2,
+        NOW() + interval '15 minutes'
+      )
+
+      ON CONFLICT(email)
+      DO UPDATE SET
+        codigo_verificacion = $2,
+        expira_en = NOW() + interval '15 minutes'
+      `,
+      [
+        email.trim().toLowerCase(),
+        codigo
+      ]
+    );
+
+    // 4. Enviar correo
+    const { error } = await resend.emails.send({
+
+      from: 'Clinica UTC <noreply@clinicautc.com>',
+
+      to: [email.trim().toLowerCase()],
+
+      subject: 'Recuperación de contraseña - Clínica UTC',
+
+      html: `
+        <div style="
+          font-family: Arial, sans-serif;
+          max-width: 600px;
+          margin: auto;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          overflow: hidden;
+        ">
+
+          <div style="
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            padding: 30px;
+            text-align: center;
+          ">
+            <h1 style="
+              color: white;
+              margin: 0;
+              font-size: 28px;
+              font-weight: bold;
+            ">
+              Clínica UTC
+            </h1>
+          </div>
+
+          <div style="padding: 40px 30px;">
+
+            <h2 style="
+              color: #1e3a8a;
+              margin-top: 0;
+            ">
+              Recuperación de contraseña
+            </h2>
+
+            <p style="
+              color: #374151;
+              font-size: 16px;
+              line-height: 1.6;
+            ">
+              Recibimos una solicitud para restablecer tu contraseña.
+            </p>
+
+            <div style="
+              background: #eff6ff;
+              border: 2px solid #2563eb;
+              border-radius: 16px;
+              padding: 25px;
+              text-align: center;
+              margin: 30px 0;
+            ">
+              <p style="
+                margin: 0 0 10px 0;
+                color: #1e3a8a;
+                font-weight: bold;
+              ">
+                Tu código de recuperación es:
+              </p>
+
+              <div style="
+                font-size: 42px;
+                font-weight: bold;
+                letter-spacing: 8px;
+                color: #ea580c;
+              ">
+                ${codigo}
+              </div>
+            </div>
+
+            <p style="
+              color: #6b7280;
+              font-size: 14px;
+              line-height: 1.5;
+            ">
+              Este código expirará en 15 minutos.
+            </p>
+
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Error enviando correo.'
+      });
+    }
+
+    res.status(200).json({
+      message: 'Código enviado correctamente.'
+    });
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error forgot-password:',
+      error.message
+    );
+
+    res.status(500).json({
+      error: 'Error interno del servidor.'
+    });
+  }
+});
+
+/**
+ * ----------------------------------------------------------------------------
+ * VERIFY RESET CODE
+ * ----------------------------------------------------------------------------
+ */
+app.post('/api/auth/verify-reset-code', async (req, res) => {
+
+  const { email, code } = req.body;
+
+  try {
+
+    const result = await pool.query(
+      `
+      SELECT * FROM password_resets
+      WHERE email = $1
+      AND codigo_verificacion = $2
+      AND expira_en > NOW()
+      `,
+      [
+        email.trim().toLowerCase(),
+        code
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        error: 'Código incorrecto o expirado.'
+      });
+    }
+
+    res.status(200).json({
+      message: 'Código válido.'
+    });
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error verify-code:',
+      error.message
+    );
+
+    res.status(500).json({
+      error: 'Error interno del servidor.'
+    });
+  }
+});
+
+
+/**
+ * ----------------------------------------------------------------------------
+ * RESET PASSWORD
+ * ----------------------------------------------------------------------------
+ */
+app.post('/api/auth/reset-password', async (req, res) => {
+
+  const { email, newPassword } = req.body;
+  const hashedPassword = await bcrypt.hash(
+  newPassword,
+  10
+);
+
+  try {
+
+    // 1. Actualizar contraseña
+    const result = await pool.query(
+      `
+      UPDATE usuarios
+      SET password = $1
+      WHERE email = $2
+      RETURNING *
+      `,
+    [
+      hashedPassword,
+      email.trim().toLowerCase()
+    ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado.'
+      });
+    }
+
+    // 2. Limpiar códigos temporales
+    await pool.query(
+      `
+      DELETE FROM password_resets
+      WHERE email = $1
+      `,
+      [email.trim().toLowerCase()]
+    );
+
+    res.status(200).json({
+      message: 'Contraseña actualizada correctamente.'
+    });
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error reset-password:',
+      error.message
+    );
+
+    res.status(500).json({
+      error: 'Error interno del servidor.'
+    });
+  }
+});
+
+/**
+ * ----------------------------------------------------------------------------
+ * VALIDAR SESIÓN
+ * ----------------------------------------------------------------------------
+ */
+
+app.get('/api/auth/validate-session', async (req, res) => {
+
+  const email = req.headers.email;
+
+  try {
+
+    if (!email) {
+
+      return res.status(400).json({
+        valid: false,
+        error: 'Email requerido'
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        nombre,
+        email,
+        rol,
+        area,
+        status AS estado
+      FROM usuarios
+      WHERE email = $1
+      `,
+      [email.trim().toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+
+      return res.status(401).json({
+        valid: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const usuario = result.rows[0];
+
+    // VALIDAR STATUS
+    if (usuario.estado === 'inactivo') {
+
+      return res.status(403).json({
+        valid: false,
+        error: 'Usuario inactivo'
+      });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        area: usuario.area,
+        estado: usuario.estado
+      }
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Error validate-session:',
+      error.message
+    );
+
+    res.status(500).json({
+      valid: false,
+      error: 'Error interno'
+    });
+  }
+});
+
 app.get('/api/usuarios', async (req, res) => {
   try {
-    // Sincronizado con el frontend: enviamos nombre, email, rol, area y estado
-    const result = await pool.query('SELECT id, nombre, email, rol, area, status as estado FROM usuarios ORDER BY id DESC');
+    const result = await pool.query('SELECT * FROM usuarios ORDER BY fecha_creacion DESC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+/**
+ * ----------------------------------------------------------------------------
+ * ENDPOINT DEFINITIVO: ACTUALIZAR PERFIL (NOMBRE, TELÉFONO Y MATRÍCULA)
+ * ----------------------------------------------------------------------------
+ */
+app.patch('/api/usuarios/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { nombre, telefono, matricula } = req.body;
+
+  // Validación de seguridad
+  if (String(req.user.id) !== String(id)) {
+    return res.status(403).json({ 
+      error: 'No tienes autorización para modificar este perfil.' 
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE usuarios 
+       SET nombre = COALESCE($1, nombre),
+           telefono = COALESCE($2, telefono),
+           matricula = COALESCE($3, matricula)
+       WHERE id = $4 
+       RETURNING id, nombre, telefono, matricula, email, rol, area, status`,
+      [nombre, telefono, matricula, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    return res.json({
+      message: 'Perfil actualizado correctamente',
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error interno en PATCH usuarios:', error.message);
+    return res.status(500).json({ 
+      error: 'Error en la base de datos al procesar la solicitud',
+      details: error.message 
+    });
+  }
+});
+
+app.put('/api/usuarios/:id',requireAuth,requireRole(['admin', 'master']),requireSameArea,async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE usuarios SET status = $1 WHERE id = $2 RETURNING *',
+      [estado, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/usuarios/:id',requireAuth,requireRole(['admin', 'master']),requireSameArea,async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    res.json({ message: "Usuario eliminado" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+/**
+ * ----------------------------------------------------------------------------
+ * SECCIÓN: GESTIÓN DE PRACTICANTES (AUTORIZACIONES)
+ * ----------------------------------------------------------------------------
+ */
+
+app.get('/api/practicantes',  requireAuth, requireRole([ 'admin', 'master' ]), async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM practicantes_autorizados ORDER BY fecha_timestamp DESC');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/usuarios/login', async (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/practicantes', async (req, res) => {
+  const { nombre, email, area, estado, fecha_autorizacion } = req.body;
   try {
     const result = await pool.query(
-        'SELECT id, nombre, email, rol, area, status as estado FROM usuarios WHERE email = $1 AND password = $2',
-        [email.trim().toLowerCase(), password]
-    );
-    if (result.rows.length > 0) {
-      res.json(result.rows[0]);
-    } else {
-      res.status(401).json({ error: 'Correo o contraseña incorrectos' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Error en el servidor" });
-  }
-});
-
-app.post('/api/usuarios/register', async (req, res) => {
-  const { nombre, email, password, rol, area } = req.body;
-  try {
-    const result = await pool.query(
-        'INSERT INTO usuarios (nombre, email, password, rol, area, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, nombre, email, rol, area, status as estado',
-        [nombre.trim(), email.trim().toLowerCase(), password, rol || 'paciente', area || null, 'activo']
+      'INSERT INTO practicantes_autorizados (nombre, email, area, estado, fecha_autorizacion) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nombre.trim(), email.trim().toLowerCase(), area, estado || 'activo', fecha_autorizacion || new Date()]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: "Error al registrar usuario. El correo podría ya existir." });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// --- LÓGICA DE RECUPERACIÓN DE CONTRASEÑA ---
-app.post('/api/usuarios/forgot-password', async (req, res) => {
-  const { email } = req.body;
+app.put('/api/practicantes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
   try {
-    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email.trim().toLowerCase()]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Correo no registrado' });
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    recoveryCodes[email] = { code, expiresAt: Date.now() + 5 * 60 * 1000 };
-
-    await resend.emails.send({
-      from: 'Clínica UTC <noreply@clinicautc.qzz.io>',
-      to: [email],
-      subject: '🔑 Código de Recuperación - UTC',
-      html: `<h1>Código: ${code}</h1><p>Válido por 5 minutos.</p>`
-    });
-    res.json({ message: 'Código enviado' });
-  } catch (error) { res.status(500).json({ error: 'Error al enviar email' }); }
-});
-
-app.post('/api/usuarios/verify-code', (req, res) => {
-  const { email, code } = req.body;
-  const data = recoveryCodes[email];
-  if (!data || Date.now() > data.expiresAt || data.code !== code) {
-    return res.status(400).json({ error: 'Código inválido o expirado' });
+    const result = await pool.query(
+      'UPDATE practicantes_autorizados SET estado = $1 WHERE id = $2 RETURNING *',
+      [estado, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  delete recoveryCodes[email];
-  res.json({ valid: true });
-});
-
-app.post('/api/usuarios/reset-password', async (req, res) => {
-  const { email, newPassword } = req.body;
-  try {
-    await pool.query('UPDATE usuarios SET password = $1 WHERE email = $2', [newPassword, email]);
-    res.json({ message: 'Contraseña actualizada' });
-  } catch (error) { res.status(500).json({ error: 'Error en la base de datos' }); }
 });
 
 /**
  * ----------------------------------------------------------------------------
- * SECCIÓN: CITAS
+ * SECCIÓN: OPERACIONES CLÍNICAS (CITAS E HISTORIALES MÉDICOS)
  * ----------------------------------------------------------------------------
  */
 
 app.get('/api/citas', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM citas ORDER BY fecha ASC, hora ASC');
-    res.json(result.rows);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+    const result = await pool.query('SELECT * FROM citas ORDER BY fecha DESC, hora DESC');
+    const citasEstandarizadas = result.rows.map(cita => ({
+      ...cita,
+      date: cita.fecha, 
+      time: cita.hora,  
+      status: cita.estado 
+    }));
+    res.json(citasEstandarizadas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.patch('/api/citas/:id/asignar', async (req, res) => {
+// Reemplaza este endpoint en tu index.js
+/**
+ * OBTENER CITAS POR PACIENTE
+ * Se eliminó el filtro de CURRENT_DATE para que el paciente 
+ * pueda visualizar sus registros previos y actuales.
+ */
+app.get('/api/citas/paciente/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT * FROM citas 
+       WHERE paciente_id = $1 
+       ORDER BY fecha DESC, hora DESC`, // Cambiado a DESC para ver las más recientes primero
+      [id]
+    );
+    
+    const citasSincronizadas = result.rows.map(cita => ({
+      ...cita,
+      tipo: cita.tipo,
+      estado: cita.estado
+    }));
+    
+    res.json(citasSincronizadas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/citas',requireAuth,requireRole(['paciente','admin','master' ]),async (req, res) => {
+  const { paciente_id, paciente_nombre, tipo, fecha, hora, estado } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [paciente_id, paciente_nombre, tipo, fecha, hora, estado || 'programada']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/citas/:id',requireAuth,canModifyAppointment,async (req, res) => {
+  const { id } = req.params;
+  const { fecha, hora, estado } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE citas SET fecha = $1, hora = $2, estado = $3 
+       WHERE id = $4 RETURNING *`,
+      [fecha, hora, estado || 'programada', id]
+    );
+    if (result.rows.length > 0) {
+      await pool.query(
+        "INSERT INTO metricas (tipo_evento, area, paciente_id, metadata) VALUES ($1, $2, $3, $4)",
+        ['cita_reagendada', result.rows[0].tipo, result.rows[0].paciente_id, JSON.stringify({ nueva_fecha: fecha })]
+      );
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: "Cita no encontrada" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/citas/:id',requireAuth,canModifyAppointment,async (req, res) => {
+  const { id } = req.params;
+  try {
+    const citaPrevia = await pool.query("SELECT * FROM citas WHERE id = $1", [id]);
+    if (citaPrevia.rowCount > 0) {
+      await pool.query(
+        "INSERT INTO metricas (tipo_evento, area, paciente_id) VALUES ($1, $2, $3)",
+        ['cita_cancelada', citaPrevia.rows[0].tipo, citaPrevia.rows[0].paciente_id]
+      );
+    }
+    const result = await pool.query('DELETE FROM citas WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount > 0) {
+      res.json({ message: "Cita eliminada correctamente" });
+    } else {
+      res.status(404).json({ error: "No se encontró la cita" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/citas/:id/asignar',requireAuth,requireRole(['admin','master']),async (req, res) => {
   const { id } = req.params;
   const { practicante_id, practicante_nombre } = req.body;
   try {
     const result = await pool.query(
-        "UPDATE citas SET practicante_id = $1, practicante_nombre = $2, estado = 'asignada' WHERE id = $3 RETURNING *",
-        [practicante_id, practicante_nombre, id]
+      `UPDATE citas SET practicante_id = $1, practicante_nombre = $2, estado = 'programada', fecha_asignacion = NOW() WHERE id = $3 RETURNING *`,
+      [practicante_id, practicante_nombre, id]
     );
-    res.json(result.rows[0]);
-  } catch (error) { res.status(500).json({ error: "Error en asignación" }); }
-});
-
-/**
- * ----------------------------------------------------------------------------
- * SECCIÓN: HISTORIALES CLÍNICOS (LÓGICA UNIFICADA)
- * ----------------------------------------------------------------------------
- */
-
-// Este endpoint es el que el frontend usa para "Buscar si ya existe un historial"
-app.get('/api/historiales', async (req, res) => {
-  try {
-    // Consultamos las dos tablas principales de historiales
-    const fisio = await pool.query("SELECT id, paciente_id, paciente_nombre, 'fisioterapia' as tipo, datos, appointment_id FROM historiales_fisioterapia");
-    const nutri = await pool.query("SELECT id, paciente_id, paciente_nombre, 'nutricion' as tipo, datos, appointment_id FROM historiales_nutricion");
-
-    // Unimos los resultados en una sola lista para el frontend
-    res.json([...fisio.rows, ...nutri.rows]);
+    res.json(result.rows.length > 0 ? result.rows[0] : res.status(404).json({ error: "No se encontró la cita." }));
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener historiales unificados" });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/historiales', async (req, res) => {
-  const { paciente_id, paciente_nombre, tipo, datos, creado_por, appointment_id } = req.body;
+/** * ----------------------------------------------------------------------------
+ * SECCIÓN: GESTIÓN DE HISTORIALES (CONFIGURACIÓN API)
+ * ----------------------------------------------------------------------------
+ */
 
-  // Determinamos a qué tabla debe ir según el tipo
-  let tabla = 'historiales_medicos'; // Fallback
-  if (tipo === 'fisioterapia') tabla = 'historiales_fisioterapia';
-  if (tipo === 'nutricion') tabla = 'historiales_nutricion';
+app.get('/api/historiales',requireAuth,requireRole(['practicante','admin','master']),async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM historiales_medicos ORDER BY fecha_creacion DESC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+  
+});
 
+/**
+ * LÓGICA DE VERIFICACIÓN DE RECURRENCIA
+ * Utilizada por los Dashboards de Practicante para cambiar el botón dinámicamente.
+ */
+app.get('/api/historiales/verificar/:pacienteId/:area', async (req, res) => {
+  const { pacienteId, area } = req.params;
+  const tabla = area === 'nutricion' ? 'historiales_nutricion' : 'historiales_fisioterapia';
+  try {
+    const result = await pool.query(`SELECT COUNT(*) FROM ${tabla} WHERE paciente_id = $1`, [pacienteId]);
+    const esRecurrente = parseInt(result.rows[0].count) > 0;
+    
+    // Registro preventivo en métricas si se detecta paciente recurrente
+    if (esRecurrente) {
+      await pool.query(
+        "INSERT INTO metricas (tipo_evento, area, paciente_id, metadata) VALUES ($1, $2, $3, $4)",
+        ['paciente_recurrente', area, pacienteId, JSON.stringify({ mensaje: "Cita subsecuente detectada" })]
+      );
+    }
+    res.json({ existe: esRecurrente });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * OBTENER HISTORIALES POR PACIENTE Y ÁREA
+ * Estos endpoints alimentan directamente al componente MedicalHistoryViewer_v2.
+ */
+/**
+ * ENDPOINT: Obtener datos específicos de un historial por ID de Cita
+ * Utilizado para el auto-rellenado de formularios guardados.
+ */
+app.get('/api/historiales-nutricion/detalle/:appointmentId', async (req, res) => {
+  const { appointmentId } = req.params;
   try {
     const result = await pool.query(
-        `INSERT INTO ${tabla} (paciente_id, paciente_nombre, tipo, datos, creado_por, appointment_id) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [paciente_id, paciente_nombre, tipo, JSON.stringify(datos), creado_por, appointment_id]
+      'SELECT datos FROM historiales_nutricion WHERE appointment_id = $1',
+      [appointmentId]
+    );
+    
+    if (result.rows.length > 0) {
+      res.json(result.rows[0].datos);
+    } else {
+      res.status(404).json({ error: "No se encontraron datos para esta cita." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/historiales-fisioterapia/paciente/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM historiales_fisioterapia WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GUARDADO DE HISTORIAL CLÍNICO (MASTER POST)
+ * Realiza tres acciones clave: Guarda datos, actualiza cita y registra métrica.
+ */
+app.post('/api/historiales', async (req, res) => {
+  const { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio } = req.body;
+  const tipoLimpio = tipo ? tipo.trim().toLowerCase() : 'medicos';
+  let tablaDestino = 'historiales_medicos';
+  
+  if (tipoLimpio === 'nutricion') tablaDestino = 'historiales_nutricion';
+  else if (tipoLimpio === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
+
+  try {
+    // 1. Inserción del registro clínico en la tabla correspondiente
+    const result = await pool.query(
+      `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [paciente_id, paciente_nombre, tipoLimpio, JSON.stringify(datos), creado_por, creado_por_nombre, appointment_id, duracion_carga || 0, timestamp_inicio || null]
+    );
+
+    // 2. MODIFICACIÓN: ACTUALIZAR ESTADO DE LA CITA PARA QUE DESAPAREZCA DEL DASHBOARD
+    // Al pasar de 'programada' a 'completada', el filtro del frontend deja de mostrarla.
+    if (appointment_id) {
+      await pool.query("UPDATE citas SET estado = 'completada' WHERE id = $1", [appointment_id]);
+    }
+
+    // 3. Registro de métrica para el dashboard de control del Master/Admin
+    await pool.query(
+      "INSERT INTO metricas (tipo_evento, area, valor_numerico, paciente_id) VALUES ($1, $2, $3, $4)",
+      ['tiempo_consulta', tipoLimpio, duracion_carga || 0, paciente_id]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/notas-evolucion', async (req, res) => {
+  const { paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO notas_evolucion (paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area || 'nutricion']
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Error al guardar historial:", error.message);
-    res.status(500).json({ error: "Error de servidor al guardar el historial clínico" });
+    res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * ----------------------------------------------------------------------------
- * SECCIÓN: COMUNICADOS (NOTAS)
+ * SECCIÓN: SISTEMA DE LOGS Y COMUNICADOS
  * ----------------------------------------------------------------------------
  */
+
+app.get('/api/logs', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM logs_sistema ORDER BY fecha DESC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/api/notas', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM notas ORDER BY fecha_creacion DESC');
     res.json(result.rows);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/notas', async (req, res) => {
-  const { titulo, contenido, destino, creado_por, creado_por_nombre, destinatario_especifico } = req.body;
+  const { titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico } = req.body;
   try {
     const result = await pool.query(
-        `INSERT INTO notas (titulo, contenido, destino, creado_por, creado_por_nombre, destinatario_especifico, fecha_creacion) 
-       VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *`,
-        [titulo, contenido, destino, creado_por, creado_por_nombre, destinatario_especifico || null]
+      `INSERT INTO notas (titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico, fecha_creacion) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
+      [titulo, contenido, destino, creado_por, creado_por_nombre || 'Master UTC', creado_por_email, destinatario_especifico || null]
     );
     res.status(201).json(result.rows[0]);
-  } catch (error) { res.status(500).json({ error: "Error al publicar nota" }); }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// --- ELIMINAR NOTA ---
-app.delete('/api/notas/:id', async (req, res) => {
+app.put('/api/notas/:id/responder', async (req, res) => {
+  const { id } = req.params;
+  const { respuesta } = req.body;
   try {
-    await pool.query('DELETE FROM notas WHERE id = $1', [req.params.id]);
-    res.json({ message: "Nota eliminada" });
-  } catch (error) { res.status(500).json({ error: "Error al eliminar" }); }
+    const result = await pool.query(`UPDATE notas SET respuesta = $1, fecha_respuesta = NOW() WHERE id = $2 RETURNING *`, [respuesta, id]);
+    res.json(result.rows.length > 0 ? result.rows[0] : res.status(404).json({ error: "La nota no existe." }));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// --- INICIO DEL SERVIDOR ---
-app.get('/', (req, res) => res.send('🚀 Servidor UTC Activo'));
+/**
+ * ----------------------------------------------------------------------------
+ * SECCIÓN: ESTADÍSTICAS E INTELIGENCIA
+ * ----------------------------------------------------------------------------
+ */
+
+app.get('/api/stats/dashboard',requireAuth,requireRole(['admin','master']),async (req, res) => {
+  try {
+    const total = await pool.query("SELECT COUNT(*) FROM citas");
+    const completadas = await pool.query("SELECT COUNT(*) FROM citas WHERE estado = 'completada'");
+    const programadas = await pool.query("SELECT COUNT(*) FROM citas WHERE estado = 'programada'");
+    const canceladasMetrica = await pool.query("SELECT COUNT(*) FROM metricas WHERE tipo_evento = 'cita_cancelada'");
+    const reagendadasMetrica = await pool.query("SELECT COUNT(*) FROM metricas WHERE tipo_evento = 'cita_reagendada'");
+    const promedioConsultaMetrica = await pool.query("SELECT AVG(valor_numerico) FROM metricas WHERE tipo_evento = 'tiempo_consulta'");
+    
+    res.json({
+      totalCitas: parseInt(total.rows[0].count),
+      citasCompletadas: parseInt(completadas.rows[0].count),
+      citasCanceladas: parseInt(canceladasMetrica.rows[0].count),
+      citasProgramadas: parseInt(programadas.rows[0].count),
+      reagendadas: parseInt(reagendadasMetrica.rows[0].count),
+      promedioConsulta: Math.round(promedioConsultaMetrica.rows[0].avg || 0),
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('🚀 Servidor UTC Activo - API funcionando correctamente.');
+});
 
 app.listen(PORT, () => {
-  console.log(`✅ API Clínica UTC corriendo en http://localhost:${PORT}`);
+  console.log(`✅ API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO ${PORT}`);
 });

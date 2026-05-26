@@ -4,7 +4,7 @@
  * PROPÓSITO: Gestión administrativa de practicantes (Estatus y Eliminación)
  * ============================================================================
  */
-
+import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -38,6 +38,7 @@ interface PractitionerManagementProps {
 }
 
 export default function PractitionerManagement({ area }: PractitionerManagementProps) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [practitioners, setPracticantes] = useState<Practitioner[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,7 +94,7 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
     try {
       const response = await fetch(`http://localhost:3001/api/usuarios/${practitionerId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify({ estado: nuevoEstado }) // 'estado' coincide con tu index.js
       });
 

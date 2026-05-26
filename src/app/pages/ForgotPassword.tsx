@@ -1,236 +1,467 @@
-/**
- * ============================================================================
- * ARCHIVO: ForgotPassword.tsx
- * PROPÓSITO: Recuperación de cuenta en 3 pasos con validación de código.
- * CORRECCIÓN: Solución a Type Narrowing y sincronización con endpoints.ts.
- * ============================================================================
- */
-
 import { useState } from 'react';
-import { Check, Mail, KeyRound, Loader2, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Check,Mail,Lock,KeyRound,Eye,EyeOff} from 'lucide-react';
+import { useNavigate } from 'react-router';
+
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
-import { endpoints } from '../lib/api';
-import { toast } from 'sonner';
+import { authAPI } from '../lib/api';
 
 type Step = 'email' | 'code' | 'password' | 'success';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<Step>('email');
-  const [loading, setLoading] = useState(false);
 
-  // ESTADOS DE DATOS
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);const [ showConfirmPassword,setShowConfirmPassword] = useState(false);
 
-  // ESTADOS DE ERROR
   const [emailError, setEmailError] = useState('');
   const [codeError, setCodeError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const passwordValidation = {
+  minLength: newPassword.length >= 8,
+  uppercase: /[A-Z]/.test(newPassword),
+  lowercase: /[a-z]/.test(newPassword),
+  number: /[0-9]/.test(newPassword),
+  special: /[^A-Za-z0-9]/.test(newPassword),
+};
 
-  // VALIDACIONES
+const isPasswordValid =
+  Object.values(passwordValidation)
+    .every(Boolean);
+
+const passwordsMatch =
+  newPassword === confirmPassword;
+
   const validateEmail = (value: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return !value || !regex.test(value) ? 'Ingresa un email válido' : '';
   };
 
-  const validatePassword = (value: string) => value.length < 8 ? 'Mínimo 8 caracteres' : '';
-  const validateConfirm = (value: string) => value !== newPassword ? 'Las contraseñas no coinciden' : '';
+  const validatePassword = (value: string) => {
+    return value.length < 8 ? 'Mínimo 8 caracteres' : '';
+  };
 
-  const handleBackToLogin = () => navigate('/login');
+  const validateConfirm = (value: string) => {
+    return value !== newPassword ? 'No coinciden' : '';
+  };
+
+  const handleBackToLogin = () => navigate('/');
+
+  // ===============================
+  // SUCCESS
+  // ===============================
+  if (currentStep === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50">
+        <div className="text-center space-y-6">
+          <Check className="w-16 h-16 mx-auto text-green-500" />
+          <h2 className="text-2xl font-bold text-blue-900">¡Contraseña actualizada!</h2>
+          <Button onClick={handleBackToLogin}>
+            Volver al login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-      <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-blue-50 to-orange-50 font-sans">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-blue-50 to-orange-50">
 
-        {/* --- SECCIÓN IZQUIERDA: INDICADORES DE PROGRESO --- */}
-        <div className="hidden lg:flex w-1/2 items-center justify-end pr-16">
-          <div className="max-w-sm w-full">
-            <h1 className="text-5xl font-black text-blue-900 mb-4 tracking-tighter uppercase">
-              Recuperar<br /><span className="text-orange-600">Acceso</span>
-            </h1>
-            <p className="text-slate-500 mb-10 font-medium italic">
-              {currentStep === 'email' && 'Paso 1: Identifica tu cuenta institucional.'}
-              {currentStep === 'code' && 'Paso 2: Verifica tu identidad con el código enviado.'}
-              {currentStep === 'password' && 'Paso 3: Define una nueva contraseña segura.'}
-              {currentStep === 'success' && '¡Listo! Tu cuenta ha sido restaurada.'}
-            </p>
+      {/* IZQUIERDA */}
+      <div className="hidden lg:flex w-1/2 items-center justify-end pr-10">
+        <div className="max-w-sm w-full">
 
-            <div className="flex items-center gap-4">
-              {/* Paso 1: Email */}
-              <StepIndicator
-                  stepNumber={1}
-                  label="Email"
-                  isActive={currentStep === 'email'}
-                  isCompleted={currentStep !== 'email'}
-              />
-              <div className={`h-0.5 w-12 ${currentStep !== 'email' ? 'bg-blue-900' : 'bg-slate-200'}`} />
+          <h1 className="text-4xl font-bold text-blue-900 mb-4">
+            Recupera contraseña
+          </h1>
 
-              {/* Paso 2: Código */}
-              <StepIndicator
-                  stepNumber={2}
-                  label="Código"
-                  isActive={currentStep === 'code'}
-                  isCompleted={currentStep === 'password' || currentStep === 'success'}
-              />
-              <div className={`h-0.5 w-12 ${(currentStep === 'password' || currentStep === 'success') ? 'bg-blue-900' : 'bg-slate-200'}`} />
+          <p className="text-gray-600 mb-10">
+            {currentStep === 'email' && 'Ingresa tu correo electrónico y te enviaremos un código de verificación para restablecer tu contraseña.'}
+            {currentStep === 'code' && 'Te enviamos un código. Escríbelo para continuar.'}
+            {currentStep === 'password' && 'Crea una nueva contraseña segura.'}
+          </p>
 
-              {/* Paso 3: Nueva Clave */}
-              <StepIndicator
-                  stepNumber={3}
-                  label="Nueva"
-                  isActive={currentStep === 'password'}
-                  isCompleted={currentStep === 'success'}
-              />
+
+          <div className="flex items-center gap-4">
+
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 flex items-center justify-center rounded-full
+                ${currentStep !== 'email'
+                  ? 'bg-blue-900 text-white'
+                  : 'bg-blue-100 text-blue-900'}`}>
+                {currentStep !== 'email' ? '✓' : '1'}
+              </div>
+              <span className="text-sm mt-2 text-gray-500">Email</span>
             </div>
-          </div>
-        </div>
 
-        {/* --- SECCIÓN DERECHA: FORMULARIOS DINÁMICOS --- */}
-        <div className="flex w-full lg:w-1/2 items-center justify-center p-6 lg:p-10">
-          <div className="w-full max-w-md bg-white/80 backdrop-blur-md rounded-[2.5rem] shadow-2xl border border-white p-8 sm:p-10 space-y-8">
+            <div className="h-1 w-16 bg-gray-200" />
 
-            {/* VISTA DE ÉXITO FINAL */}
-            {currentStep === 'success' ? (
-                <div className="text-center space-y-6 py-4 animate-in zoom-in-95 duration-300">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                    <Check className="w-10 h-10 text-green-600" />
-                  </div>
-                  <h2 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">¡Éxito Total!</h2>
-                  <p className="text-slate-500 text-sm font-medium italic">Tu contraseña ha sido actualizada correctamente. Ya puedes volver a ingresar al sistema.</p>
-                  <Button onClick={handleBackToLogin} className="w-full h-12 bg-blue-900 hover:bg-black text-white font-black uppercase rounded-xl">
-                    Ir al Inicio de Sesión
-                  </Button>
-                </div>
-            ) : (
-                <>
-                  {/* FORMULARIO: PASO 1 (EMAIL) */}
-                  {currentStep === 'email' && (
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const err = validateEmail(email);
-                        setEmailError(err);
-                        if (err) return;
-                        try {
-                          setLoading(true);
-                          const res = await fetch(`${endpoints.usuarios}/forgot-password`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email })
-                          });
-                          if (res.ok) { setCurrentStep('code'); toast.success("Código de verificación enviado"); }
-                          else { const d = await res.json(); setEmailError(d.error || 'Correo no encontrado'); }
-                        } catch { setEmailError('Error de conexión con el servidor'); }
-                        finally { setLoading(false); }
-                      }} className="space-y-6">
-                        <div className="space-y-2">
-                          <Label className="text-blue-900 font-black uppercase text-xs ml-1">Correo Electrónico</Label>
-                          <div className="relative">
-                            <Mail className="absolute left-4 top-3.5 w-5 h-5 text-blue-900/30" />
-                            <Input value={email} onChange={(e) => { setEmail(e.target.value.trim()); setEmailError(''); }} placeholder="usuario@utc.edu.mx" className="pl-12 h-12 rounded-xl border-slate-100 bg-white" />
-                          </div>
-                          {emailError && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{emailError}</p>}
-                        </div>
-                        <Button type="submit" disabled={loading} className="w-full h-12 bg-blue-900 hover:bg-black text-white font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95">
-                          {loading ? <Loader2 className="animate-spin" /> : "Enviar Código"}
-                        </Button>
-                      </form>
-                  )}
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 flex items-center justify-center rounded-full
+                ${currentStep === 'password' || currentStep === 'success'
+                  ? 'bg-blue-900 text-white'
+                  : currentStep === 'code'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-blue-100 text-blue-900'}`}>
+                {currentStep === 'password' || currentStep === 'success' ? '✓' : '2'}
+              </div>
+              <span className="text-sm mt-2 text-gray-500">Código</span>
+            </div>
 
-                  {/* FORMULARIO: PASO 2 (CÓDIGO) */}
-                  {currentStep === 'code' && (
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (verificationCode.length !== 6) { setCodeError('Código incompleto'); return; }
-                        try {
-                          setLoading(true);
-                          const res = await fetch(`${endpoints.usuarios}/verify-code`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, code: verificationCode })
-                          });
-                          if (res.ok) setCurrentStep('password');
-                          else { const d = await res.json(); setCodeError(d.error || 'Código incorrecto'); }
-                        } catch { setCodeError('Fallo en la verificación'); }
-                        finally { setLoading(false); }
-                      }} className="space-y-6">
-                        <div className="space-y-2">
-                          <Label className="text-blue-900 font-black uppercase text-xs ml-1">Código de 6 Dígitos</Label>
-                          <div className="relative">
-                            <KeyRound className="absolute left-4 top-3.5 w-5 h-5 text-blue-900/30" />
-                            <Input value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" className="pl-12 h-14 rounded-xl text-2xl tracking-[0.5em] text-center font-black border-slate-100 bg-white" />
-                          </div>
-                          {codeError && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{codeError}</p>}
-                        </div>
-                        <Button type="submit" disabled={loading || verificationCode.length !== 6} className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase rounded-xl shadow-lg">
-                          {loading ? <Loader2 className="animate-spin" /> : "Validar Código"}
-                        </Button>
-                      </form>
-                  )}
+            <div className="h-1 w-16 bg-gray-200" />
 
-                  {/* FORMULARIO: PASO 3 (NUEVA CONTRASEÑA) */}
-                  {currentStep === 'password' && (
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const pErr = validatePassword(newPassword);
-                        const cErr = validateConfirm(confirmPassword);
-                        setPasswordError(pErr); setConfirmPasswordError(cErr);
-                        if (pErr || cErr) return;
-                        try {
-                          setLoading(true);
-                          const res = await fetch(`${endpoints.usuarios}/reset-password`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, newPassword })
-                          });
-                          if (res.ok) setCurrentStep('success');
-                          else toast.error("Error al actualizar la base de datos");
-                        } catch { toast.error("Error de red"); }
-                        finally { setLoading(false); }
-                      }} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="text-blue-900 font-black uppercase text-xs ml-1">Nueva Contraseña</Label>
-                          <Input type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }} className="h-12 rounded-xl border-slate-100" />
-                          {passwordError && <p className="text-red-500 text-xs font-bold">{passwordError}</p>}
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-blue-900 font-black uppercase text-xs ml-1">Confirmar Contraseña</Label>
-                          <Input type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setConfirmPasswordError(''); }} className="h-12 rounded-xl border-slate-100" />
-                          {confirmPasswordError && <p className="text-red-500 text-xs font-bold">{confirmPasswordError}</p>}
-                        </div>
-                        <Button type="submit" disabled={loading} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-black uppercase rounded-xl shadow-lg">
-                          {loading ? <Loader2 className="animate-spin" /> : "Restablecer Ahora"}
-                        </Button>
-                      </form>
-                  )}
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 flex items-center justify-center rounded-full
+                ${currentStep === 'success'
+                  ? 'bg-blue-900 text-white'
+                  : currentStep === 'password'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-blue-100 text-blue-900'}`}>
+                {currentStep === 'success' ? '✓' : '3'}
+              </div>
+              <span className="text-sm mt-2 text-gray-500">Nueva</span>
+            </div>
 
-                  <div className="pt-4 border-t border-slate-50 text-center">
-                    <button onClick={handleBackToLogin} className="text-blue-900/40 hover:text-blue-900 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 mx-auto transition-colors">
-                      <ArrowLeft className="w-3 h-3" /> Volver al Login
-                    </button>
-                  </div>
-                </>
-            )}
           </div>
         </div>
       </div>
-  );
+      {
+  currentStep === 'password' && (
+    <div className="
+      hidden
+      xl:flex
+      flex-col
+      justify-center
+      px-10
+      text-sm
+      space-y-3
+      min-w-[260px]
+    ">
+      <h3 className="text-blue-900 font-bold ">Contraseña segura</h3>
+
+      <p className={
+        passwordValidation.minLength
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Mínimo 8 caracteres
+      </p>
+
+      <p className={
+        passwordValidation.uppercase
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Una letra mayúscula
+      </p>
+
+      <p className={
+        passwordValidation.lowercase
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Una letra minúscula
+      </p>
+
+      <p className={
+        passwordValidation.number
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Un número
+      </p>
+
+      <p className={
+        passwordValidation.special
+          ? 'text-green-600 font-medium'
+          : 'text-slate-400'
+      }>
+        • Un carácter especial
+      </p>
+
+    </div>
+  )
 }
 
-// COMPONENTE AUXILIAR PARA LOS CÍRCULOS DE PROGRESO
-function StepIndicator({ stepNumber, label, isActive, isCompleted }: { stepNumber: number, label: string, isActive: boolean, isCompleted: boolean }) {
-  return (
-      <div className="flex flex-col items-center">
-        <div className={`w-12 h-12 flex items-center justify-center rounded-2xl shadow-sm transition-all duration-500
-        ${isCompleted ? 'bg-blue-900 text-white' : isActive ? 'bg-orange-500 text-white scale-110' : 'bg-white text-slate-300 border-2 border-slate-100'}`}>
-          {isCompleted ? <Check className="w-5 h-5" /> : <span className="font-black">{stepNumber}</span>}
+      {/* DERECHA */}
+
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 lg:p-10">
+        <div className="w-full max-w-sm sm:max-w-md bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
+
+          {/* EMAIL */}
+          {currentStep === 'email' && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+
+                const err = validateEmail(email);
+                setEmailError(err);
+                if (err) return;
+
+                try {
+          await authAPI.forgotPassword(email);
+
+          setCurrentStep('code');
+
+                } catch {
+                  setEmailError('Error de conexión');
+                }
+              }}
+              className="space-y-4"
+            >
+              <Label>Correo electrónico</Label>
+
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 w-4 h-4 opacity-50" />
+                <Input
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError('');
+                  }}
+                  placeholder="tu@email.com"
+                  className="pl-10"
+                />
+              </div>
+
+              {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
+
+              <Button type="submit" className="w-full cursor-pointer bg-blue-900 hover:bg-blue-800">
+                Enviar código
+              </Button>
+            </form>
+          )}
+
+          {/* CODE */}
+          {currentStep === 'code' && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+
+                if (verificationCode.length !== 6) {
+                  setCodeError('El código debe tener 6 dígitos');
+                  return;
+                }
+
+                try {
+                await authAPI.verifyResetCode({
+                  email,
+                  code: verificationCode
+                  });
+
+setCurrentStep('password');
+
+                } catch {
+                  setCodeError('Error de conexión');
+                }
+              }}
+              className="space-y-4"
+            >
+              <Label>Código</Label>
+
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-3 w-4 h-4 opacity-50" />
+                <Input
+                  value={verificationCode}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setVerificationCode(value);
+                    setCodeError('');
+                  }}
+                  placeholder="123456"
+                  maxLength={6}
+                  inputMode="numeric"
+                  className="pl-10 text-center"
+                />
+              </div>
+
+              {codeError && <p className="text-red-500 text-sm">{codeError}</p>}
+
+              <Button 
+                type="submit"
+                disabled={verificationCode.length !== 6}
+                className={`w-full
+                  ${verificationCode.length !== 6
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-900 hover:bg-blue-800 cursor-pointer'
+                  }`}
+              >
+                Verificar
+              </Button>
+            </form>
+          )}
+
+          {/* PASSWORD */}
+          {currentStep === 'password' && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+
+                const pErr = validatePassword(newPassword);
+                const cErr = validateConfirm(confirmPassword);
+
+                setPasswordError(pErr);
+                setConfirmPasswordError(cErr);
+
+                if (pErr || cErr) return;
+
+                try {
+              await authAPI.resetPassword({
+                email,
+                newPassword
+               });
+
+setCurrentStep('success');
+
+                } catch {
+                  setPasswordError('Error de conexión');
+                }
+              }}
+              className="space-y-4"
+            >
+<Label>Nueva contraseña</Label>
+
+<div className="relative">
+
+  <Input
+    type={
+      showPassword
+        ? 'text'
+        : 'password'
+    }
+    value={newPassword}
+    onChange={(e) => {
+      setNewPassword(e.target.value);
+      setPasswordError('');
+    }}
+    className="pr-10"
+  />
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowPassword(!showPassword)
+    }
+    className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-slate-400
+      hover:text-blue-900
+    "
+  >
+    {
+      showPassword
+        ? (
+          <EyeOff className="w-4 h-4" />
+        )
+        : (
+          <Eye className="w-4 h-4" />
+        )
+    }
+  </button>
+
+</div>
+
+{
+  passwordError && (
+    <p className="text-red-500 text-sm">
+      {passwordError}
+    </p>
+  )
+}
+
+<Label>
+  Confirmar contraseña
+</Label>
+
+<div className="relative">
+
+  <Input
+    type={
+      showConfirmPassword
+        ? 'text'
+        : 'password'
+    }
+    value={confirmPassword}
+    onChange={(e) => {
+      setConfirmPassword(e.target.value);
+      setConfirmPasswordError('');
+    }}
+    className="pr-10"
+  />
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowConfirmPassword(
+        !showConfirmPassword
+      )
+    }
+    className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-slate-400
+      hover:text-blue-900
+    "
+  >
+    {
+      showConfirmPassword
+        ? (
+          <EyeOff className="w-4 h-4" />
+        )
+        : (
+          <Eye className="w-4 h-4" />
+        )
+    }
+  </button>
+
+</div>
+
+{
+  confirmPassword &&
+  !passwordsMatch && (
+    <p className="text-red-500 text-sm">
+      Las contraseñas no coinciden
+    </p>
+  )
+}
+
+              <Button disabled={!isPasswordValid ||!passwordsMatch}
+  className={`w-full
+    ${
+      isPasswordValid &&
+      passwordsMatch
+        ? 'bg-orange-500 hover:bg-orange-600 cursor-pointer'
+        : 'bg-gray-400 cursor-not-allowed'
+    }
+  `}
+>
+                Guardar contraseña
+              </Button>
+            </form>
+          )}
+
+          <div className="text-center">
+            <button
+              onClick={handleBackToLogin}
+              className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              Volver al inicio de sesión
+            </button>
+          </div>
+
         </div>
-        <span className={`text-[10px] mt-2 font-black uppercase tracking-widest ${isActive ? 'text-orange-600' : 'text-blue-900/40'}`}>{label}</span>
       </div>
+    </div>
   );
 }

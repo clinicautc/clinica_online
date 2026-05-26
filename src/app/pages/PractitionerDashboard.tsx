@@ -3,139 +3,168 @@ import { useAuth } from '../contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { LogOut, Users, FileText, Calendar, Clock, Utensils, Activity, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+import { Badge } from '../components/ui/badge';
+// Iconos temáticos: Actividad para Fisio y Utensilios para Nutrición
+import { LogOut, Users, FileText, Calendar, Clock, Utensils, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router';
+// Librerías de fechas para que el sistema sepa exactamente qué es "hoy"
+import { format, parseISO, isSameDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { mockAppointments, Appointment } from '../lib/mockData';
 
+// Componentes modulares que hacen que este Dashboard no esté saturado de código
 import PatientList from '../components/PatientList';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
-import { endpoints } from '../lib/api';
-
-interface Appointment {
-    id: number;
-    paciente_nombre: string;
-    tipo: string;
-    fecha: string;
-    hora: string;
-    estado: string;
-    practicante_id?: number | null;
-    paciente_id?: number;
-}
 
 export default function PractitionerDashboard() {
-    const { user, logout, isLoading: authLoading } = useAuth();
-    const navigate = useNavigate();
-    const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
-    const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  // Estado para guardar las citas que el practicante debe atender hoy
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
 
-    // Variables dinámicas según el área
-    const isNutricion = user?.area === 'nutricion';
-    const themeColor = isNutricion ? 'orange' : 'blue';
-    const AreaIcon = isNutricion ? Utensils : Activity;
-    const areaName = isNutricion ? 'Nutrición' : 'Fisioterapia';
-
-    useEffect(() => {
-        const fetchTodayAppointments = async () => {
-            try {
-                setIsLoadingCitas(true);
-                const todayStr = format(new Date(), 'yyyy-MM-dd');
-                const response = await fetch(endpoints.citas);
-
-                if (response.ok) {
-                    const allAppointments: Appointment[] = await response.json();
-                    const filtered = allAppointments.filter((apt) => {
-                        const cleanAptDate = apt.fecha.split('T')[0];
-                        return (
-                            cleanAptDate === todayStr &&
-                            apt.tipo === user?.area &&
-                            (apt.estado === 'programada' || apt.estado === 'asignada') &&
-                            String(apt.practicante_id) === String(user?.id)
-                        );
-                    });
-                    setTodayAppointments(filtered);
-                }
-            } catch (error) {
-                toast.error("Error al sincronizar la agenda");
-            } finally {
-                setIsLoadingCitas(false);
-            }
-        };
-
-        if (user?.id) fetchTodayAppointments();
-    }, [user]);
-
-    const handleAccessForms = (appointment: any) => {
-        const idReal = appointment.paciente_id || 5;
-        navigate(`/forms/${user?.area}/${appointment.id}?pId=${idReal}`);
-    };
-
-    if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className={`animate-spin text-${themeColor}-600 w-10 h-10`} /></div>;
-
-    return (
-        <div className={`min-h-screen bg-gradient-to-br from-${themeColor}-50 to-${themeColor}-100`}>
-            <header className={`bg-white border-b border-${themeColor}-900/10 shadow-sm`}>
-                <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 bg-gradient-to-br from-${themeColor}-600 to-${themeColor}-500 rounded-full flex items-center justify-center shadow-sm`}>
-                            <AreaIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className={`text-xl font-bold text-${themeColor}-900`}>Clínica UTC - {areaName}</h1>
-                            <p className={`text-sm text-${themeColor}-900/60 font-serif italic`}>Practicante: {user?.nombre}</p>
-                        </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/login'); }} className={`border-${themeColor}-200 text-${themeColor}-900`}>
-                        <LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión
-                    </Button>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-                <Tabs defaultValue="today_appointments" className="space-y-6">
-                    <TabsList className={`bg-white border border-${themeColor}-200 p-1 h-auto shadow-sm`}>
-                        <TabsTrigger value="today_appointments" className={`data-[state=active]:bg-${themeColor}-600 data-[state=active]:text-white font-bold`}><Calendar className="w-4 h-4 mr-2" /> Citas Asignadas</TabsTrigger>
-                        <TabsTrigger value="patients" className={`data-[state=active]:bg-${themeColor}-600 data-[state=active]:text-white font-bold`}><Users className="w-4 h-4 mr-2" /> Pacientes</TabsTrigger>
-                        <TabsTrigger value="histories" className={`data-[state=active]:bg-${themeColor}-600 data-[state=active]:text-white font-bold`}><FileText className="w-4 h-4 mr-2" /> Historiales</TabsTrigger>
-                        <TabsTrigger value="notes" className={`data-[state=active]:bg-${themeColor}-600 data-[state=active]:text-white font-bold`}><FileText className="w-4 h-4 mr-2" /> Notas del Docente</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="today_appointments">
-                        <Card className="shadow-md">
-                            <CardHeader><CardTitle className={`text-${themeColor}-900 flex items-center gap-2`}><Clock className={`w-5 h-5 text-${themeColor}-600`} /> Agenda - Hoy ({format(new Date(), 'dd/MM/yyyy')})</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {isLoadingCitas ? (
-                                        <div className="flex flex-col items-center py-12"><Loader2 className={`w-10 h-10 animate-spin text-${themeColor}-600`} /></div>
-                                    ) : todayAppointments.length === 0 ? (
-                                        <div className="text-center py-12 border-2 border-dashed bg-white"><p className="text-gray-500 italic">No tienes citas asignadas para hoy.</p></div>
-                                    ) : (
-                                        todayAppointments.map((apt) => (
-                                            <div key={apt.id} className={`flex justify-between items-center p-4 border rounded-lg bg-white shadow-sm border-l-4 border-l-${themeColor}-600`}>
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`p-3 rounded-full bg-${themeColor}-50`}><AreaIcon className={`w-5 h-5 text-${themeColor}-600`}/></div>
-                                                    <div>
-                                                        <p className={`font-bold text-${themeColor}-900 text-lg`}>{apt.paciente_nombre}</p>
-                                                        <p className="text-sm text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} hrs</p>
-                                                    </div>
-                                                </div>
-                                                <Button className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white`} onClick={() => handleAccessForms(apt)}>
-                                                    <FileText className="w-4 h-4 mr-2" /> Iniciar Evaluación
-                                                </Button>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="patients"><PatientList /></TabsContent>
-                    <TabsContent value="histories"><MedicalHistoryViewer filterType={user?.area || undefined} /></TabsContent>
-                    <TabsContent value="notes"><NotesViewer readOnly filterCategory={user?.area || undefined} /></TabsContent>
-                </Tabs>
-            </main>
-        </div>
+  // --- LÓGICA DE CARGA DE DATOS ---
+  useEffect(() => {
+    // 1. Intentamos leer de LocalStorage (datos reales guardados) o usamos los Mock (datos de prueba)
+    const stored = localStorage.getItem('utc_appointments');
+    const allAppointments = stored ? JSON.parse(stored) : mockAppointments;
+    
+    // 2. FILTRADO INTELIGENTE: 
+    // Comparamos la fecha de la cita con la fecha actual del sistema (new Date())
+    // Y solo mostramos las que están en estado 'programada'
+    const filtered = allAppointments.filter((apt: Appointment) => 
+      isSameDay(parseISO(apt.date), new Date()) && apt.status === 'programada'
     );
+    setTodayAppointments(filtered);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // --- NAVEGACIÓN DINÁMICA A FORMULARIOS ---
+  const handleAccessForms = (appointment: Appointment) => {
+    // Dependiendo del tipo de cita, el sistema te manda al formulario correcto
+    if (appointment.type === 'nutricion') {
+      navigate(`/forms/nutricion/${appointment.id}`);
+    } else if (appointment.type === 'fisioterapia') {
+      navigate(`/forms/fisioterapia/${appointment.id}`);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
+      {/* HEADER: Identidad visual UTC */}
+      <header className="bg-white border-b border-blue-900/10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold">UTC</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-blue-900">Clínica Universitaria</h1>
+                <p className="text-sm text-blue-900/60">Panel de Practicante</p>
+              </div>
+            </div>
+            {/* Info del Practicante (Nombre y Carrera) */}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-blue-900">{user?.name}</p>
+                <p className="text-xs text-blue-900/60 capitalize">{user?.role}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="border-blue-900/20 text-blue-900">
+                <LogOut className="w-4 h-4 mr-2" />
+                Cerrar Sesión
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-blue-900 mb-2">Panel de Control</h2>
+          <p className="text-blue-900/70">Gestiona pacientes, citas y consulta historiales médicos</p>
+        </div>
+
+        {/* --- SISTEMA DE PESTAÑAS (TABS) --- */}
+        <Tabs defaultValue="patients" className="space-y-6">
+          <TabsList className="bg-white border border-blue-900/10 p-1 h-auto flex-wrap">
+            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <Users className="w-4 h-4 mr-2" /> Pacientes
+            </TabsTrigger>
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <Calendar className="w-4 h-4 mr-2" /> Citas de Hoy
+            </TabsTrigger>
+            <TabsTrigger value="histories" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <FileText className="w-4 h-4 mr-2" /> Historiales
+            </TabsTrigger>
+            {/* Pestaña de Notas: Donde el profesor deja retroalimentación */}
+            <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white">
+              <Calendar className="w-4 h-4 mr-2" /> Notas Uni
+            </TabsTrigger>
+          </TabsList>
+
+          {/* CONTENIDO 1: Lista general de pacientes registrados */}
+          <TabsContent value="patients">
+            <PatientList />
+          </TabsContent>
+
+          {/* CONTENIDO 2: Agenda específica del día actual */}
+          <TabsContent value="today_appointments">
+            <Card className="border-blue-900/10">
+              <CardHeader>
+                <CardTitle className="text-blue-900">Agenda de Hoy</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {todayAppointments.length === 0 ? (
+                    <p className="text-center py-4 text-gray-500 italic">No tienes citas programadas para hoy.</p>
+                  ) : (
+                    todayAppointments.map((apt) => (
+                      <div key={apt.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-white shadow-sm gap-4">
+                        <div className="flex items-center gap-4">
+                          {/* Icono dinámico según la carrera (Fisio o Nutri) */}
+                          <div className={`p-2 rounded-full ${apt.type === 'fisioterapia' ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                            {apt.type === 'fisioterapia' ? <Activity className="w-5 h-5 text-blue-900"/> : <Utensils className="w-5 h-5 text-orange-600"/>}
+                          </div>
+                          <div>
+                            <p className="font-bold text-blue-900">{apt.patientName}</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3"/> {apt.time} - <span className="capitalize">{apt.type}</span>
+                            </p>
+                          </div>
+                        </div>
+                        {/* Botón para saltar directo a la evaluación clínica */}
+                        <Button 
+                          size="sm" 
+                          className="w-full sm:w-auto bg-blue-900 hover:bg-blue-800"
+                          onClick={() => handleAccessForms(apt)}
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Iniciar Evaluación
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* CONTENIDO 3: Visor de expedientes pasados */}
+          <TabsContent value="histories">
+            <MedicalHistoryViewer />
+          </TabsContent>
+
+          {/* CONTENIDO 4: Notas académicas (Modo Solo Lectura para el alumno) */}
+          <TabsContent value="notes">
+            <NotesViewer readOnly />
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
 }
