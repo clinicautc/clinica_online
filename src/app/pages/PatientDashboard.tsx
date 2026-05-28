@@ -359,13 +359,11 @@ export default function PatientDashboard() {
                               Nueva Fecha y Hora para {areaFiltro}
                             </span>
                           </div>
-                          <AppointmentForm 
-                            patientId={patientId || ''} 
-                            isReassign={true} 
-                            appointmentId={cita.id} 
-                            fixedType={areaFiltro} 
-                            onSuccess={handleReagendarSuccess} 
-                          />
+                          {/* CÓDIGO NUEVO (CORRECTO) */}
+<AppointmentForm 
+  patientId={String(user.id)} 
+  existingAppointment={cita} // <-- ¡Esta es la clave mágica! (Asegúrate de que 'cita' o 'apt' sea la variable del .map)
+/>
                           <Button 
                             variant="ghost" 
                             size="sm" 

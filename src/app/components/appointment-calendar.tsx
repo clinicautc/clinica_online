@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { Button } from './ui/button';
+import { format, parseISO } from 'date-fns';
 
 type AppointmentCalendarProps = {
   userId?: string;
@@ -22,12 +23,28 @@ export function AppointmentCalendar({ userId }: AppointmentCalendarProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState<any[]>([]);
 
+  // --------------------------------------------------------------------------
+  // CORRECCIÓN: CONEXIÓN REAL A LA BASE DE DATOS
+  // --------------------------------------------------------------------------
   useEffect(() => {
-    const stored = localStorage.getItem('appointments');
-    if (stored) {
-      setAppointments(JSON.parse(stored));
-    }
+    const fetchAppointments = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/citas');
+        if (response.ok) {
+          const data = await response.json();
+          // Filtramos solo las citas activas ('programada' o 'asignada')
+          const activeAppointments = data.filter((apt: any) => 
+            apt.estado === 'programada' || apt.estado === 'asignada' || apt.status === 'programada'
+          );
+          setAppointments(activeAppointments);
+        }
+      } catch (error) {
+        console.error("Error cargando citas para el calendario:", error);
+      }
+    };
+    fetchAppointments();
   }, []);
+  // --------------------------------------------------------------------------
 
   const timeSlots = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -73,24 +90,45 @@ export function AppointmentCalendar({ userId }: AppointmentCalendarProps) {
     );
   };
 
+  // --------------------------------------------------------------------------
+  // CORRECCIÓN: ADAPTACIÓN DE MAPEO A ESTRUCTURA POSTGRESQL
+  // --------------------------------------------------------------------------
   const getAppointmentsForDate = (day: number) => {
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return appointments.filter((apt) => apt.date === dateStr);
+    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const dateStr = format(targetDate, 'yyyy-MM-dd');
+    
+    return appointments.filter((apt) => {
+      // Soportar tanto 'fecha' (Postgres crudo) como 'date' (Alias del frontend)
+      const dbDate = apt.fecha ? apt.fecha.substring(0, 10) : apt.date;
+      return dbDate === dateStr;
+    });
   };
 
   const getTimeSlotsForSelectedDate = (): TimeSlot[] => {
-    const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-    const dayAppointments = appointments.filter((apt) => apt.date === dateStr);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    const dayAppointments = appointments.filter((apt) => {
+      const dbDate = apt.fecha ? apt.fecha.substring(0, 10) : apt.date;
+      return dbDate === dateStr;
+    });
 
     return timeSlots.map((time) => {
-      const appointment = dayAppointments.find((apt) => apt.time === time);
+      const appointment = dayAppointments.find((apt) => {
+        // Extraemos solo "HH:mm" del formato de hora del backend
+        let dbTime = apt.hora || apt.time || '';
+        if (dbTime.length > 0 && dbTime.indexOf(':') === 1) {
+          dbTime = '0' + dbTime; 
+        }
+        return dbTime.substring(0, 5) === time;
+      });
+
       if (appointment) {
         return {
           time,
           available: false,
           appointmentInfo: {
-            service: appointment.service,
-            patientName: appointment.patientName,
+            service: appointment.tipo || appointment.service, // Soportar ambos nombres
+            patientName: appointment.paciente_nombre || appointment.patientName,
           },
         };
       }
@@ -100,6 +138,7 @@ export function AppointmentCalendar({ userId }: AppointmentCalendarProps) {
       };
     });
   };
+  // --------------------------------------------------------------------------
 
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',

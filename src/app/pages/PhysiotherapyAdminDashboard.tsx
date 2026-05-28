@@ -31,9 +31,11 @@ import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
 import PractitionerManagement from '../components/PractitionerManagement';
+import AppointmentForm from '../components/AppointmentForm'; // NUEVO: Importación del formulario
 
 interface Appointment {
   id: number;
+  paciente_id?: number; // NUEVO: Agregado para poder pasar el ID al re-agendar
   paciente_nombre: string; 
   tipo: string;      
   fecha: string;
@@ -51,6 +53,9 @@ export default function PhysiotherapyAdminDashboard() {
   // ESTADOS DE CITAS
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  
+  // NUEVO: Estado para controlar el despliegue del formulario de re-agendar
+  const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
 
   // --- PASO 3: ESTADOS PARA EL MODAL DE ASIGNACIÓN ---
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -381,48 +386,88 @@ export default function PhysiotherapyAdminDashboard() {
                     </div>
                   ) : (
                     todayAppointments.map((apt) => (
-                      <div key={apt.id} className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 rounded-full bg-blue-50 text-blue-900">
-                            <Activity className="w-5 h-5"/>
-                          </div>
-                          <div>
-                            <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                            <div className="flex gap-3 items-center">
-                              <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
-                              </span>
-                              <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
-                                {apt.estado}
-                              </span>
+                      <div key={apt.id} className="space-y-2">
+                        <div className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 rounded-full bg-blue-50 text-blue-900">
+                              <Activity className="w-5 h-5"/>
+                            </div>
+                            <div>
+                              <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
+                              <div className="flex gap-3 items-center">
+                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
+                                </span>
+                                <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
+                                  {apt.estado}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-6">
-                          {apt.practicante_id && (
-                            <div className="flex flex-col items-end">
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                Responsable:
-                              </span>
-                              <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
-                                <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
-                              </span>
-                            </div>
-                          )}
+                          
+                          <div className="flex items-center gap-6">
+                            {apt.practicante_id && (
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                  Responsable:
+                                </span>
+                                <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
+                                  <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                                </span>
+                              </div>
+                            )}
 
-                          <Button 
-                            onClick={() => handleOpenAssignModal(apt)}
-                            className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
-                              apt.practicante_id 
-                                ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
-                                : "bg-blue-600 text-white hover:bg-blue-700"
-                            }`}
-                          >
-                            <UserPlus className="w-4 h-4" />
-                            {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-                          </Button>
+                            {/* NUEVO BOTÓN RE-AGENDAR PARA FISIO */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                              onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
+                            >
+                              <Calendar className="w-4 h-4" />
+                              {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
+                            </Button>
+
+                            <Button 
+                              onClick={() => handleOpenAssignModal(apt)}
+                              className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
+                                apt.practicante_id 
+                                  ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
+                                  : "bg-blue-600 text-white hover:bg-blue-700"
+                              }`}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                            </Button>
+                          </div>
                         </div>
+
+                        {/* NUEVO: DESPLEGABLE DEL FORMULARIO PARA REAGENDAR (FISIOTERAPIA) */}
+                        {reagendarCitaId === apt.id && (
+                          <div className="bg-white border border-blue-900/10 rounded-xl p-5 shadow-inner animate-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-5 text-blue-900">
+                              <Calendar className="w-5 h-5" />
+                              <span className="text-xs font-black uppercase tracking-widest">
+                                Nueva Fecha y Hora para {apt.paciente_nombre}
+                              </span>
+                            </div>
+                            
+                            {/* AQUÍ ESTÁ LA MAGIA PARA NO DUPLICAR */}
+                            <AppointmentForm 
+                              patientId={apt.paciente_id?.toString() || ''} 
+                              existingAppointment={apt as any} 
+                            />
+                            
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setReagendarCitaId(null)}
+                              className="w-full mt-3 text-slate-400 text-[10px] font-bold hover:bg-slate-50"
+                            >
+                              <X className="w-3.5 h-3.5 mr-1" /> CANCELAR EDICIÓN
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

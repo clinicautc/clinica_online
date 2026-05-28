@@ -2,7 +2,7 @@
  * ============================================================================
  * ARCHIVO: PatientList.tsx
  * PROPÓSITO: Gestión de expedientes de pacientes.
- * MODIFICACIÓN: Sincronización de ruta de historial con parámetro de área dinámico.
+ * MODIFICACIÓN: Restricción de eliminación de pacientes solo para el rol "master".
  * ============================================================================
  */
 
@@ -59,7 +59,7 @@ export default function PatientList() {
   };
 
   /**
-   * ELIMINAR PACIENTE (SOLO ADMINS)
+   * ELIMINAR PACIENTE (SOLO MASTER)
    */
   const handleEliminarPaciente = async (id: string | number) => {
     if (!window.confirm('¿Deseas eliminar permanentemente este expediente? Esta acción no se puede deshacer.')) return;
@@ -99,7 +99,9 @@ export default function PatientList() {
   );
 
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
-  const esAdminDeArea = user?.rol === 'admin' || user?.rol === 'master'; // Validación extendida
+  
+  // MODIFICACIÓN APLICADA: Solo el rol 'master' puede eliminar
+  const esMaster = user?.rol === 'master';
 
   return (
       <Card className="border-blue-900/10 w-full bg-white shadow-lg overflow-hidden" style={arialStyle}>
@@ -143,7 +145,8 @@ export default function PatientList() {
                           <span className="text-xs font-mono font-bold text-blue-900/40">ID: {patient.id}</span>
                           <div className="flex gap-2">
                             <Badge className="bg-green-100 text-green-700 border-green-200 font-bold uppercase text-[9px]">REGISTRADO</Badge>
-                            {esAdminDeArea && (
+                            {/* Mostrar botón solo si es Master */}
+                            {esMaster && (
                               <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={() => handleEliminarPaciente(patient.id)}>
                                 <Trash2 className="w-3 h-3" />
                               </Button>
@@ -169,8 +172,8 @@ export default function PatientList() {
                         <TableHead className="text-blue-900 font-bold">Email Institucional</TableHead>
                         <TableHead className="text-blue-900 font-bold text-center">Estado</TableHead>
                         <TableHead className="text-blue-900 font-bold text-right">Expediente</TableHead>
-                        {/* CABECERA ACCIONES */}
-                        {esAdminDeArea && (
+                        {/* CABECERA ACCIONES: Mostrar solo si es Master */}
+                        {esMaster && (
                           <TableHead className="text-blue-900 font-bold text-center">Acciones</TableHead>
                         )}
                       </TableRow>
@@ -189,8 +192,8 @@ export default function PatientList() {
                                 <BookOpen className="w-4 h-4" /> Historiales
                               </Button>
                             </TableCell>
-                            {/* COLUMNA ACCIONES: Solo Admin de Área */}
-                            {esAdminDeArea && (
+                            {/* COLUMNA ACCIONES: Solo Master */}
+                            {esMaster && (
                               <TableCell className="text-center">
                                 <Button 
                                   variant="ghost" 

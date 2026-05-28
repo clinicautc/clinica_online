@@ -1,92 +1,113 @@
-//AppointmentManager.tsx
 import { useState, useEffect } from 'react';
-// UI: Componentes de tabla y tarjetas de Shadcn
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge'; // Para etiquetas de estado (colores)
+import { Badge } from './ui/badge'; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-// UTILS: Formateo de fechas y manejo de datos locales
+// IMPORTANTE: Importamos el Dialog (Modal) para meter ahí el formulario
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'; 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { mockAppointments, Appointment } from '../lib/mockData';
-// ICONOS: Visuales para diferenciar Nutrición de Fisioterapia
-import { Calendar, Clock, Activity, Utensils, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, Activity, Utensils, Trash2, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
+// IMPORTANTE: Importamos el formulario híbrido que hicimos antes
+import AppointmentForm from './AppointmentForm'; 
+
+// Ajustamos la interfaz a lo que devuelve la base de datos
+export interface AppointmentDB {
+  id: number;
+  paciente_id: number;
+  paciente_nombre: string;
+  tipo: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+}
+
 export default function AppointmentManager() {
-  // --- 1. ESTADO DE LA LISTA ---
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // --- ESTADOS ---
+  const [appointments, setAppointments] = useState<AppointmentDB[]>([]);
+  
+  // ESTOS SON LOS ESTADOS CLAVE PARA EL REAGENDAMIENTO
+  const [citaParaReagendar, setCitaParaReagendar] = useState<AppointmentDB | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  /**
-   * NOTA: CARGA Y ORDENAMIENTO
-   * Al montar el componente, leemos de LocalStorage.
-   * IMPORTANTE: Usamos .sort() para que las citas más recientes 
-   * aparezcan hasta arriba (orden cronológico descendente).
-   */
+  // --- CARGAR DATOS DESDE EL BACKEND ---
   useEffect(() => {
-    const stored = localStorage.getItem('utc_appointments');
-    const allAppointments = stored ? JSON.parse(stored) : mockAppointments;
-    
-    const sorted = allAppointments.sort((a: Appointment, b: Appointment) => {
-      // Creamos objetos Date combinando fecha y hora para comparar
-      const dateA = new Date(`${a.date}T${a.time}`);
-      const dateB = new Date(`${b.date}T${b.time}`);
-      return dateB.getTime() - dateA.getTime();
-    });
-
-    setAppointments(sorted);
+    fetchAppointments();
   }, []);
 
-  /**
-   * NOTA: FUNCIÓN DE PERSISTENCIA
-   * Cada vez que cambiamos algo (completar, cancelar o borrar),
-   * debemos actualizar el estado de React Y el LocalStorage.
-   */
-  const updateAppointments = (updated: Appointment[]) => {
-    setAppointments(updated);
-    localStorage.setItem('utc_appointments', JSON.stringify(updated));
+  const fetchAppointments = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/citas');
+      if (response.ok) {
+        const data = await response.json();
+        // Orden cronológico descendente
+        const sorted = data.sort((a: AppointmentDB, b: AppointmentDB) => {
+          const dateA = new Date(`${a.fecha.substring(0, 10)}T${a.hora.substring(0, 5)}`);
+          const dateB = new Date(`${b.fecha.substring(0, 10)}T${b.hora.substring(0, 5)}`);
+          return dateB.getTime() - dateA.getTime();
+        });
+        setAppointments(sorted);
+      }
+    } catch (error) {
+      console.error("Error al cargar citas:", error);
+      toast.error("No se pudieron cargar las citas del servidor.");
+    }
   };
 
-  // --- 2. ACCIONES DE GESTIÓN ---
+  // --- ACCIONES CONECTADAS AL BACKEND ---
 
-  const handleComplete = (id: string) => {
-    const updated = appointments.map(apt => 
-      apt.id === id ? { ...apt, status: 'completada' as const } : apt
-    );
-    updateAppointments(updated);
-    toast.success('Cita marcada como completada');
+  const handleStatusUpdate = async (id: number, newStatus: string) => {
+    try {
+      const currentApt = appointments.find(a => a.id === id);
+      if (!currentApt) return;
+
+      const response = await fetch(`http://localhost:3001/api/citas/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        // Enviamos la misma fecha y hora, solo cambiamos el estado
+        body: JSON.stringify({ fecha: currentApt.fecha, hora: currentApt.hora, estado: newStatus })
+      });
+
+      if (response.ok) {
+        toast.success(`Cita marcada como ${newStatus}`);
+        fetchAppointments(); // Recargamos para reflejar cambios
+      } else {
+        throw new Error('Error en el servidor');
+      }
+    } catch (error) {
+      toast.error('Error al actualizar la cita');
+    }
   };
 
-  const handleCancel = (id: string) => {
-    const updated = appointments.map(apt => 
-      apt.id === id ? { ...apt, status: 'cancelada' as const } : apt
-    );
-    updateAppointments(updated);
-    toast.error('Cita cancelada');
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/citas/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        toast.success('Cita eliminada del sistema');
+        fetchAppointments();
+      }
+    } catch (error) {
+      toast.error('Error al eliminar la cita');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    // El filter elimina el elemento del arreglo permanentemente
-    const updated = appointments.filter(apt => apt.id !== id);
-    updateAppointments(updated);
-    toast.success('Cita eliminada del sistema');
+  // FUNCIÓN PARA ABRIR EL MODAL DE REAGENDAR
+  const handleOpenReagendar = (cita: AppointmentDB) => {
+    setCitaParaReagendar(cita);
+    setIsModalOpen(true);
   };
 
-  /**
-   * NOTA: getStatusBadge
-   * Lógica visual para que el usuario identifique el estado de un vistazo.
-   * Azul = Pendiente, Verde = Listo, Rojo = Cancelado.
-   */
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'programada':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Programada</Badge>;
-      case 'completada':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Completada</Badge>;
-      case 'cancelada':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelada</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
+      case 'programada': return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Programada</Badge>;
+      case 'asignada': return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Asignada</Badge>;
+      case 'completada': return <Badge className="bg-green-100 text-green-800 border-green-200">Completada</Badge>;
+      case 'cancelada': return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelada</Badge>;
+      default: return <Badge>{status}</Badge>;
     }
   };
 
@@ -95,19 +116,17 @@ export default function AppointmentManager() {
       <CardHeader>
         <CardTitle className="text-blue-900">Gestión de Citas Administrativa</CardTitle>
         <CardDescription>
-          Vista general para practicantes y administración de la Clínica UTC.
+          Vista general conectada a la base de datos de la Clínica UTC.
         </CardDescription>
       </CardHeader>
       
       <CardContent>
-        {/* CASO: NO HAY DATOS */}
         {appointments.length === 0 ? (
           <div className="text-center py-12 bg-blue-50/50 rounded-lg border border-dashed border-blue-200">
             <Calendar className="w-12 h-12 mx-auto text-blue-900/20 mb-3" />
             <p className="text-blue-900/60 font-medium">No hay citas registradas en el sistema</p>
           </div>
         ) : (
-          /* CASO: TABLA DE CITAS */
           <div className="border border-blue-900/10 rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
@@ -122,59 +141,67 @@ export default function AppointmentManager() {
               <TableBody>
                 {appointments.map((appointment) => (
                   <TableRow key={appointment.id} className="hover:bg-blue-50/30 transition-colors">
-                    {/* COLUMNA PACIENTE */}
+                    
                     <TableCell className="font-semibold text-blue-900">
-                      {appointment.patientName}
+                      {appointment.paciente_nombre}
                     </TableCell>
 
-                    {/* COLUMNA TIPO (Icono + Texto) */}
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {appointment.type === 'fisioterapia' ? (
+                        {appointment.tipo === 'fisioterapia' ? (
                           <Activity className="w-4 h-4 text-blue-700" />
                         ) : (
                           <Utensils className="w-4 h-4 text-orange-600" />
                         )}
-                        <span className="capitalize text-sm">{appointment.type}</span>
+                        <span className="capitalize text-sm">{appointment.tipo}</span>
                       </div>
                     </TableCell>
 
-                    {/* COLUMNA FECHA/HORA */}
                     <TableCell>
                       <div className="flex flex-col gap-1 text-xs">
                         <span className="flex items-center gap-1 font-medium">
                           <Calendar className="w-3 h-3 text-blue-900/40" />
-                          {format(parseISO(appointment.date), "PPP", { locale: es })}
+                          {format(parseISO(appointment.fecha), "PPP", { locale: es })}
                         </span>
                         <span className="flex items-center gap-1 text-gray-500">
                           <Clock className="w-3 h-3" />
-                          {appointment.time} hrs
+                          {appointment.hora.substring(0, 5)} hrs
                         </span>
                       </div>
                     </TableCell>
 
-                    {/* COLUMNA ESTADO */}
-                    <TableCell>{getStatusBadge(appointment.status)}</TableCell>
+                    <TableCell>{getStatusBadge(appointment.estado)}</TableCell>
 
-                    {/* COLUMNA ACCIONES (BOTONES DINÁMICOS) */}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {/* NOTA: Solo mostramos Completar/Cancelar si la cita está pendiente */}
-                        {appointment.status === 'programada' && (
+                        
+                        {(appointment.estado === 'programada' || appointment.estado === 'asignada') && (
                           <>
+                            {/* BOTÓN MAGICO DE REAGENDAR */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenReagendar(appointment)}
+                              className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                              title="Re-Agendar Cita"
+                            >
+                              <Edit className="w-4 h-4 mr-1" /> Re-agendar
+                            </Button>
+
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleComplete(appointment.id)}
+                              onClick={() => handleStatusUpdate(appointment.id, 'completada')}
                               className="text-green-600 hover:text-green-700 hover:bg-green-50"
                               title="Marcar como Completada"
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>
+                            
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleCancel(appointment.id)}
+                              onClick={() => handleStatusUpdate(appointment.id, 'cancelada')}
                               className="text-red-500 hover:text-red-600 hover:bg-red-50"
                               title="Cancelar Cita"
                             >
@@ -182,13 +209,13 @@ export default function AppointmentManager() {
                             </Button>
                           </>
                         )}
-                        {/* Botón de eliminar siempre visible para limpieza de DB */}
+                        
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleDelete(appointment.id)}
                           className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                          title="Eliminar de la lista"
+                          title="Eliminar de la DB"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -201,6 +228,22 @@ export default function AppointmentManager() {
           </div>
         )}
       </CardContent>
+
+      {/* EL MODAL PARA REAGENDAR */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl sm:max-w-xl md:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Formulario de Cita</DialogTitle>
+          </DialogHeader>
+          
+          {citaParaReagendar && (
+            <AppointmentForm 
+              patientId={String(citaParaReagendar.paciente_id)} 
+              existingAppointment={citaParaReagendar as any} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
