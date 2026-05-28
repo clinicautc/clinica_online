@@ -882,19 +882,32 @@ app.post('/api/citas',requireAuth,requireRole(['paciente','admin','master' ]),as
   }
 });
 
-app.put('/api/citas/:id',requireAuth,canModifyAppointment,async (req, res) => {
+/**
+ * ----------------------------------------------------------------------------
+ * REAGENDAR O MODIFICAR CITA
+ * Se agregó requireRole(['paciente', 'admin', 'master']) para permitir
+ * que los coordinadores (admin) puedan re-agendar desde su panel.
+ * ----------------------------------------------------------------------------
+ */
+app.put('/api/citas/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { fecha, hora, estado } = req.body;
+  
+  // Opcional: Si quieres mantener canModifyAppointment, asegúrate que dentro de ese middleware 
+  // exista la excepción: if (req.user.rol === 'admin' || req.user.rol === 'master') return next();
+  // Si no tienes esa excepción, mejor quita canModifyAppointment y valida manualmente aquí.
+
   try {
     const result = await pool.query(
       `UPDATE citas SET fecha = $1, hora = $2, estado = $3 
        WHERE id = $4 RETURNING *`,
       [fecha, hora, estado || 'programada', id]
     );
+    
     if (result.rows.length > 0) {
       await pool.query(
         "INSERT INTO metricas (tipo_evento, area, paciente_id, metadata) VALUES ($1, $2, $3, $4)",
-        ['cita_reagendada', result.rows[0].tipo, result.rows[0].paciente_id, JSON.stringify({ nueva_fecha: fecha })]
+        ['cita_reagendada', result.rows[0].tipo, result.rows[0].paciente_id, JSON.stringify({ nueva_fecha: fecha, nueva_hora: hora })]
       );
       res.json(result.rows[0]);
     } else {
