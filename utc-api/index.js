@@ -42,6 +42,7 @@ app.get('/api/health', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
     res.json({ 
+      
       status: "✅ Conectado a Render", 
       serverTime: result.rows[0],
       database: process.env.DB_NAME 
@@ -62,6 +63,7 @@ app.get('/api/health', async (req, res) => {
  * ----------------------------------------------------------------------------
  */
 app.post('/api/auth/pre-register', async (req, res) => {
+   console.log('🚨 PRE-REGISTER EJECUTADO');
   const { name, email, password } = req.body;
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -708,6 +710,37 @@ app.get('/api/usuarios', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+app.get('/api/usuarios/:id', async (req, res) => {
+
+  const { id } = req.params;
+
+  try {
+
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message
+    });
+
+  }
+
+});
+
+
+
 /**
  * ----------------------------------------------------------------------------
  * ENDPOINT DEFINITIVO: ACTUALIZAR PERFIL (NOMBRE, TELÉFONO Y MATRÍCULA)
@@ -1031,6 +1064,29 @@ app.get('/api/historiales-fisioterapia/paciente/:id', async (req, res) => {
   }
 });
 
+app.get('/api/historiales-nutricion/paciente/:id', async (req, res) => {
+
+  const { id } = req.params;
+
+  try {
+
+    const result = await pool.query(
+      'SELECT * FROM historiales_nutricion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      [id]
+    );
+
+    res.json(result.rows);
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message
+    });
+
+  }
+
+});
+
 /**
  * GUARDADO DE HISTORIAL CLÍNICO (MASTER POST)
  * Realiza tres acciones clave: Guarda datos, actualiza cita y registra métrica.
@@ -1100,7 +1156,7 @@ app.get('/api/logs', async (req, res) => {
 
 app.get('/api/notas', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM notas ORDER BY fecha_creacion DESC');
+    const result = await pool.query('SELECT * FROM notas_universitarias ORDER BY fecha_creacion DESC');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1108,12 +1164,35 @@ app.get('/api/notas', async (req, res) => {
 });
 
 app.post('/api/notas', async (req, res) => {
-  const { titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico } = req.body;
+  const {
+  titulo,
+  contenido,
+  creado_por,
+  creado_por_nombre,
+  destino
+} = req.body;
   try {
-    const result = await pool.query(
-      `INSERT INTO notas (titulo, contenido, destino, creado_por, creado_por_nombre, creado_por_email, destinatario_especifico, fecha_creacion) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
-      [titulo, contenido, destino, creado_por, creado_por_nombre || 'Master UTC', creado_por_email, destinatario_especifico || null]
+    const result = await pool.query( `INSERT INTO notas_universitarias
+(
+  titulo,
+  contenido,
+  categoria,
+  creado_por,
+  creado_por_nombre,
+  fecha_creacion
+)
+VALUES
+(
+  $1,$2,$3,$4,$5,NOW()
+)
+RETURNING *`,
+      [
+  titulo,
+  contenido,
+  destino,
+  creado_por,
+  creado_por_nombre || 'Master UTC'
+]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -1162,9 +1241,9 @@ app.get('/api/stats/dashboard',requireAuth,requireRole(['admin','master']),async
 });
 
 app.get('/', (req, res) => {
-  res.send('🚀 Servidor UTC Activo - API funcionando correctamente.');
+  res.send(' Servidor UTC Activo - API funcionando correctamente.');
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO ${PORT}`);
+  console.log(` API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO ${PORT}`);
 });

@@ -37,7 +37,8 @@ const PhysiotherapyMasterForm: React.FC = () => {
     const cargarHistorialExistente = async () => {
       if (!appointmentId) return;
       try {
-        const response = await fetch('http://localhost:3001/api/historiales');
+        const response = await fetch('http://localhost:3001/api/historiales',{
+          headers: {email: user?.email || ''}});
         if (response.ok) {
           const todos: any[] = await response.json();
           const encontrado = todos.find(h => 
