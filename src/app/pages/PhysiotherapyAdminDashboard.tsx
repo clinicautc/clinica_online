@@ -175,7 +175,7 @@ export default function PhysiotherapyAdminDashboard() {
       setIsAssigning(true);
       const response = await fetch(`http://localhost:3001/api/citas/${selectedAppointment.id}/asignar`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify({ 
           practicante_id: selectedPractitioner.id,
           practicante_nombre: selectedPractitioner.nombre 
@@ -228,7 +228,7 @@ export default function PhysiotherapyAdminDashboard() {
 
       const response = await fetch('http://localhost:3001/api/notas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify(payload)
       });
 

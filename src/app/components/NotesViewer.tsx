@@ -26,7 +26,7 @@ interface Note {
   id: number;
   titulo: string;
   contenido: string;
-  destino: 'fisioterapia' | 'nutricion' | 'general' | 'todos';
+  categoria: 'fisioterapia' | 'nutricion' | 'general' | 'todos';
   creado_por_nombre: string;
   creado_por_email: string;
   destinatario_especifico: string | null;
@@ -142,10 +142,15 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
   /**
    * HELPER DE IDENTIFICACIÓN DEL MASTER
    */
-  const isFromMaster = (name: string) => {
-    const n = (name || '').toLowerCase();
-    return n.includes('master') || n.includes('velázquez');
-  };
+const isFromMaster = (name: string) => {
+  const n = (name || '').toLowerCase();
+
+  return (
+    n.includes('master') ||
+    n.includes('velázquez') ||
+    n.includes('liliana')
+  );
+};
 
   /**
    * LÓGICA DE CONTEO PARA BURBUJAS DE PESTAÑA
@@ -158,7 +163,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
       
       if (!matchTab) return false;
 
-      const destino = (note.destino || '').toLowerCase();
+      const destino = (note.categoria || '').toLowerCase();
       const esParaMi = (note.destinatario_especifico || '').toLowerCase() === miEmail;
       
       if (!(destino === miArea || destino === 'todos' || destino === 'general' || esParaMi)) return false;
@@ -171,7 +176,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
 
   const filteredNotes = notes.filter(note => {
     const fromMaster = isFromMaster(note.creado_por_nombre);
-    const destinoNota = (note.destino || '').toLowerCase();
+    const destinoNota = (note.categoria || '').toLowerCase();
     const esParaMi = (note.destinatario_especifico || '').toLowerCase() === miEmail;
 
     if (filterCategory && destinoNota !== filterCategory && destinoNota !== 'todos' && destinoNota !== 'general') {
@@ -294,7 +299,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
                         </div>
                         <div className="flex gap-2">
                           {note.destinatario_especifico && <Badge className="bg-purple-50 text-purple-600 border-black border text-[8px] font-black uppercase">PRIVADO</Badge>}
-                          {getCategoryBadge(note.destino || 'general')}
+                          {getCategoryBadge(note.categoria || 'general')}
                         </div>
                       </div>
 

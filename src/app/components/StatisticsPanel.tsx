@@ -393,8 +393,8 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
 
         // 1. Obtención de datos base y analíticos (Consumiendo la nueva tabla metricas)
         const [resCitas, resHistoriales, resDashboard] = await Promise.all([
-          fetch('http://localhost:3001/api/citas'),
-          fetch('http://localhost:3001/api/historiales'),
+          fetch('http://localhost:3001/api/citas', { headers: { email: user?.email || '' } }),
+          fetch('http://localhost:3001/api/historiales', { headers: { email: user?.email || '' } }),
           fetch('http://localhost:3001/api/stats/dashboard', { headers: { email: user?.email || '' } }), // NUEVO: Trae datos de la tabla 'metricas'
         ]);
 
