@@ -196,13 +196,19 @@ const isFromMaster = (name: string) => {
       return false;
     }
 
-    if (esAdminDeArea) {
+    if (esAdminDeArea) { // Lógica para ADMINS
       if (tabView === 'alumnos') {
         return !fromMaster && (destinoNota === miArea || destinoNota === 'todos' || destinoNota === 'general' || esParaMi);
       } else {
         return fromMaster;
       }
-    } else {
+    } else if (user?.rol === 'practicante') { // Lógica estricta SOLO para PRACTICANTES
+      // Bloqueamos los mensajes del Master, pase lo que pase
+      if (fromMaster) return false; 
+      
+      // Solo ven mensajes de su área, todos, general o privados
+      return (destinoNota === miArea || destinoNota === 'todos' || destinoNota === 'general' || esParaMi);
+    } else { // Lógica para el MASTER u otros roles
       return (destinoNota === miArea || destinoNota === 'todos' || destinoNota === 'general' || esParaMi);
     }
   });
