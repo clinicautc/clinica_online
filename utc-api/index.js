@@ -1154,7 +1154,7 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-app.get('/api/notas', async (req, res) => {
+app.get('/api/notas_universitarias', requireAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM notas_universitarias ORDER BY fecha_creacion DESC');
     res.json(result.rows);
@@ -1163,50 +1163,41 @@ app.get('/api/notas', async (req, res) => {
   }
 });
 
-app.post('/api/notas', async (req, res) => {
-  const {
-  titulo,
-  contenido,
-  creado_por,
-  creado_por_nombre,
-  destino
-} = req.body;
+app.post('/api/notas_universitarias', requireAuth, async (req, res) => {
+  const { titulo, contenido, creado_por, creado_por_nombre, destino, destinatario_especifico, creado_por_email } = req.body;
+
   try {
-    const result = await pool.query( `INSERT INTO notas_universitarias
-(
-  titulo,
-  contenido,
-  categoria,
-  creado_por,
-  creado_por_nombre,
-  fecha_creacion
-)
-VALUES
-(
-  $1,$2,$3,$4,$5,NOW()
-)
-RETURNING *`,
-      [
-  titulo,
-  contenido,
-  destino,
-  creado_por,
-  creado_por_nombre || 'Master UTC'
-]
-    );
+    const result = await pool.query(
+  `INSERT INTO notas_universitarias (titulo, contenido, categoria, creado_por, creado_por_nombre, fecha_creacion, destinatario_especifico, creado_por_email) 
+   VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7) RETURNING *`,
+  [titulo, contenido, destino, creado_por, creado_por_nombre, destinatario_especifico, creado_por_email]
+);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/notas/:id/responder', async (req, res) => {
+app.put('/api/notas_universitarias/:id/responder', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { respuesta } = req.body;
+  
   try {
-    const result = await pool.query(`UPDATE notas SET respuesta = $1, fecha_respuesta = NOW() WHERE id = $2 RETURNING *`, [respuesta, id]);
-    res.json(result.rows.length > 0 ? result.rows[0] : res.status(404).json({ error: "La nota no existe." }));
+    const result = await pool.query(
+      `UPDATE notas_universitarias 
+       SET respuesta = $1, fecha_respuesta = NOW() 
+       WHERE id = $2 
+       RETURNING *`, 
+      [respuesta, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "La nota no existe." });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
+    console.error("Error en PUT responder:", error);
     res.status(500).json({ error: error.message });
   }
 });
