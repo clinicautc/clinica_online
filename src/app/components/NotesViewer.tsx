@@ -70,19 +70,29 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
   const esAdminDeArea = user?.rol === 'admin';
 
   const fetchNotes = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('http://localhost:3001/api/notas');
-      if (response.ok) {
-        const data = await response.json();
-        setNotes(data);
+  try {
+    setIsLoading(true);
+    // Agregamos el header 'email' al GET
+    const response = await fetch('http://localhost:3001/api/notas_universitarias', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'email': user?.email || '' // <--- Esto es lo que faltaba
       }
-    } catch (error) {
-      console.error("Error en sincronización de notas:", error);
-    } finally {
-      setIsLoading(false);
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      setNotes(data);
+    } else {
+      console.error("Error de autenticación:", response.status);
     }
-  };
+  } catch (error) {
+    console.error("Error en sincronización de notas:", error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchNotes();
@@ -117,9 +127,12 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
         ? `${notaActual.respuesta} <BR> ${nuevoComentario}` 
         : nuevoComentario;
 
-      const response = await fetch(`http://localhost:3001/api/notas/${noteId}/responder`, {
+      const response = await fetch(`http://localhost:3001/api/notas_universitarias/${noteId}/responder`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+       headers: { 
+        'Content-Type': 'application/json',
+        'email': user?.email || '' // <--- ESTO ES LO QUE FALTA
+      },
         body: JSON.stringify({ respuesta: historialCompleto })
       });
 
