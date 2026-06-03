@@ -23,7 +23,9 @@
   const NutritionMasterForm: React.FC = () => {
     // --- CONTROL DE PASOS ---
     const navigate = useNavigate();
-    const { appointmentId } = useParams(); // <--- VA AQUÍ (Línea 30 aprox.)
+    const params = useParams();
+// Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
+const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Línea 30 aprox.)
     const { user } = useAuth();
     const [step, setStep] = useState(1);
     
@@ -37,35 +39,34 @@
 
     const [isReadOnly, setIsReadOnly] = useState(false);
       // AGREGA ESTE BLOQUE AQUÍ:
-    useEffect(() => {
-      const cargarDatosGuardados = async () => {
-        // Ahora appointmentId ya está definido y no marcará error
-        if (!appointmentId) return; 
+    // Lógica de carga automática desde PostgreSQL para Nutrición
+  useEffect(() => {
+    const cargarHistorialExistente = async () => {
+      if (!appointmentId) return; 
 
-        try {
-          const response = await fetch('http://localhost:3001/api/historiales',{
-            headers: {email: user?.email || ''}});
-          if (response.ok) {
-            const todos: any[] = await response.json();
-            
-            const encontrado = todos.find(h => 
-              String(h.appointment_id) === String(appointmentId) && 
-              h.tipo === 'nutricion'
-            );
+      try {
+        const response = await fetch(`http://localhost:3001/api/historiales-nutricion/detalle/${appointmentId}`);
+        
+        if (response.ok) {
+          const dataGuardada = await response.json();
+          console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada); // <--- AGREGA ESTO
+          
+          // HIDRATACIÓN: Combinamos la estructura base vacía con los datos de la DB
+          setFormData((prevData: any) => ({
+            ...prevData,
+            ...dataGuardada
+          }));
 
-            if (encontrado) {
-    setFormData(encontrado.datos); // Inyecta el JSON completo
-    setIsReadOnly(true);
-    toast.success("Expediente recuperado");
-  }
-          }
-        } catch (error) {
-          console.error("Error al recuperar datos:", error);
+          toast.success("Expediente nutricional cargado");
         }
-      };
+      } catch (error) {
+        console.error("Error al cargar historial nutricional:", error);
+        toast.error("Hubo un problema al recuperar el expediente.");
+      }
+    };
 
-      cargarDatosGuardados();
-    }, [appointmentId]);
+    cargarHistorialExistente();
+  }, [appointmentId]);
 
     // Función núcleo para actualizar datos sin perder los anteriores
     const updateGlobalData = (page: string, data: any) => {

@@ -226,7 +226,7 @@ export default function NutritionAdminDashboard() {
         destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
       };
 
-      const response = await fetch('http://localhost:3001/api/notas', {
+      const response = await fetch('http://localhost:3001/api/notas_universitarias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

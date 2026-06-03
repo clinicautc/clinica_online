@@ -326,8 +326,8 @@ export default function NutritionPractitionerDashboard() {
           </TabsContent>
 
           <TabsContent value="notes">
-            <NotesViewer readOnly filterCategory="nutricion" />
-          </TabsContent>
+  <NotesViewer readOnly={false} filterCategory="nutricion" />
+</TabsContent>
         </Tabs>
       </main>
 

@@ -207,9 +207,12 @@ export default function ManageAdminPage() {
 
     try {
       setIsEnviando(true);
-      const response = await fetch('http://localhost:3001/api/notas', {
+      const response = await fetch('http://localhost:3001/api/notas_universitarias', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'email': user?.email || '' // <--- ESTA ES LA LÍNEA QUE DEBES AGREGAR
+        },
         body: JSON.stringify({
           titulo: notaNueva.titulo,
           contenido: notaNueva.contenido,
@@ -219,6 +222,8 @@ export default function ManageAdminPage() {
           destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
         })
       });
+
+      // ... resto de tu código
 
       if (response.ok) {
         toast.success(`Comunicado publicado exitosamente`);

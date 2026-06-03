@@ -1037,12 +1037,41 @@ app.get('/api/historiales-nutricion/detalle/:appointmentId', async (req, res) =>
   const { appointmentId } = req.params;
   try {
     const result = await pool.query(
-      'SELECT datos FROM historiales_nutricion WHERE appointment_id = $1',
+      'SELECT datos FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1',
       [appointmentId]
     );
     
     if (result.rows.length > 0) {
-      res.json(result.rows[0].datos);
+      let datosCrudos = result.rows[0].datos;
+      // Pequeño seguro por si postgres lo devuelve como texto en vez de JSON
+      if (typeof datosCrudos === 'string') {
+        datosCrudos = JSON.parse(datosCrudos);
+      }
+      res.json(datosCrudos);
+    } else {
+      res.status(404).json({ error: "No se encontraron datos para esta cita." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+/**
+ * ENDPOINT: Obtener datos específicos de un historial de FISIOTERAPIA por ID de Cita
+ */
+app.get('/api/historiales-fisioterapia/detalle/:appointmentId', async (req, res) => {
+  const { appointmentId } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT datos FROM historiales_fisioterapia WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1',
+      [appointmentId]
+    );
+    
+    if (result.rows.length > 0) {
+      let datosCrudos = result.rows[0].datos;
+      if (typeof datosCrudos === 'string') {
+        datosCrudos = JSON.parse(datosCrudos);
+      }
+      res.json(datosCrudos);
     } else {
       res.status(404).json({ error: "No se encontraron datos para esta cita." });
     }
@@ -1092,7 +1121,8 @@ app.get('/api/historiales-nutricion/paciente/:id', async (req, res) => {
  * Realiza tres acciones clave: Guarda datos, actualiza cita y registra métrica.
  */
 app.post('/api/historiales', async (req, res) => {
-  const { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio } = req.body;
+  let { paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio } = req.body;
+  
   const tipoLimpio = tipo ? tipo.trim().toLowerCase() : 'medicos';
   let tablaDestino = 'historiales_medicos';
   
@@ -1100,15 +1130,30 @@ app.post('/api/historiales', async (req, res) => {
   else if (tipoLimpio === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
 
   try {
-    // 1. Inserción del registro clínico en la tabla correspondiente
+    // --- NUEVA LÓGICA DE AUTO-COMPLETADO ---
+    // Si el formulario nos envía el ID de la cita, le preguntamos a la base de datos a quién le pertenece.
+    if (appointment_id) {
+      const citaResult = await pool.query('SELECT paciente_id, paciente_nombre FROM citas WHERE id = $1', [appointment_id]);
+      
+      if (citaResult.rows.length > 0) {
+        // Rellenamos automáticamente el paciente_id si venía nulo o vacío desde el frontend
+        paciente_id = paciente_id || citaResult.rows[0].paciente_id;
+        
+        // Si el nombre venía como "Paciente sin nombre", usamos el nombre real de la cita
+        if (!paciente_nombre || paciente_nombre === "Paciente sin nombre") {
+          paciente_nombre = citaResult.rows[0].paciente_nombre;
+        }
+      }
+    }
+
+    // 1. Inserción del registro clínico en la tabla correspondiente (ahora con el paciente_id garantizado)
     const result = await pool.query(
       `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [paciente_id, paciente_nombre, tipoLimpio, JSON.stringify(datos), creado_por, creado_por_nombre, appointment_id, duracion_carga || 0, timestamp_inicio || null]
     );
 
-    // 2. MODIFICACIÓN: ACTUALIZAR ESTADO DE LA CITA PARA QUE DESAPAREZCA DEL DASHBOARD
-    // Al pasar de 'programada' a 'completada', el filtro del frontend deja de mostrarla.
+    // 2. ACTUALIZAR ESTADO DE LA CITA PARA QUE DESAPAREZCA DEL DASHBOARD
     if (appointment_id) {
       await pool.query("UPDATE citas SET estado = 'completada' WHERE id = $1", [appointment_id]);
     }
@@ -1156,7 +1201,14 @@ app.get('/api/logs', async (req, res) => {
 
 app.get('/api/notas_universitarias', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM notas_universitarias ORDER BY fecha_creacion DESC');
+   const result = await pool.query(`
+      SELECT 
+        n.*, 
+        u.rol AS creado_por_rol 
+      FROM notas_universitarias n
+      LEFT JOIN usuarios u ON n.creado_por = u.id
+      ORDER BY n.fecha_creacion DESC
+    `);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
