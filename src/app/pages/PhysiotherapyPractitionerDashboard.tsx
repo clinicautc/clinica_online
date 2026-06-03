@@ -313,7 +313,7 @@ export default function PhysiotherapyPractitionerDashboard() {
 
           <TabsContent value="patients"><PatientList /></TabsContent>
           <TabsContent value="histories"><MedicalHistoryViewer filterType="fisioterapia" /></TabsContent>
-          <TabsContent value="notes"><NotesViewer readOnly filterCategory="fisioterapia" /></TabsContent>
+          <TabsContent value="notes"><NotesViewer readOnly={false} filterCategory="fisioterapia" /></TabsContent>
         </Tabs>
       </main>
 

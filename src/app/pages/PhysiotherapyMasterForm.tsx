@@ -33,27 +33,37 @@ const PhysiotherapyMasterForm: React.FC = () => {
   });
 
   // Lógica de carga automática desde PostgreSQL
+  // Lógica de carga automática desde PostgreSQL
   useEffect(() => {
     const cargarHistorialExistente = async () => {
-      if (!appointmentId) return;
+      // Si no hay ID en la URL, es un formulario nuevo, no hacemos nada.
+      if (!appointmentId) return; 
+
       try {
-        const response = await fetch('http://localhost:3001/api/historiales',{
-          headers: {email: user?.email || ''}});
+        const response = await fetch(`http://localhost:3001/api/historiales-fisioterapia/detalle/${appointmentId}`);
+        
         if (response.ok) {
-          const todos: any[] = await response.json();
-          const encontrado = todos.find(h => 
-            String(h.appointment_id) === String(appointmentId) && h.tipo === 'fisioterapia'
-          );
-          if (encontrado) {
-            setFormData(encontrado.datos); // Inyecta los datos guardados
-            setIsReadOnly(true); // Activa modo lectura
-            toast.info("Visualizando historial clínico guardado.");
-          }
+          const dataGuardada = await response.json();
+
+          console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada); // <--- AGREGA ESTO
+          
+          
+          // HIDRATACIÓN: Inyectamos los datos guardados en el estado del formulario
+          setFormData((prevData: any) => ({
+            ...prevData,
+            ...dataGuardada
+          }));
+
+          // OPCIONAL: Como es un historial ya guardado ("Ver Expediente"), lo ponemos en modo lectura
+          setIsReadOnly(true); 
+          toast.success("Expediente cargado correctamente");
         }
       } catch (error) {
-        console.error("Error al recuperar historial:", error);
+        console.error("Error al cargar historial:", error);
+        toast.error("Hubo un problema al recuperar el expediente.");
       }
     };
+
     cargarHistorialExistente();
   }, [appointmentId]);
 
@@ -996,7 +1006,9 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const { appointmentId } = useParams();
+  const params = useParams();
+// Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
+const appointmentId = params.id || params.appointmentId;
   const navigate = useNavigate();
 
   // --- LÓGICA DE MARCADORES (P3 - Dermatomas) ---

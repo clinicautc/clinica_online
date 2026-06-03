@@ -29,6 +29,7 @@ interface Note {
   categoria: 'fisioterapia' | 'nutricion' | 'general' | 'todos';
   creado_por_nombre: string;
   creado_por_email: string;
+  creado_por_rol?: string; // <--- AÑADIR ESTA LÍNEA
   destinatario_especifico: string | null;
   fecha_creacion: string;
   respuesta: string | null;
@@ -152,26 +153,17 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
   const miEmail = (user?.email || '').toLowerCase();
   const miArea = (user?.area || '').toLowerCase();
 
-  /**
-   * HELPER DE IDENTIFICACIÓN DEL MASTER
-   */
-const isFromMaster = (name: string) => {
-  const n = (name || '').toLowerCase();
+  
 
-  return (
-    n.includes('master') ||
-    n.includes('velázquez') ||
-    n.includes('liliana')
-  );
-};
 
   /**
    * LÓGICA DE CONTEO PARA BURBUJAS DE PESTAÑA
    * Verifica si existen mensajes con respuestas nuevas en la categoría seleccionada.
    */
-  const hasUnreadInTab = (type: 'alumnos' | 'administrativo') => {
+ const hasUnreadInTab = (type: 'alumnos' | 'administrativo') => {
     return notes.some(note => {
-      const fromMaster = isFromMaster(note.creado_por_nombre);
+      // CAMBIO AQUÍ: Evaluamos el rol directo de la base de datos
+      const fromMaster = note.creado_por_rol === 'master'; 
       const matchTab = type === 'alumnos' ? !fromMaster : fromMaster;
       
       if (!matchTab) return false;
@@ -188,8 +180,10 @@ const isFromMaster = (name: string) => {
   };
 
   const filteredNotes = notes.filter(note => {
-    const fromMaster = isFromMaster(note.creado_por_nombre);
+    // CAMBIO AQUÍ: Evaluamos el rol
+    const fromMaster = note.creado_por_rol === 'master'; 
     const destinoNota = (note.categoria || '').toLowerCase();
+    // ... resto de la función sigue igual
     const esParaMi = (note.destinatario_especifico || '').toLowerCase() === miEmail;
 
     if (filterCategory && destinoNota !== filterCategory && destinoNota !== 'todos' && destinoNota !== 'general') {
@@ -284,8 +278,10 @@ const isFromMaster = (name: string) => {
           <div className="grid grid-cols-1 gap-8">
             {filteredNotes.map((note) => {
               const nombreAutor = note.creado_por_nombre || 'Usuario UTC';
-              const esMensajeMaster = isFromMaster(nombreAutor);
+              // CAMBIO AQUÍ: Evaluamos el rol
+              const esMensajeMaster = note.creado_por_rol === 'master'; 
               const numRespuestas = note.respuesta ? note.respuesta.split('<BR>').length : 0;
+              // ... resto del renderizado sigue igual
               const leido = (readMessages[note.id] || 0) >= numRespuestas;
               
               let areaBorderColor = esMensajeMaster ? 'border-l-amber-500' : 'border-l-blue-900';
