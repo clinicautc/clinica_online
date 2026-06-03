@@ -35,37 +35,40 @@ const PhysiotherapyMasterForm: React.FC = () => {
   // Lógica de carga automática desde PostgreSQL
   // Lógica de carga automática desde PostgreSQL
   useEffect(() => {
-    const cargarHistorialExistente = async () => {
-      // Si no hay ID en la URL, es un formulario nuevo, no hacemos nada.
-      if (!appointmentId) return; 
+  const cargarHistorialExistente = async () => {
+    if (!appointmentId) return; 
 
-      try {
-        const response = await fetch(`http://localhost:3001/api/historiales-fisioterapia/detalle/${appointmentId}`);
-        
-        if (response.ok) {
-          const dataGuardada = await response.json();
-
-          console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada); // <--- AGREGA ESTO
-          
-          
-          // HIDRATACIÓN: Inyectamos los datos guardados en el estado del formulario
-          setFormData((prevData: any) => ({
-            ...prevData,
-            ...dataGuardada
-          }));
-
-          // OPCIONAL: Como es un historial ya guardado ("Ver Expediente"), lo ponemos en modo lectura
-          setIsReadOnly(true); 
-          toast.success("Expediente cargado correctamente");
+    try {
+      // Se agregó el objeto de configuración con headers y el email
+      const response = await fetch(`http://localhost:3001/api/historiales-fisioterapia/detalle/${appointmentId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'email': user?.email || '' // <--- ESTO ES LO QUE ESTABA CAUSANDO EL ERROR 401
         }
-      } catch (error) {
-        console.error("Error al cargar historial:", error);
-        toast.error("Hubo un problema al recuperar el expediente.");
-      }
-    };
+      });
+      
+      if (response.ok) {
+        const dataGuardada = await response.json();
+        console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
+        
+        // HIDRATACIÓN: Inyectamos los datos guardados en el estado del formulario
+        setFormData((prevData: any) => ({
+          ...prevData,
+          ...dataGuardada
+        }));
 
-    cargarHistorialExistente();
-  }, [appointmentId]);
+        setIsReadOnly(true); 
+        toast.success("Expediente cargado correctamente");
+      }
+    } catch (error) {
+      console.error("Error al cargar historial:", error);
+      toast.error("Hubo un problema al recuperar el expediente.");
+    }
+  };
+
+  cargarHistorialExistente();
+}, [appointmentId, user]); // Se añadió 'user' a las dependencias
 
   // ... (Sigue el resto del código: updateGlobalData, handleNext, etc.)
 
@@ -1056,11 +1059,13 @@ const appointmentId = params.id || params.appointmentId;
     };
 
     const response = await fetch('http://localhost:3001/api/historiales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'email': user?.email || '' // <--- ESTO ES LA LLAVE DE ACCESO ✅
+  },
+  body: JSON.stringify(payload)
+});
     if (response.ok) {
       toast.success('¡Historial guardado con éxito!');
       

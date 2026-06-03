@@ -41,32 +41,38 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
       // AGREGA ESTE BLOQUE AQUÍ:
     // Lógica de carga automática desde PostgreSQL para Nutrición
   useEffect(() => {
-    const cargarHistorialExistente = async () => {
-      if (!appointmentId) return; 
+  const cargarHistorialExistente = async () => {
+    if (!appointmentId) return; 
 
-      try {
-        const response = await fetch(`http://localhost:3001/api/historiales-nutricion/detalle/${appointmentId}`);
-        
-        if (response.ok) {
-          const dataGuardada = await response.json();
-          console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada); // <--- AGREGA ESTO
-          
-          // HIDRATACIÓN: Combinamos la estructura base vacía con los datos de la DB
-          setFormData((prevData: any) => ({
-            ...prevData,
-            ...dataGuardada
-          }));
-
-          toast.success("Expediente nutricional cargado");
+    try {
+      const response = await fetch(`http://localhost:3001/api/historiales-nutricion/detalle/${appointmentId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'email': user?.email || '' // <--- SE AGREGÓ EL HEADER PARA AUTORIZACIÓN
         }
-      } catch (error) {
-        console.error("Error al cargar historial nutricional:", error);
-        toast.error("Hubo un problema al recuperar el expediente.");
-      }
-    };
+      });
+      
+      if (response.ok) {
+        const dataGuardada = await response.json();
+        console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
+        
+        // HIDRATACIÓN: Combinamos la estructura base vacía con los datos de la DB
+        setFormData((prevData: any) => ({
+          ...prevData,
+          ...dataGuardada
+        }));
 
-    cargarHistorialExistente();
-  }, [appointmentId]);
+        toast.success("Expediente nutricional cargado");
+      }
+    } catch (error) {
+      console.error("Error al cargar historial nutricional:", error);
+      toast.error("Hubo un problema al recuperar el expediente.");
+    }
+  };
+
+  cargarHistorialExistente();
+}, [appointmentId, user]); // Se agregó 'user' a las dependencias para asegurar consistencia
 
     // Función núcleo para actualizar datos sin perder los anteriores
     const updateGlobalData = (page: string, data: any) => {
@@ -1790,10 +1796,13 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
         };
 
         const response = await fetch('http://localhost:3001/api/historiales', {
-          method: 'POST',
-           headers: {'Content-Type': 'application/json',email: user?.email || ''},
-          body: JSON.stringify(payload)
-        });
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'email': user?.email || '' // <--- ESTO ES LA LLAVE DE ACCESO ✅
+  },
+  body: JSON.stringify(payload)
+});
 
         if (!response.ok) {
           const errorData = await response.json();
