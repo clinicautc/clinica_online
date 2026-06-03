@@ -1033,7 +1033,7 @@ app.get('/api/historiales/verificar/:pacienteId/:area', async (req, res) => {
  * ENDPOINT: Obtener datos específicos de un historial por ID de Cita
  * Utilizado para el auto-rellenado de formularios guardados.
  */
-app.get('/api/historiales-nutricion/detalle/:appointmentId', async (req, res) => {
+app.get('/api/historiales-nutricion/detalle/:appointmentId',requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
   const { appointmentId } = req.params;
   try {
     const result = await pool.query(
@@ -1058,7 +1058,8 @@ app.get('/api/historiales-nutricion/detalle/:appointmentId', async (req, res) =>
 /**
  * ENDPOINT: Obtener datos específicos de un historial de FISIOTERAPIA por ID de Cita
  */
-app.get('/api/historiales-fisioterapia/detalle/:appointmentId', async (req, res) => {
+app.get('/api/historiales-fisioterapia/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
+  // ... resto de tu código
   const { appointmentId } = req.params;
   try {
     const result = await pool.query(
