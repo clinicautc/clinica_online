@@ -36,7 +36,10 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
   const currentUser = user as any;
   const isAdmin = currentUser?.rol === 'admin';
   const isRescheduling = !!existingAppointment; // Bandera booleana
-
+  
+  // ESTADO NUEVO: Almacena exclusivamente las horas bloqueadas por la base de datos
+  const [horasOcupadas, setHorasOcupadas] = useState<string[]>([]);
+  
   // Si estamos reagendando, inicializamos los estados con los datos de la cita existente
   const [type, setType] = useState<'fisioterapia' | 'nutricion' | ''>(
     (existingAppointment?.tipo as 'fisioterapia' | 'nutricion') || ''
@@ -50,7 +53,6 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
     existingAppointment?.hora ? existingAppointment.hora.substring(0, 5) : ''
   );
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -75,48 +77,39 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
 
   const availableTimeSlots = generateAvailableSlots();
 
+  // EFECTO PRINCIPAL: CONSULTA LA BASE DE DATOS CADA VEZ QUE CAMBIA FECHA O ÁREA
   useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/citas');
-        if (response.ok) {
-          const data = await response.json();
-          setAppointments(data);
+    if (date && type) {
+      const fetchDisponibilidad = async () => {
+        try {
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const response = await fetch(`http://localhost:3001/api/citas/disponibilidad?fecha=${dateStr}&tipo=${type}`);
+          
+          if (response.ok) {
+            const ocupadasDesdeDB = await response.json(); // Array de strings: ['08:00', '09:30']
+            
+            // Si estamos reagendando, DEBEMOS excluir la hora original de la cita 
+            // de la lista de ocupadas, solo si estamos consultando el mismo día original.
+            if (isRescheduling && existingAppointment && existingAppointment.fecha.substring(0, 10) === dateStr) {
+              const horaOriginalCorta = existingAppointment.hora.substring(0, 5);
+              const filtradas = ocupadasDesdeDB.filter((h: string) => h.substring(0, 5) !== horaOriginalCorta);
+              
+              // Map para asegurar formato '08:00'
+              setHorasOcupadas(filtradas.map((h: string) => h.substring(0, 5)));
+            } else {
+              setHorasOcupadas(ocupadasDesdeDB.map((h: string) => h.substring(0, 5)));
+            }
+          }
+        } catch (error) {
+          console.error("Error al consultar disponibilidad:", error);
         }
-      } catch (error) {
-        console.error("Error cargando citas ocupadas:", error);
-      }
-    };
-    fetchAppointments();
-  }, []);
+      };
 
-  const getOccupiedSlots = (selectedDate: Date) => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
-    return appointments
-      .filter(apt => {
-        // EXCEPCIÓN: Si estamos reagendando, ignoramos el slot de la cita actual 
-        // para que nos permita dejarla a la misma hora si cambiamos de día.
-        // CORRECCIÓN TS: Se agregó validación existingAppointment para evitar errores de undefined
-        if (isRescheduling && existingAppointment && apt.id === existingAppointment.id) {
-          return false; 
-        }
-
-        const dbDate = apt.fecha ? apt.fecha.substring(0, 10) : '';
-        const dbPatientId = apt.paciente_id || (apt as any).pacienteId;
-        const isSamePatient = String(dbPatientId) === String(patientId);
-        const isActive = apt.estado === 'programada' || apt.estado === 'asignada';
-
-        return dbDate === dateStr && isActive && isSamePatient;
-      })
-      .map(apt => {
-        let dbTime = apt.hora || '';
-        if (dbTime.length > 0 && dbTime.indexOf(':') === 1) {
-          dbTime = '0' + dbTime; 
-        }
-        return dbTime.substring(0, 5); 
-      });
-  };
+      fetchDisponibilidad();
+    } else {
+      setHorasOcupadas([]);
+    }
+  }, [date, type, isRescheduling, existingAppointment]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,9 +124,9 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       return;
     }
 
-    const occupiedSlotsValidation = getOccupiedSlots(date);
-    if (occupiedSlotsValidation.includes(time)) {
-      toast.error("El paciente ya tiene una cita agendada a esta hora. Por favor selecciona un horario diferente.");
+    // Validación doble (aunque el botón esté bloqueado, por si lo hackean)
+    if (horasOcupadas.includes(time)) {
+      toast.error(`El horario de las ${time} ya está ocupado en el área de ${type}. Por favor selecciona otro.`);
       return;
     }
 
@@ -145,7 +138,6 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       // ---------------------------------------------------------
       // MAGIA HÍBRIDA: Decide dinámicamente si es POST o PUT
       // ---------------------------------------------------------
-      // CORRECCIÓN TS: Uso de optional chaining (?.) para el ID
       const endpoint = isRescheduling 
         ? `http://localhost:3001/api/citas/${existingAppointment?.id}` 
         : 'http://localhost:3001/api/citas';
@@ -153,7 +145,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       const method = isRescheduling ? 'PUT' : 'POST';
       
       const payload = isRescheduling 
-        ? { fecha: dateStr, hora: time, estado: 'programada' } // El backend (PUT) solo requiere esto
+        ? { fecha: dateStr, hora: time, tipo: type, estado: 'programada' } // Añadimos tipo al PUT
         : { paciente_id: Number(patientId), paciente_nombre: patientName, tipo: type, fecha: dateStr, hora: time, estado: 'programada' };
 
       const response = await fetch(endpoint, {
@@ -166,6 +158,16 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       });
 
       const result = await response.json();
+
+      // Manejo del error HTTP 409 (Conflicto de Horario por concurrencia)
+      if (response.status === 409) {
+        toast.error(result.error);
+        setIsSaving(false);
+        // Recargar la disponibilidad para que se bloquee el botón
+        setHorasOcupadas(prev => [...prev, time]);
+        setTime('');
+        return;
+      }
 
       if (response.ok) {
         toast.success(isRescheduling ? '¡Cita reagendada exitosamente!' : '¡Cita agendada exitosamente!');
@@ -188,7 +190,6 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
     return isBefore(date, startOfDay(new Date()));
   };
 
-  const occupiedSlots = date ? getOccupiedSlots(date) : [];
   const isSelectedDateToday = date ? isToday(date) : false;
 
   return (
@@ -212,7 +213,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
             {/* Si estamos reagendando, NO se puede cambiar el área */}
             <Select 
               value={type} 
-              onValueChange={(value: any) => setType(value)} 
+              onValueChange={(value: any) => { setType(value); setTime(''); }} 
               disabled={isSaving || isAdmin || isRescheduling}
             >
               <SelectTrigger className={`border-blue-900/20 ${(isAdmin || isRescheduling) ? 'bg-gray-100 cursor-not-allowed opacity-80' : ''}`}>
@@ -233,7 +234,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
               <Calendar
                 mode="single"
                 selected={date}
-                onSelect={setDate}
+                onSelect={(newDate) => { setDate(newDate); setTime(''); }}
                 disabled={isDateDisabled || isSaving}
                 locale={es}
                 className="rounded-md"
@@ -246,7 +247,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
             )}
           </div>
 
-          {date && (
+          {date && type && (
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
               <Label className="text-blue-900 font-semibold flex items-center gap-2">
                 <Clock className="w-4 h-4" /> Horario Disponible (00:00 - 17:00)
@@ -254,7 +255,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md shadow-inner bg-slate-50">
                 {availableTimeSlots.map((slot) => {
                   const isBlockedByTime = isSelectedDateToday;
-                  const isOccupied = occupiedSlots.includes(slot) || isBlockedByTime;
+                  const isOccupied = horasOcupadas.includes(slot) || isBlockedByTime;
                   const isSelected = time === slot;
                   
                   return (
@@ -265,9 +266,9 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
                       className={`
                         text-xs transition-all duration-200
                         ${isOccupied 
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50' 
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60 border-dashed border-gray-300 hover:bg-gray-200' 
                           : isSelected
-                          ? 'bg-blue-900 text-white'
+                          ? 'bg-blue-900 text-white shadow-md scale-105'
                           : 'border-blue-900/20 text-blue-900 hover:bg-blue-50'
                         }
                       `}
@@ -284,13 +285,13 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
 
           <Button 
             type="submit" 
-            className={`w-full text-white py-6 text-lg font-bold shadow-md ${isRescheduling ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-900 hover:bg-blue-800'}`}
+            className={`w-full text-white py-6 text-lg font-bold shadow-md transition-all ${isRescheduling ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-900 hover:bg-blue-800'}`}
             disabled={!type || !date || !time || isSaving || isSelectedDateToday}
           >
             {isSaving ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Guardando en Servidor...</span>
+                <span>Validando disponibilidad...</span>
               </div>
             ) : (
               isRescheduling ? 'Confirmar Reagendamiento' : 'Confirmar Cita Universitaria'

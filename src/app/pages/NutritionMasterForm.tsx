@@ -18,6 +18,8 @@
     onBack: () => void;
     onNext: () => void;
     isReadOnly: boolean;
+    historialId?: number | null; // <--- 1. AGREGA ESTA LÍNEA
+
   }
 
   const NutritionMasterForm: React.FC = () => {
@@ -38,6 +40,8 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
   });
 
     const [isReadOnly, setIsReadOnly] = useState(false);
+    const [historialId, setHistorialId] = useState<number | null>(null);
+
       // AGREGA ESTE BLOQUE AQUÍ:
     // Lógica de carga automática desde PostgreSQL para Nutrición
   useEffect(() => {
@@ -53,17 +57,21 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
         }
       });
       
-      if (response.ok) {
-        const dataGuardada = await response.json();
-        console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
+     if (response.ok) {
+        const filaCompleta = await response.json();
+        console.log("¡FILA COMPLETA RECUPERADA!", filaCompleta);
         
-        // HIDRATACIÓN: Combinamos la estructura base vacía con los datos de la DB
+        // 1. Guardamos el ID del historial para que el PUT funcione
+        setHistorialId(filaCompleta.id);
+        
+        // 2. Hidratación: MUY IMPORTANTE usar filaCompleta.datos
         setFormData((prevData: any) => ({
           ...prevData,
-          ...dataGuardada
+          ...filaCompleta.datos, 
+          paciente_id: filaCompleta.paciente_id // <-- ¡Esto evita el error de redirección!
         }));
 
-        toast.success("Expediente nutricional cargado");
+        toast.success("Expediente cargado correctamente");
       }
     } catch (error) {
       console.error("Error al cargar historial nutricional:", error);
@@ -121,16 +129,15 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
             onBack={() => setStep(3)} 
             onNext={() => {}} 
             isReadOnly={isReadOnly}
+            historialId={historialId}
           />
         )}
-
-        {/* --- PÁGINA 1 --- */}
+{/* --- PÁGINA 1 --- */}
         <div className={step === 1 ? "block" : "hidden"}>
-          
+         
           {/* BOTONES DE NAVEGACIÓN FIJOS */}
-          <button
-            onClick={() => window.history.back()}
-            className="fixed top-4 right-4 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
+         <button onClick={() => navigate(-1)}
+         className="fixed top-4 right-4 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
@@ -145,180 +152,191 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
             Siguiente (P2) →
           </button>
 
-          {/* CONTENEDOR HOJA A4 (DISEÑO ORIGINAL INTACTO) */}
-          <div className="bg-white w-[210mm] h-[297mm] p-[10mm] pt-[5mm] relative shadow-2xl flex flex-col overflow-hidden text-[#2c5392] print:shadow-none">
+          {/* CONTENEDOR HOJA A4 (DISEÑO UNIFORME SIN SUPERPOSICIONES) */}
+          <div className="bg-white w-[210mm] h-[297mm] px-[8mm] pt-[6mm] pb-[6mm] relative shadow-2xl flex flex-col justify-between overflow-hidden text-[#2c5392] print:shadow-none print:w-[210mm] print:h-[297mm] print:p-[8mm] print:m-0">
             
             {/* ENCABEZADO */}
-            <header className="flex justify-between items-start mb-2">
+            <header className="flex justify-between items-start mb-1 shrink-0">
               <div className="leading-none shrink-0">
                 <h1 className="text-[32px] font-black tracking-tighter mb-0">utc</h1>
-                <p className="text-[7px] font-bold leading-tight uppercase">Universidad<br />Tres Culturas</p>
+                <p className="text-[7.5px] font-bold leading-tight uppercase">Universidad<br />Tres Culturas</p>
               </div>
-              <div className="text-center flex-grow mt-2">
-                <div className="bg-[#2c5392] text-white px-10 py-1.5 rounded-full text-2xl font-bold inline-block mb-1">
+              <div className="text-center flex-grow mt-1">
+                <div className="bg-[#2c5392] text-white px-10 py-1.5 rounded-full text-[22px] font-bold inline-block mb-1">
                   Historia Clínica Nutricional
                 </div>
                 <p className="text-[8px] font-bold">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</p>
               </div>
-              <div className="flex items-end gap-1 text-[10px] font-bold mt-2 border-b border-[#2c5392]">
+              <div className="flex items-end gap-1 text-[9.5px] font-bold mt-3 border-b-2 border-[#2c5392] pb-0.5">
                 <span>Fecha</span>
-                <input 
-                  type="text" 
-                  id="fecha" 
+                <input
+                  type="text"
+                  id="fecha"
                   value={formData.pagina_1.fecha || ''}
-                  onChange={(e) => handleInputChange(e, 'fecha')} 
-                  className="w-24 outline-none px-1 h-3.5 bg-transparent" 
+                  onChange={(e) => handleInputChange(e, 'fecha')}
+                  className="w-24 outline-none px-1 h-3.5 bg-transparent text-center font-bold text-[#333]"
                 />
               </div>
             </header>
 
             {/* DATOS PERSONALES */}
             <SectionBox title="Datos personales" marginTop="mt-2">
-              <div className="flex items-end gap-1 mb-1 text-[10px] font-bold">
+              <div className="flex items-end gap-1 mb-1 text-[9.5px] font-bold w-full">
                 <span className="shrink-0">Nombre completo</span>
-      <input 
-    type="text" 
-    value={formData.pagina_1?.nombre || ''} // CORRECTO: Lee del estado local inyectado
+      <input
+    type="text"
+    value={formData.pagina_1?.nombre || ''}
     onChange={(e) => handleInputChange(e, 'nombre')}
     disabled={isReadOnly}
-    className="border-b border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent"
+    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
   />
-                <span className="shrink-0">Expediente</span>
-                <input 
-                  type="text" 
-                  id="expediente" 
+                <span className="shrink-0 ml-2">Expediente</span>
+                <input
+                  type="text"
+                  id="expediente"
                   value={formData.pagina_1.expediente || ''}
-                  onChange={(e) => handleInputChange(e, 'expediente')} 
-                  className="border-b border-[#2c5392] w-24 outline-none px-1 h-3.5 bg-transparent" 
+                  onChange={(e) => handleInputChange(e, 'expediente')}
+                  className="border-b-[1.5px] border-[#2c5392] w-24 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
                 />
               </div>
 
-              <div className="flex items-end gap-1 mb-1 text-[10px] font-bold overflow-hidden">
-                <span className="shrink-0">Edad</span>
-                <input 
-                  type="text" 
-                  id="edad" 
-                  value={formData.pagina_1.edad || ''}
-                  onChange={(e) => handleInputChange(e, 'edad')} 
-                  className="border-b border-[#2c5392] w-10 outline-none px-1 h-3.5 bg-transparent" 
-                />
-                <span className="ml-1 shrink-0">Sexo</span>
-                <CustomCheckbox 
-                  label="Fem" 
-                  checked={formData.pagina_1.sexo === 'Fem'} 
-                  onChange={() => updateGlobalData('pagina_1', {sexo: 'Fem'})} 
-                />
-                <CustomCheckbox 
-                  label="Mas" 
-                  checked={formData.pagina_1.sexo === 'Mas'} 
-                  onChange={() => updateGlobalData('pagina_1', {sexo: 'Mas'})} 
-                />
-                <span className="ml-2 shrink-0">Edo. civil</span>
-                <CustomCheckbox 
-                  label="Soltero" 
-                  checked={formData.pagina_1.civil === 'Soltero'} 
-                  onChange={() => updateGlobalData('pagina_1', {civil: 'Soltero'})}
-                />
-                <CustomCheckbox 
-                  label="Casado" 
-                  checked={formData.pagina_1.civil === 'Casado'} 
-                  onChange={() => updateGlobalData('pagina_1', {civil: 'Casado'})}
-                />
-                <span className="ml-2 shrink-0">Ocupación</span>
-                <input 
-                  type="text" 
-                  id="ocupacion" 
-                  value={formData.pagina_1.ocupacion || ''}
-                  onChange={(e) => handleInputChange(e, 'ocupacion')} 
-                  className="border-b border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent" 
-                />
-                <span className="shrink-0 ml-1">F/N</span>
-                <input 
-                  type="text" 
-                  id="fn" 
-                  value={formData.pagina_1.fn || ''}
-                  onChange={(e) => handleInputChange(e, 'fn')} 
-                  className="border-b border-[#2c5392] w-16 outline-none px-1 h-3.5 bg-transparent" 
-                />
+              <div className="flex items-end gap-2 text-[9.5px] font-bold overflow-hidden w-full mb-1">
+                <div className="flex items-end gap-1 shrink-0">
+                  <span>Edad</span>
+                  <input
+                    type="text"
+                    id="edad"
+                    value={formData.pagina_1.edad || ''}
+                    onChange={(e) => handleInputChange(e, 'edad')}
+                    className="border-b-[1.5px] border-[#2c5392] w-10 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                  <span>Sexo</span>
+                  <CustomCheckbox
+                    label="Fem"
+                    checked={formData.pagina_1.sexo === 'Fem'}
+                    onChange={() => updateGlobalData('pagina_1', {sexo: 'Fem'})}
+                  />
+                  <CustomCheckbox
+                    label="Mas"
+                    checked={formData.pagina_1.sexo === 'Mas'}
+                    onChange={() => updateGlobalData('pagina_1', {sexo: 'Mas'})}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <span>Edo. civil</span>
+                  <CustomCheckbox
+                    label="Soltero"
+                    checked={formData.pagina_1.civil === 'Soltero'}
+                    onChange={() => updateGlobalData('pagina_1', {civil: 'Soltero'})}
+                  />
+                  <CustomCheckbox
+                    label="Casado"
+                    checked={formData.pagina_1.civil === 'Casado'}
+                    onChange={() => updateGlobalData('pagina_1', {civil: 'Casado'})}
+                  />
+                </div>
+                <div className="flex items-end gap-1 flex-grow ml-2">
+                  <span className="shrink-0">Ocupación</span>
+                  <input
+                    type="text"
+                    id="ocupacion"
+                    value={formData.pagina_1.ocupacion || ''}
+                    onChange={(e) => handleInputChange(e, 'ocupacion')}
+                    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
+                  />
+                </div>
+                <div className="flex items-end gap-1 shrink-0">
+                  <span>F/N</span>
+                  <input
+                    type="text"
+                    id="fn"
+                    value={formData.pagina_1.fn || ''}
+                    onChange={(e) => handleInputChange(e, 'fn')}
+                    className="border-b-[1.5px] border-[#2c5392] w-20 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-end gap-1 text-[10px] font-bold">
+              <div className="flex items-end gap-1 text-[9.5px] font-bold w-full">
                 <span className="shrink-0">Teléfono</span>
-                <input 
-                  type="text" 
-                  id="telefono" 
+                <input
+                  type="text"
+                  id="telefono"
                   value={formData.pagina_1.telefono || ''}
-                  onChange={(e) => handleInputChange(e, 'telefono')} 
-                  className="border-b border-[#2c5392] w-48 outline-none px-1 h-3.5 bg-transparent" 
+                  onChange={(e) => handleInputChange(e, 'telefono')}
+                  className="border-b-[1.5px] border-[#2c5392] w-48 outline-none px-1 h-3.5 bg-transparent text-[#333]"
                 />
-                <span className="shrink-0 ml-1">Dirección</span>
-                <input 
-                  type="text" 
-                  id="direccion" 
+                <span className="shrink-0 ml-2">Dirección</span>
+                <input
+                  type="text"
+                  id="direccion"
                   value={formData.pagina_1.direccion || ''}
-                  onChange={(e) => handleInputChange(e, 'direccion')} 
-                  className="border-b border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent" 
+                  onChange={(e) => handleInputChange(e, 'direccion')}
+                  className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
                 />
               </div>
             </SectionBox>
 
             {/* MOTIVOS Y QX */}
-            <div className="grid grid-cols-2 gap-2">
-              <SectionBox title="Motivos de consulta" paddingX="px-0" marginTop="mt-3">
-                <LineTextarea 
-                  id="motivos" 
-                  value={formData.pagina_1.motivos || ''} 
-                  onChange={handleInputChange} 
-                  rows={4} 
-                  lineHeight={18} 
+            <div className="grid grid-cols-2 gap-2 shrink-0">
+              <SectionBox title="Motivos de consulta" paddingX="px-2" marginTop="mt-2">
+                <LineTextarea
+                  id="motivos"
+                  value={formData.pagina_1.motivos || ''}
+                  onChange={handleInputChange}
+                  rows={2}
+                  lineHeight={16}
                 />
               </SectionBox>
-              <SectionBox title="Qx o Tx previos" paddingX="px-0" marginTop="mt-3">
-                <LineTextarea 
-                  id="qx" 
-                  value={formData.pagina_1.qx || ''} 
-                  onChange={handleInputChange} 
-                  rows={4} 
-                  lineHeight={18} 
+              <SectionBox title="Qx o Tx previos" paddingX="px-2" marginTop="mt-2">
+                <LineTextarea
+                  id="qx"
+                  value={formData.pagina_1.qx || ''}
+                  onChange={handleInputChange}
+                  rows={2}
+                  lineHeight={16}
                 />
               </SectionBox>
             </div>
 
             {/* ANTECEDENTES GRID */}
-            <div className="grid grid-cols-[1.7fr_1fr] gap-2">
-              <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-3" className="overflow-hidden">
-                <div className="max-h-[200px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-400">
-                  <table className="w-full border-collapse text-[8.5px] font-bold table-fixed mt-1">
+            <div className="grid grid-cols-[1.7fr_1fr] gap-2 shrink-0">
+              <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-2">
+                <div className="w-full h-full overflow-hidden rounded-b-md">
+                  <table className="w-full border-collapse text-[8.5px] font-bold table-fixed mt-0">
                     <thead>
-                      <tr className="border-b border-[#2c5392]">
-                        <th className="text-left pl-1 w-[38%]">Enfermedades</th>
-                        {['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'].map(h => <th key={h} className="text-[8px]">{h}</th>)}
+                      <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
+                        <th className="text-left pl-2 w-[40%] py-1">Enfermedades</th>
+                        {['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'].map(h => <th key={h} className="text-[7.5px] py-1">{h}</th>)}
                       </tr>
                     </thead>
                     <tbody className="text-center">
                       {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map((item) => (
-                        <tr key={item} className="border-b border-[#2c5392] h-[16px]">
-                          <td className="text-left pl-1 border-r border-[#2c5392] whitespace-nowrap overflow-hidden text-ellipsis">{item}</td>
+                        <tr key={item} className="border-b-[1.5px] border-[#2c5392] h-[13.5px]">
+                          <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] whitespace-nowrap overflow-hidden text-ellipsis">{item}</td>
                           {[...Array(6)].map((_, i) => (
-                            <td key={i} className="border-r border-[#2c5392] last:border-r-0">
-                              <input 
-    type="checkbox" 
-    checked={formData.pagina_1[`heredo-${item}-${i}`] || false} // Usa formData aquí
-    onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
-    disabled={isReadOnly}
-  />
+                            <td key={i} className="border-r-[1.5px] border-[#2c5392] last:border-r-0">
+                              <input
+                                type="checkbox"
+                                checked={formData.pagina_1[`heredo-${item}-${i}`] || false}
+                                onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
+                                disabled={isReadOnly}
+                                className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
+                              />
                             </td>
                           ))}
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={7} className="text-left px-1 py-1 text-[9px]">
-                          Otras: <input 
-                            type="text" 
-                            id="otrasHeredo" 
+                        <td colSpan={7} className="text-left px-2 py-1 text-[8.5px]">
+                          Otras: <input
+                            type="text"
+                            id="otrasHeredo"
                             value={formData.pagina_1.otrasHeredo || ''}
-                            onChange={(e) => handleInputChange(e, 'otrasHeredo')} 
-                            className="border-b border-[#2c5392] w-[80%] outline-none h-3 bg-transparent" 
+                            onChange={(e) => handleInputChange(e, 'otrasHeredo')}
+                            className="border-b-[1.5px] border-[#2c5392] w-[80%] outline-none h-3.5 bg-transparent ml-1 text-[#333]"
                           />
                         </td>
                       </tr>
@@ -327,53 +345,53 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-3">
-                <div className="flex flex-col gap-0.5 text-[9px] font-bold px-0.5 mt-1">
+              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-2">
+                <div className="flex flex-col justify-between h-full text-[9px] font-bold px-1 py-1">
                   {['Diabetes Mellitus', 'Obesidad o Sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map(item => (
-                    <CustomCheckbox 
-                      key={item} 
-                      label={item} 
+                    <CustomCheckbox
+                      key={item}
+                      label={item}
                       checked={formData.pagina_1[`pers-${item}`] || false}
                       onChange={(e:any) => updateGlobalData('pagina_1', {[`pers-${item}`]: e.target.checked})}
-                      textSize="text-[9px]" 
+                      textSize="text-[9px]"
                     />
                   ))}
-                  <div className="flex items-end gap-1 mt-1">
+                  <div className="flex items-end gap-1 mt-auto pt-2">
                     <span className="whitespace-nowrap">Otras:</span>
-                    <input 
-                      type="text" 
-                      id="otrasPers" 
+                    <input
+                      type="text"
+                      id="otrasPers"
                       value={formData.pagina_1.otrasPers || ''}
-                      onChange={(e) => handleInputChange(e, 'otrasPers')} 
-                      className="border-b border-[#2c5392] flex-grow outline-none h-3 bg-transparent" 
+                      onChange={(e) => handleInputChange(e, 'otrasPers')}
+                      className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-3.5 bg-transparent text-[#333]"
                     />
                   </div>
                 </div>
               </SectionBox>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-3">
-                <table className="w-full text-[8.5px] font-bold table-fixed border-collapse mt-1">
-                  <thead><tr className="border-b border-[#2c5392]"><th className="text-left pl-1 border-r border-[#2c5392] w-[60%]">Enfermedades</th><th>Freq./Cant.</th></tr></thead>
+            <div className="grid grid-cols-3 gap-2 shrink-0">
+              <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-2">
+                <table className="w-full text-[8.5px] font-bold table-fixed border-collapse mt-0 h-full">
+                  <thead><tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50"><th className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[60%] py-1">Enfermedades</th><th className="py-1">Freq./Cant.</th></tr></thead>
                   <tbody>
                     {['Gastritis', 'Colitis', 'Reflujo gastroesofágico', 'Diarrea', 'Estreñimiento', 'Vómito', 'Náuseas', 'Disfagia', 'Hiperfagia', 'Flatulencias', 'Distensión abdominal', 'Hiporexia'].map(item => (
-                      <tr key={item} className="border-b border-[#2c5392] h-[16.5px]">
-                        <td className="text-left pl-1 border-r border-[#2c5392] flex items-center gap-1 h-full">
-                          <input 
-                            type="checkbox" 
+                      <tr key={item} className="border-b-[1.5px] border-[#2c5392] h-[14.5px]">
+                        <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] flex items-center gap-1.5 h-full">
+                          <input
+                            type="checkbox"
                             checked={formData.pagina_1[`sintoma-check-${item}`] || false}
                             onChange={(e) => updateGlobalData('pagina_1', {[`sintoma-check-${item}`]: e.target.checked})}
-                            className="appearance-none w-2.5 h-2.5 border border-[#2c5392] shrink-0" 
+                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] shrink-0 cursor-pointer align-middle"
                           />
                           <span className="truncate">{item}</span>
                         </td>
                         <td className="p-0 border-none h-full">
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             value={formData.pagina_1[`sintoma-val-${item}`] || ''}
                             onChange={(e) => updateGlobalData('pagina_1', {[`sintoma-val-${item}`]: e.target.value})}
-                            className="w-full h-full border-none outline-none px-1 bg-transparent" 
+                            className="w-full h-full border-none outline-none px-1.5 bg-transparent text-center text-[#333]"
                           />
                         </td>
                       </tr>
@@ -382,67 +400,66 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
                 </table>
               </SectionBox>
 
-              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-3">
-                <div className="flex flex-col items-center w-full">
+              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-2">
+                <div className="flex flex-col items-center justify-center w-full h-full py-1">
                   <img
                     src={bristolImg}
                     alt="Escala de Bristol"
-                    className="max-h-[120px] w-auto object-contain mix-blend-multiply"
+                    className="max-h-[60px] w-auto object-contain mix-blend-multiply mb-2"
                     onError={(e) => {
-                      e.currentTarget.src = "https://via.placeholder.com/150x100?text=Bristol+Img";
+                      e.currentTarget.src = "https://via.placeholder.com/150x60?text=Bristol+Img";
                     }}
                   />
-                  <div className="flex justify-between w-full px-2 mt-1">
+                  <div className="flex justify-between w-full px-5">
                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                      <div key={num} className="flex flex-col items-center flex-1">
-                        <input 
-                          type="radio" 
-                          name="bristol_scale" 
-                          checked={formData.pagina_1.bristol === num}
-                          onChange={() => updateGlobalData('pagina_1', {bristol: num})}
-                          className="appearance-none w-3 h-3 border border-[#2c5392] checked:bg-[#2c5392] cursor-pointer" 
-                        />
-                      </div>
+                      <input
+                        key={num}
+                        type="radio"
+                        name="bristol_scale"
+                        checked={formData.pagina_1.bristol === num}
+                        onChange={() => updateGlobalData('pagina_1', {bristol: num})}
+                        className="appearance-none w-3.5 h-3.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer"
+                      />
                     ))}
                   </div>
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-3" className="pb-0">
-                <table className="w-full text-[8.5px] font-bold border-collapse table-fixed mt-1">
+              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-2" className="pb-0">
+                <table className="w-full text-[8.5px] font-bold border-collapse table-fixed mt-0 h-full">
                   <thead>
-                    <tr className="border-b border-[#2c5392]">
-                      <th className="w-[45%] border-r border-[#2c5392]"></th>
-                      <th className="border-r border-[#2c5392]">Frecuencia</th>
-                      <th>Cantidad</th>
+                    <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
+                      <th className="w-[45%] border-r-[1.5px] border-[#2c5392] py-1"></th>
+                      <th className="border-r-[1.5px] border-[#2c5392] py-1">Frecuencia</th>
+                      <th className="py-1">Cantidad</th>
                     </tr>
                   </thead>
                   <tbody className="leading-none">
                     {['Hábito tabáquico', 'Consumo de alcohol', 'Consumo de drogas'].map((item, index, array) => (
-                      <tr key={item} className={`${index === array.length - 1 ? '' : 'border-b border-[#2c5392]'} h-[18px]`}>
-                        <td className="text-left pl-1 border-r border-[#2c5392] flex items-center gap-1 h-full">
-                          <input 
-                            type="checkbox" 
+                      <tr key={item} className={`${index === array.length - 1 ? '' : 'border-b-[1.5px] border-[#2c5392]'} h-[16px]`}>
+                        <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] flex items-center gap-1.5 h-full">
+                          <input
+                            type="checkbox"
                             checked={formData.pagina_1[`nopato-check-${item}`] || false}
                             onChange={(e) => updateGlobalData('pagina_1', {[`nopato-check-${item}`]: e.target.checked})}
-                            className="appearance-none w-2.5 h-2.5 border border-[#2c5392] shrink-0" 
+                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] shrink-0 cursor-pointer align-middle"
                           />
                           <span className="truncate">{item}</span>
                         </td>
-                        <td className="border-r border-[#2c5392] p-0">
-                          <input 
-                            type="text" 
+                        <td className="border-r-[1.5px] border-[#2c5392] p-0">
+                          <input
+                            type="text"
                             value={formData.pagina_1[`nopato-freq-${item}`] || ''}
                             onChange={(e) => updateGlobalData('pagina_1', {[`nopato-freq-${item}`]: e.target.value})}
-                            className="w-full h-full border-none outline-none text-center bg-transparent" 
+                            className="w-full h-full border-none outline-none text-center bg-transparent text-[#333]"
                           />
                         </td>
                         <td className="p-0">
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             value={formData.pagina_1[`nopato-cant-${item}`] || ''}
                             onChange={(e) => updateGlobalData('pagina_1', {[`nopato-cant-${item}`]: e.target.value})}
-                            className="w-full h-full border-none outline-none text-center bg-transparent" 
+                            className="w-full h-full border-none outline-none text-center bg-transparent text-[#333]"
                           />
                         </td>
                       </tr>
@@ -451,15 +468,15 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
                 </table>
               </SectionBox>
 
-              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-3">
-                <div className="mt-1 flex flex-col gap-0 border-t border-[#2c5392]">
+              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-2">
+                <div className="flex flex-col justify-between h-full border-t-[1.5px] border-[#2c5392]">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="border-b border-[#2c5392] flex items-center">
-                      <input 
-                        type="text" 
+                    <div key={i} className="border-b-[1.5px] border-[#2c5392] last:border-b-0 flex-1 flex items-center">
+                      <input
+                        type="text"
                         value={formData.pagina_1[`diag-med-${i}`] || ''}
                         onChange={(e) => updateGlobalData('pagina_1', {[`diag-med-${i}`]: e.target.value})}
-                        className="w-full h-[14.5px] border-none outline-none px-2 bg-transparent text-[9.5px]" 
+                        className="w-full h-full border-none outline-none px-2 bg-transparent text-[9px] text-[#333]"
                       />
                     </div>
                   ))}
@@ -467,22 +484,22 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
               </SectionBox>
 
               <SectionBox title={
-                <div className="flex justify-between w-[150px] text-[9px]"><span>Medicamentos</span> <span>Dosis</span></div>
-              } paddingX="px-1" marginTop="mt-3">
-                <div className="mt-1 flex flex-col gap-0.5">
+                <div className="flex gap-8 px-2 text-[9px]"><span>Medicamentos</span> <span>Dosis</span></div>
+              } paddingX="px-1.5" marginTop="mt-2">
+                <div className="flex flex-col justify-between h-full py-0.5">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex justify-between items-center w-full">
-                      <input 
-                        type="text" 
+                    <div key={i} className="flex justify-between items-center w-full gap-2">
+                      <input
+                        type="text"
                         value={formData.pagina_1[`med-nom-${i}`] || ''}
                         onChange={(e) => updateGlobalData('pagina_1', {[`med-nom-${i}`]: e.target.value})}
-                        className="w-[48%] h-[14.5px] border-b border-[#2c5392] outline-none px-1 bg-transparent text-[9.5px]" 
+                        className="flex-1 h-[13px] border-b-[1.5px] border-[#2c5392] outline-none px-1 bg-transparent text-[9px] text-[#333]"
                       />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.pagina_1[`med-dos-${i}`] || ''}
                         onChange={(e) => updateGlobalData('pagina_1', {[`med-dos-${i}`]: e.target.value})}
-                        className="w-[48%] h-[14.5px] border-b border-[#2c5392] outline-none px-1 bg-transparent text-[9.5px]" 
+                        className="flex-1 h-[13px] border-b-[1.5px] border-[#2c5392] outline-none px-1 bg-transparent text-[9px] text-[#333]"
                       />
                     </div>
                   ))}
@@ -490,96 +507,100 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
               </SectionBox>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <SectionBox title="Ejercicio" marginTop="mt-3">
-                <div className="flex items-center gap-2 text-[9px] font-bold mb-1 mt-1">
-                  <span className="shrink-0">Realiza ejercicio</span>
-                  <CustomCheckbox label="No" />
-                  <CustomCheckbox label="Sí" />
-                  <div className="flex gap-2 ml-auto">
-                    <CustomCheckbox label="Aeróbico" />
-                    <CustomCheckbox label="Anaeróbico" />
+            <div className="grid grid-cols-2 gap-2 shrink-0">
+              <SectionBox title="Ejercicio" marginTop="mt-2">
+                <div className="flex flex-col gap-1 w-full h-full justify-center">
+                  <div className="flex items-center gap-2 text-[9px] font-bold w-full mb-1">
+                    <span className="shrink-0">Realiza ejercicio</span>
+                    <CustomCheckbox label="No" />
+                    <CustomCheckbox label="Sí" />
+                    <div className="flex gap-2 ml-auto">
+                      <CustomCheckbox label="Aeróbico" />
+                      <CustomCheckbox label="Anaeróbico" />
+                    </div>
                   </div>
+                  <FilaInput
+                    label="¿Cuál?"
+                    id="ejercicioCual"
+                    value={formData.pagina_1.ejercicioCual || ''}
+                    onChange={handleInputChange}
+                  />
+                  <div className="flex gap-3 w-full">
+                    <FilaInput
+                      label="Frecuencia"
+                      id="frecuencia"
+                      value={formData.pagina_1.frecuencia || ''}
+                      onChange={handleInputChange}
+                    />
+                    <FilaInput
+                      label="Intensidad"
+                      id="intensidad"
+                      value={formData.pagina_1.intensidad || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="flex gap-3 w-full">
+                    <FilaInput
+                      label="Tiempo"
+                      id="tiempo"
+                      value={formData.pagina_1.tiempo || ''}
+                      onChange={handleInputChange}
+                    />
+                    <FilaInput
+                      label="Volumen"
+                      id="volumen"
+                      value={formData.pagina_1.volumen || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <FilaInput
+                    label="Progresión"
+                    id="progresion"
+                    value={formData.pagina_1.progresion || ''}
+                    onChange={handleInputChange}
+                  />
                 </div>
-                <FilaInput 
-                  label="¿Cuál?" 
-                  id="ejercicioCual" 
-                  value={formData.pagina_1.ejercicioCual || ''} 
-                  onChange={handleInputChange} 
-                />
-                <div className="flex gap-4">
-                  <FilaInput 
-                    label="Frecuencia" 
-                    id="frecuencia" 
-                    value={formData.pagina_1.frecuencia || ''} 
-                    onChange={handleInputChange} 
-                  />
-                  <FilaInput 
-                    label="Intensidad" 
-                    id="intensidad" 
-                    value={formData.pagina_1.intensidad || ''} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-                <div className="flex gap-4">
-                  <FilaInput 
-                    label="Tiempo" 
-                    id="tiempo" 
-                    value={formData.pagina_1.tiempo || ''} 
-                    onChange={handleInputChange} 
-                  />
-                  <FilaInput 
-                    label="Volumen" 
-                    id="volumen" 
-                    value={formData.pagina_1.volumen || ''} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-                <FilaInput 
-                  label="Progresión" 
-                  id="progresion" 
-                  value={formData.pagina_1.progresion || ''} 
-                  onChange={handleInputChange} 
-                />
               </SectionBox>
 
-              <SectionBox title="Antecedentes gineco-obstétricos" marginTop="mt-3">
-                <div className="flex items-end gap-1 text-[9px] font-bold mb-1 mt-1">
-                  <span>G</span><input type="text" value={formData.pagina_1.g || ''} onChange={(e) => updateGlobalData('pagina_1', {g: e.target.value})} className="border-b border-[#2c5392] w-6 outline-none text-center h-3" />
-                  <span className="ml-1 text-[7px]">de las cuales fueron:</span>
-                  <span>P</span><input type="text" value={formData.pagina_1.p || ''} onChange={(e) => updateGlobalData('pagina_1', {p: e.target.value})} className="border-b border-[#2c5392] w-4 outline-none text-center h-3" />
-                  <span>C</span><input type="text" value={formData.pagina_1.c || ''} onChange={(e) => updateGlobalData('pagina_1', {c: e.target.value})} className="border-b border-[#2c5392] w-4 outline-none text-center h-3" />
-                  <span>A</span><input type="text" value={formData.pagina_1.a || ''} onChange={(e) => updateGlobalData('pagina_1', {a: e.target.value})} className="border-b border-[#2c5392] w-4 outline-none text-center h-3" />
-                  <span className="ml-auto">FUM</span><input type="text" value={formData.pagina_1.fum || ''} onChange={(e) => updateGlobalData('pagina_1', {fum: e.target.value})} className="border-b border-[#2c5392] w-14 outline-none h-3" />
-                </div>
-                <div className="flex items-center gap-2 text-[9px] font-bold mb-1">
-                  <span className="shrink-0">Embarazo</span>
-                  <CustomCheckbox label="No" />
-                  <CustomCheckbox label="Sí" />
-                  <span className="ml-2">SDG</span><input type="text" value={formData.pagina_1.sdg || ''} onChange={(e) => updateGlobalData('pagina_1', {sdg: e.target.value})} className="border-b border-[#2c5392] w-10 outline-none text-center h-3" />
-                </div>
-                <div className="flex items-center gap-2 text-[9px] font-bold mb-1">
-                  <span className="whitespace-nowrap shrink-0">Remplazo hormonal</span>
-                  <CustomCheckbox label="No" />
-                  <CustomCheckbox label="Sí" />
-                  <input type="text" value={formData.pagina_1.hormo || ''} onChange={(e) => updateGlobalData('pagina_1', {hormo: e.target.value})} className="border-b border-[#2c5392] flex-grow outline-none h-3" />
-                </div>
-                <div className="flex items-center gap-2 text-[9px] font-bold">
-                  <span className="whitespace-nowrap shrink-0">Anticonceptivos</span>
-                  <CustomCheckbox label="No" />
-                  <CustomCheckbox label="Sí" />
-                  <input type="text" value={formData.pagina_1.anti || ''} onChange={(e) => updateGlobalData('pagina_1', {anti: e.target.value})} className="border-b border-[#2c5392] flex-grow outline-none h-3" />
+              <SectionBox title="Antecedentes gineco-obstétricos" marginTop="mt-2">
+                <div className="flex flex-col gap-1.5 justify-center h-full w-full">
+                  <div className="flex items-end gap-1.5 text-[9px] font-bold w-full">
+                    <span>G</span><input type="text" value={formData.pagina_1.g || ''} onChange={(e) => updateGlobalData('pagina_1', {g: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-6 outline-none text-center h-[13px] text-[#333]" />
+                    <span className="ml-0.5 text-[7.5px]">de las cuales fueron:</span>
+                    <span>P</span><input type="text" value={formData.pagina_1.p || ''} onChange={(e) => updateGlobalData('pagina_1', {p: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-5 outline-none text-center h-[13px] text-[#333]" />
+                    <span>C</span><input type="text" value={formData.pagina_1.c || ''} onChange={(e) => updateGlobalData('pagina_1', {c: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-5 outline-none text-center h-[13px] text-[#333]" />
+                    <span>A</span><input type="text" value={formData.pagina_1.a || ''} onChange={(e) => updateGlobalData('pagina_1', {a: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-5 outline-none text-center h-[13px] text-[#333]" />
+                    <span className="ml-auto">FUM</span><input type="text" value={formData.pagina_1.fum || ''} onChange={(e) => updateGlobalData('pagina_1', {fum: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-14 outline-none h-[13px] text-center text-[#333]" />
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] font-bold w-full">
+                    <span className="shrink-0">Embarazo</span>
+                    <CustomCheckbox label="No" />
+                    <CustomCheckbox label="Sí" />
+                    <span className="ml-auto">SDG</span><input type="text" value={formData.pagina_1.sdg || ''} onChange={(e) => updateGlobalData('pagina_1', {sdg: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-12 outline-none text-center h-[13px] text-[#333]" />
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] font-bold w-full">
+                    <span className="whitespace-nowrap shrink-0">Remplazo hormonal</span>
+                    <CustomCheckbox label="No" />
+                    <CustomCheckbox label="Sí" />
+                    <input type="text" value={formData.pagina_1.hormo || ''} onChange={(e) => updateGlobalData('pagina_1', {hormo: e.target.value})} className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-[13px] text-[#333]" />
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] font-bold w-full">
+                    <span className="whitespace-nowrap shrink-0">Anticonceptivos</span>
+                    <CustomCheckbox label="No" />
+                    <CustomCheckbox label="Sí" />
+                    <input type="text" value={formData.pagina_1.anti || ''} onChange={(e) => updateGlobalData('pagina_1', {anti: e.target.value})} className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-[13px] text-[#333]" />
+                  </div>
                 </div>
               </SectionBox>
             </div>
 
             {/* FOOTER */}
-            <footer className="mt-auto pt-1 flex justify-between items-end border-t border-[#2c5392] text-[7px] leading-tight font-bold italic">
+            <footer className="mt-1 flex justify-between items-end border-t-2 border-[#2c5392] pt-1 text-[8px] leading-tight font-bold italic shrink-0">
               <div>
                 ESA: Exploración sin alteraciones; N/A: No Aplica; PN: Preguntado y negado; ✔: Adecuado.<br />
                 G: Gestas; P: Partos; C: Cesáreas; A: Abortos. FUM: Fecha de última menstruación. SDG: Semanas de Gestación.
               </div>
-              <div className="text-xs font-black not-italic">1</div>
+              <div className="text-sm font-black not-italic text-[#2c5392]">1</div>
             </footer>
           </div>
         </div>
@@ -595,12 +616,14 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     className?: string,
     paddingX?: string,
     marginTop?: string
-  }> = ({ title, children, className = "", paddingX = "px-2", marginTop = "mt-4" }) => (
-    <section className={`relative border-2 border-[#2c5392] border-t-0 rounded-b-lg ${marginTop} pt-4 pb-1 ${paddingX} w-full ${className}`}>
-      <span className="absolute -top-[11px] left-3 bg-[#2c5392] text-white px-4 py-0.5 rounded-xl text-[10px] font-bold z-10 whitespace-nowrap min-h-[18px] flex items-center shadow-sm">
+  }> = ({ title, children, className = "", paddingX = "px-2", marginTop = "mt-2" }) => (
+    <section className={`relative border-[1.5px] border-[#2c5392] rounded-lg ${marginTop} pt-[10px] pb-1.5 ${paddingX} w-full flex flex-col bg-white ${className}`}>
+      <div className="absolute -top-[8.5px] left-4 bg-[#2c5392] text-white px-3 py-[1px] rounded-full text-[9px] font-bold z-10 whitespace-nowrap shadow-sm leading-none flex items-center justify-center">
         {title}
-      </span>
-      {children}
+      </div>
+      <div className="flex-1 flex flex-col w-full h-full justify-start">
+        {children}
+      </div>
     </section>
   );
 
@@ -610,47 +633,47 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     value?: string,
     onChange: any,
     lineHeight?: number
-  }> = ({ rows = 3, id, value = "", onChange, lineHeight = 16 }) => {
+  }> = ({ rows = 2, id, value = "", onChange, lineHeight = 16 }) => {
     const totalHeight = rows * lineHeight;
     return (
       <textarea
         value={value}
         onChange={(e) => onChange(e, id)}
         style={{
-          backgroundImage: `linear-gradient(transparent ${lineHeight - 1}px, #2c5392 ${lineHeight - 1}px)`,
+          backgroundImage: `linear-gradient(transparent ${lineHeight - 1}px, #2c5392 1px)`,
           backgroundSize: `100% ${lineHeight}px`,
           lineHeight: `${lineHeight}px`,
-          height: `${totalHeight + 2}px`
+          height: `${totalHeight}px`
         }}
-        className="w-full resize-none border-none outline-none text-[#333] text-[9.5px] bg-repeat-y bg-transparent px-2 mt-0.5 block overflow-hidden"
+        className="w-full resize-none border-none outline-none text-[#333] text-[10px] bg-repeat-y bg-transparent px-1 m-0 p-0 block overflow-hidden box-border"
       />
     );
   };
 
   const FilaInput: React.FC<{ label: string, id: string, value?: string, onChange: any }> = ({ label, id, value = "", onChange }) => (
-    <div className="flex items-end gap-1 mb-0.5 text-[9px] font-bold w-full overflow-hidden">
+    <div className="flex items-end gap-1 mb-[2px] text-[9px] font-bold w-full overflow-hidden flex-1">
       <span className="whitespace-nowrap shrink-0">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e, id)}
-        className="border-b border-[#2c5392] flex-grow outline-none text-[#333] px-1 h-3 bg-transparent"
+        className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none text-[#333] px-1 h-[13px] bg-transparent"
       />
     </div>
   );
 
-  const CustomCheckbox: React.FC<{ label: string, checked?: boolean, onChange?: any, textSize?: string }> = ({ label, checked, onChange, textSize = "text-[10px]" }) => (
-    <label className={`flex items-center gap-1 cursor-pointer shrink-0 ${textSize}`}>
-      <input 
-        type="checkbox" 
-        checked={checked} 
+  const CustomCheckbox: React.FC<{ label: string, checked?: boolean, onChange?: any, textSize?: string }> = ({ label, checked, onChange, textSize = "text-[9px]" }) => (
+    <label className={`flex items-center gap-1 cursor-pointer shrink-0 ${textSize} font-bold`}>
+      <input
+        type="checkbox"
+        checked={checked}
         onChange={onChange}
-        className="appearance-none w-2.5 h-2.5 border border-[#2c5392] checked:bg-[#2c5392] transition-all relative" 
+        className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] transition-colors relative cursor-pointer align-middle shrink-0"
       />
-      {label}
+      <span className="truncate leading-none pt-[1px]">{label}</span>
     </label>
   );
-
+  
   /* --- DECLARACIONES DE FUNCIONES (Páginas 2, 3 y 4) --- */
   // Las llenaremos conforme me pases los códigos.
 
@@ -1758,8 +1781,8 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
    * ============================================================================
    */
 
-  function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly }: PageProps) {
-    const [isSaving, setIsSaving] = useState(false);
+function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly, historialId }: PageProps) {   
+  const [isSaving, setIsSaving] = useState(false);
     
     const { user } = useAuth(); // Obtenemos el usuario autenticado
     const navigate = useNavigate();
@@ -1776,54 +1799,61 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
     // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
     const handleFinalizar = async () => {
-      try {
-        setIsSaving(true);
+  try {
+    setIsSaving(true);
 
-        // Extraemos el ID del paciente asegurando que provenga de la identificación de la página 1
-        // Esto es vital para que la tabla 'metricas' y 'historiales' coincidan
-        const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
-        const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
-        const aId = appointmentId ? parseInt(appointmentId) : null;
+    const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
+    const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
+    const aId = appointmentId ? parseInt(appointmentId) : null;
 
-        const payload = {
-          paciente_id: pId, 
-          paciente_nombre: pNombre,
-          tipo: 'nutricion',
-          datos: accumulatedData, 
-          creado_por: user?.id || (user as any)?.id || 1, 
-          creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Nutrición",
-          appointment_id: aId 
-        };
-
-        const response = await fetch('http://localhost:3001/api/historiales', {
-  method: 'POST',
-  headers: { 
-    'Content-Type': 'application/json',
-    'email': user?.email || '' // <--- ESTO ES LA LLAVE DE ACCESO ✅
-  },
-  body: JSON.stringify(payload)
-});
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Detalle del error en servidor:", errorData);
-          toast.error("Error al guardar: Verifique la conexión con el servidor.");
-        } else {
-          // Registro exitoso: El paciente ahora será detectado como 'Recurrente'
-          toast.success("Historial clínico guardado exitosamente");
-          
-          // Redirección inmediata al dashboard sincronizado
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 1500);
-        }
-      } catch (error) {
-        console.error("Error crítico en el proceso de guardado:", error);
-        toast.error("Error de conexión. Intente más tarde.");
-      } finally {
-        setIsSaving(false);
-      }
+    const payload = {
+      paciente_id: pId, 
+      paciente_nombre: pNombre,
+      tipo: 'nutricion',
+      datos: accumulatedData, 
+      creado_por: user?.id || (user as any)?.id || 1, 
+      creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Nutrición",
+      appointment_id: aId 
     };
+
+    // LÓGICA DE ACTUALIZACIÓN:
+    // Si ya tienes un historialId guardado en el estado del componente, usamos PUT (Actualizar)
+    // Si no tienes ID (es un formulario nuevo), usamos POST (Crear nuevo)
+  const url = historialId 
+        ? `http://localhost:3001/api/historiales/${historialId}` 
+        : 'http://localhost:3001/api/historiales';
+      
+      const method = historialId ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+      method: method,
+      headers: { 
+        'Content-Type': 'application/json',
+        'email': user?.email || ''
+      },
+      body: JSON.stringify({ ...payload, tipo: 'nutricion' }) // 'tipo' necesario para el backend
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Detalle del error:", errorData);
+      toast.error("Error al guardar en la base de datos.");
+    } else {
+      toast.success("Expediente guardado/actualizado correctamente");
+      
+     // REDIRECCIÓN INTELIGENTE:
+      setTimeout(() => {
+        // AGREGA EL { replace: true } AQUÍ
+        navigate(`/historial/${pId}/nutricion`, { replace: true });
+      }, 1000);
+    }
+  } catch (error) {
+    console.error("Error crítico:", error);
+    toast.error("Error de conexión.");
+  } finally {
+    setIsSaving(false);
+  }
+};
     const styles: { [key: string]: React.CSSProperties } = {
       bodyWrapper: {
         fontFamily: 'Segoe UI, Arial, sans-serif',

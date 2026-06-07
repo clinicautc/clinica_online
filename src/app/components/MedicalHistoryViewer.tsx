@@ -199,8 +199,12 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="border-gray-200"><ArrowLeft className="w-4 h-4 mr-2" />Volver</Button>
-          </div>
+            
+<Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="border-gray-200">
+  <ArrowLeft className="w-4 h-4 mr-2" />Volver 
+</Button>
+
+              </div>
         </div>
       </header>
 

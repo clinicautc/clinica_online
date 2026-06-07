@@ -16,6 +16,7 @@ interface PageProps {
   appointmentId?: string;
   isSaving?: boolean;
   setIsSaving: (value: boolean) => void;
+  historialId?: number | null; // <--- 1. AGREGA ESTA LÍNEA
 }
 
 const PhysiotherapyMasterForm: React.FC = () => {
@@ -25,6 +26,8 @@ const PhysiotherapyMasterForm: React.FC = () => {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+const [historialId, setHistorialId] = useState<number | null>(null); // <--- 2. AGREGAR ESTE ESTADO
+
 
   const [formData, setFormData] = useState<any>({
     pagina_1: {},
@@ -52,11 +55,15 @@ const PhysiotherapyMasterForm: React.FC = () => {
         const dataGuardada = await response.json();
         console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
         
+setHistorialId(dataGuardada.id)
+
         // HIDRATACIÓN: Inyectamos los datos guardados en el estado del formulario
         setFormData((prevData: any) => ({
           ...prevData,
-          ...dataGuardada
+          ...dataGuardada.datos,   // <--- ¡SOLO DEBES AGREGAR ".datos" AQUÍ!
+          paciente_id: dataGuardada.paciente_id 
         }));
+
 
         setIsReadOnly(true); 
         toast.success("Expediente cargado correctamente");
@@ -84,6 +91,7 @@ const PhysiotherapyMasterForm: React.FC = () => {
   const handleBack = () => setStep((prev) => prev - 1);
 
   // --- LÓGICA DE GUARDADO FINAL (En el último paso) ---
+ // --- LÓGICA DE GUARDADO FINAL (En el último paso) ---
   const handleFinalSave = async () => {
     try {
       setIsSaving(true);
@@ -112,16 +120,14 @@ const PhysiotherapyMasterForm: React.FC = () => {
       setIsSaving(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-zinc-600">
       
-      {/* RENDERIZADO DINÁMICO SEGÚN EL PASO */}
       {step === 1 && (
         <PhysiotherapyPage1Component 
           accumulatedData={formData}
           onUpdate={updateGlobalData}
-          onBack={() => window.history.back()}
+          onBack={() => navigate(-1)} 
           onNext={handleNext}
           appointmentId={appointmentId}
         />
@@ -141,9 +147,10 @@ const PhysiotherapyMasterForm: React.FC = () => {
           accumulatedData={formData}
           onUpdate={updateGlobalData}
           onBack={handleBack}
-          onNext={handleFinalSave}
+          onNext={() => {}} // <--- AQUÍ: Ya no llamamos al handleFinalSave viejo
           isSaving={isSaving}
           setIsSaving={setIsSaving}
+          historialId={historialId} 
         />
       )}
 
@@ -151,9 +158,10 @@ const PhysiotherapyMasterForm: React.FC = () => {
   );
 };
 
+
 /**
  * ============================================================================
- * PIEZA 1: COMPONENTE PÁGINA 1 (HISTORIA CLÍNICA)
+ * PIEZA 1: COMPONENTE PÁGINA 1 (HISTORIA CLÍNICA) - ESCALA EXPANDIDA Y UNIFORME
  * ============================================================================
  */
 const PhysiotherapyPage1Component: React.FC<PageProps> = ({ 
@@ -175,6 +183,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
+        /* Configuraciones Generales */
         .hc-container * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
             --utc-blue: #2A4B8C;
@@ -182,116 +191,145 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         }
         .hc-body {
             font-family: Arial, sans-serif;
-            font-size: 10px;
             background-color: #525659;
             display: flex;
             justify-content: center;
             padding: 20px;
             min-height: 100vh;
         }
+        
+        /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
         .page {
             background-color: #fff;
             width: 100%;
             max-width: 215.9mm;
-            height: auto;
-            min-height: 279.4mm;
-            padding: 10mm 12mm;
+            height: 279.4mm; /* Altura exacta de carta */
+            padding: 12mm 15mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            position: relative;
             color: #5575B3; 
+            position: relative;
             overflow: hidden;
-            zoom: 0.7; 
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Separación ampliada entre las cajas principales */
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
         }
-        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+
+        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: -5px; }
         .logo { display: flex; flex-direction: column; color: #2A4B8C; width: 120px;}
-        .logo h1 { font-size: 38px; letter-spacing: -2px; margin-bottom: -5px; font-weight: 900; text-transform: lowercase; }
-        .logo p { font-size: 8px; line-height: 1; font-weight: bold; }
+        .logo h1 { font-size: 42px; letter-spacing: -2px; margin-bottom: -5px; font-weight: 900; text-transform: lowercase; }
+        .logo p { font-size: 9px; line-height: 1; font-weight: bold; }
         .title-section { flex-grow: 1; margin-left: 15px; display: flex; flex-direction: column;}
+        
         .main-title {
             background-color: #2A4B8C;
             color: #fff;
             text-align: center;
-            font-size: 22px;
+            font-size: 24px;
             font-weight: bold;
-            padding: 6px 20px;
+            padding: 8px 20px;
             border-radius: 20px;
             print-color-adjust: exact;
         }
-        .title-sub-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 5px; padding: 0 10px; }
-        .address { font-size: 9px; color: #5575B3; font-weight: bold;}
-        .fecha-container { display: flex; align-items: flex-end; width: 140px; }
+        .title-sub-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; padding: 0 10px; }
+        .address { font-size: 10px; color: #5575B3; font-weight: bold;}
+        .fecha-container { display: flex; align-items: flex-end; width: 150px; }
+        
         .box {
             border: 2px solid #2A4B8C;
-            border-radius: 12px;
+            border-radius: 8px;
             position: relative;
-            padding: 10px 8px 6px 8px;
-            margin-top: 12px;
-            margin-bottom: 2px;
+            padding: 16px 12px 12px 12px; /* Padding interior aumentado */
             background: transparent;
             width: 100%;
+            display: flex;
+            flex-direction: column;
         }
         .box-title {
             position: absolute;
-            top: -10px;
+            top: -12px;
             left: 50%;
             transform: translateX(-50%);
             background-color: #2A4B8C;
             color: white;
-            font-size: 11px;
+            font-size: 12px; /* Letra más grande */
             font-weight: bold;
-            padding: 2px 15px;
+            padding: 4px 18px;
             border-radius: 10px;
             print-color-adjust: exact;
             white-space: nowrap;
+            z-index: 2;
         }
         .box-title.left-aligned { left: 15px; transform: none; }
-        .form-row { display: flex; flex-wrap: wrap; gap: 5px 10px; align-items: flex-end; margin-bottom: 4px; }
+        
+        .form-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin-bottom: 8px; } /* Más espacio entre filas */
         .field { display: flex; align-items: flex-end; flex-grow: 1; }
-        .field-label { font-weight: bold; color: #2A4B8C; margin-right: 4px; white-space: nowrap; }
+        .field-label { font-weight: bold; font-size: 11px; color: #2A4B8C; margin-right: 4px; white-space: nowrap; }
         input.line-input {
             border: none;
             border-bottom: 1px solid #5575B3;
             background: transparent;
-            font-size: 9px;
+            font-size: 11px; /* Texto escrito más grande */
             color: #000;
             flex-grow: 1;
-            height: 12px;
+            height: 18px; /* Líneas más altas */
+            min-height: 18px;
             outline: none;
             width: 100%;
+            font-family: Arial, sans-serif;
         }
-        .chk-group { display: flex; align-items: center; gap: 4px; color: #5575B3; flex-wrap: wrap;}
-        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 9px;}
+        
+        .chk-group { display: flex; align-items: center; gap: 6px; color: #5575B3; flex-wrap: wrap;}
+        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 11px;}
         input[type="checkbox"], input[type="radio"] {
             appearance: none;
-            width: 9px; height: 9px;
+            width: 12px; height: 12px; /* Checkboxes más grandes */
             border: 1px solid #2A4B8C;
-            margin-right: 3px; position: relative; cursor: pointer;
+            margin-right: 4px; position: relative; cursor: pointer;
+            display: grid; place-content: center;
+            background-color: #fff;
         }
         input[type="checkbox"]:checked::after, input[type="radio"]:checked::after {
-            content: '✓'; position: absolute; top: -4px; left: 0px;
-            font-size: 10px; color: #2A4B8C; font-weight: bold;
+            content: '✓'; position: absolute; top: -3px; left: 1px;
+            font-size: 12px; color: #2A4B8C; font-weight: bold;
         }
-        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 6px; flex-wrap: wrap; gap: 5px; }
-        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 8px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 2px; }
-        .table-responsive { width: 100%; overflow-x: auto; }
+        
+        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 10px; flex-wrap: wrap; gap: 5px; }
+        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 11px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 4px; }
+        
+        .table-responsive { width: 100%; overflow: visible; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
-        th, td { border: 1px solid #5575B3; padding: 0; font-size: 8px; height: 14px; }
-        th { color: #fff; background-color: #2A4B8C; font-weight: bold; print-color-adjust: exact; padding: 2px;}
-        .text-left { text-align: left; padding-left: 4px; }
-        input.table-input { width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-size: 9px; outline: none; padding: 0 2px; color: #000; }
-        .tabla-antecedentes th, .tabla-antecedentes td { border: 1px solid #2A4B8C !important; color: #2A4B8C !important; padding: 3px 4px; height: 18px; }
-        .tabla-antecedentes th { background-color: transparent !important; font-size: 10.5px; }
+        .text-left { text-align: left; padding-left: 6px; }
+        
+        /* TABLA DE ANTECEDENTES EXPANDIDA */
+        .tabla-antecedentes th, .tabla-antecedentes td { 
+            border: 1px solid #2A4B8C !important; 
+            color: #2A4B8C !important; 
+            padding: 4px 6px; 
+            height: 24px; /* Filas mucho más altas para llenar espacio */
+        }
+        .tabla-antecedentes th { background-color: transparent !important; font-size: 11px; }
+        .tabla-antecedentes td.text-left { font-size: 10px; }
+        
         .grid-60-40 { display: grid; grid-template-columns: 63% 35%; gap: 2%; }
-        .grid-3-col { display: grid; grid-template-columns: 28% 34% 34%; gap: 2%; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 11px; padding: 3px 0; text-align: center; width: 100%; print-color-adjust: exact; }
-        .blank-lines { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
-        .motivo-container { display: flex; gap: 15px; }
-        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-        .alicia-box { width: 160px; font-size: 8px; border-left: 1px solid #2A4B8C; padding-left: 10px; }
-        .alicia-box b { color: #2A4B8C; }
-        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; font-size: 7px; color: #5575B3; border-top: 1px solid #ddd; padding-top: 5px;}
-        .page-num { font-size: 12px; font-weight: bold; color: #2A4B8C; }
+        .grid-3-col { display: grid; grid-template-columns: 28% 34% 34%; gap: 2%; flex-grow: 1;}
+        
+        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 12px; padding: 5px 0; text-align: center; width: 100%; print-color-adjust: exact; margin-bottom: 2px; }
+        
+        /* LÍNEAS DE ESCRITURA SEPARADAS */
+        .blank-lines { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; flex-grow: 1; justify-content: flex-start; }
+        .motivo-container { display: flex; gap: 15px; flex-grow: 1; padding: 4px 0;}
+        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 14px; justify-content: flex-start; margin-top: 4px; }
+        
+        /* ALICIA AJUSTADA */
+        .alicia-box { width: 180px; font-size: 10px; border-left: 1px solid #2A4B8C; padding-left: 15px; display: flex; flex-direction: column; justify-content: center; line-height: 1.8;}
+        .alicia-box b { color: #2A4B8C; font-size: 12px; margin-bottom: 4px;}
+        
+        /* FOOTER */
+        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 8px;}
+        .page-num { font-size: 14px; font-weight: bold; color: #2A4B8C; }
+        
         .btn-salir-fixed { position: fixed; top: 16px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
         .btn-siguiente-fixed { position: fixed; bottom: 32px; right: 32px; padding: 12px 32px; border-radius: 9999px; font-weight: bold; z-index: 50; border: none; transition: all 0.2s; background-color: #16a34a; color: white; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
         .btn-siguiente-fixed:hover { transform: scale(1.05); background-color: #15803d; }
@@ -299,17 +337,30 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         @media print {
             @page { size: letter portrait; margin: 0; }
             body, html { height: 100%; overflow: hidden; background-color: #fff; }
-            .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: block !important; }
-            .page { box-shadow: none !important; border: none !important; width: 215.9mm !important; height: 279.4mm !important; padding: 10mm 15mm !important; position: absolute; top: 0; left: 0; margin: 0 auto !important; transform: scale(0.7); transform-origin: top center; }
+            .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: flex !important; justify-content: center !important; }
+            .page { 
+                box-shadow: none !important; 
+                border: none !important; 
+                width: 215.9mm !important; 
+                height: 279.4mm !important; 
+                padding: 10mm 15mm !important; 
+                position: relative !important; 
+                margin: 0 auto !important; 
+                transform: scale(0.96); 
+                transform-origin: top center; 
+            }
             .btn-salir-fixed, .btn-siguiente-fixed { display: none !important; }
         }
       ` }} />
 
       <div className="hc-container hc-body">
+        
+        {/* BOTONES FLOTANTES RESTAURADOS AQUÍ */}
         <button className="btn-salir-fixed" onClick={onBack}>Salir</button>
         <button className="btn-siguiente-fixed" onClick={onNext}>Siguiente (P2) →</button>
 
         <div className="page">
+          
           {/* HEADER */}
           <div className="header">
             <div className="logo">
@@ -329,7 +380,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           </div>
 
           {/* DATOS PERSONALES */}
-          <div className="box" style={{ marginTop: 0 }}>
+          <div className="box" style={{ marginTop: '0' }}>
             <div className="box-title left-aligned">Datos personales</div>
             <div className="form-row">
               <div className="field" style={{ flex: 3 }}>
@@ -380,30 +431,32 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
 
           {/* ANTECEDENTES */}
           <div className="grid-60-40">
-            <div className="box" style={{ padding: 0, overflow: 'hidden', borderWidth: '2px' }}>
+            <div className="box" style={{ padding: 0, borderWidth: '2px' }}>
               <div className="full-width-title">Antecedentes patológicos heredofamiliares</div>
-              <table className="tabla-antecedentes">
-                <thead>
-                  <tr>
-                    <th className="text-left" style={{ width: '42%' }}>Enfermedades</th>
-                    <th>Madre</th><th>Padre</th><th>Aa Mat</th><th>Ao Mat</th><th>Aa Pat</th><th>Ao Pat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas'].map((item) => (
-                    <tr key={item}>
-                      <td className="text-left">{item}</td>
-                      {[...Array(6)].map((_, i) => (
-                        <td key={i}><input type="checkbox" checked={accumulatedData.pagina_1[`heredo-${item}-${i}`] || false} onChange={(e) => handleCheckboxChange(`heredo-${item}-${i}`, e.target.checked)} /></td>
-                      ))}
+              <div className="table-responsive">
+                <table className="tabla-antecedentes">
+                  <thead>
+                    <tr>
+                      <th className="text-left" style={{ width: '42%' }}>Enfermedades</th>
+                      <th>Madre</th><th>Padre</th><th>Aa Mat</th><th>Ao Mat</th><th>Aa Pat</th><th>Ao Pat</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas'].map((item) => (
+                      <tr key={item}>
+                        <td className="text-left">{item}</td>
+                        {[...Array(6)].map((_, i) => (
+                          <td key={i}><input type="checkbox" checked={accumulatedData.pagina_1[`heredo-${item}-${i}`] || false} onChange={(e) => handleCheckboxChange(`heredo-${item}-${i}`, e.target.checked)} /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div className="box">
               <div className="box-title left-aligned">Antecedentes personales</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4.5px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', marginTop: '10px' }}>
                 {['Diabetes', 'Obesidad', 'Hipertensión', 'Renales', 'Endocrinas', 'Tiroidea', 'Fracturas', 'Esguinces'].map(item => (
                   <label key={item} className="chk-label"><input type="checkbox" checked={accumulatedData.pagina_1[`pers-${item}`] || false} onChange={(e) => handleCheckboxChange(`pers-${item}`, e.target.checked)} /> {item}</label>
                 ))}
@@ -412,9 +465,9 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           </div>
 
           <div className="grid-3-col">
-            <div className="box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
               <div className="box-title">Dolor</div>
-              <img src={caritasImg} alt="EVA" style={{ maxWidth: '100%', height: 'auto' }} />
+              <img src={caritasImg} alt="EVA" style={{ maxWidth: '95%', height: 'auto', marginBottom: '8px', marginTop: '16px' }} />
               <div className="escala-dolor-chk">
                 {[...Array(10)].map((_, i) => (
                   <label key={i+1}>{i+1}<input type="checkbox" checked={accumulatedData.pagina_1.dolor_escala === (i+1)} onChange={() => onUpdate('pagina_1', { dolor_escala: (i+1) })} /></label>
@@ -443,7 +496,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
               </div>
               <div className="alicia-box">
                 <p><b>ALICIA:</b></p>
-                <p>A: Antigüedad | L: Lugar | I: Incidencia | C: Caract. | I: Inten. | A: Agrav.</p>
+                <p>A: Antigüedad<br/>L: Lugar<br/>I: Incidencia<br/>C: Característica<br/>I: Intensidad<br/>A: Agravantes</p>
               </div>
             </div>
           </div>
@@ -457,7 +510,6 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
     </>
   );
 };
-
 /**
  * ============================================================================
  * PIEZA 2: COMPONENTE PÁGINA 2 (OBJETIVOS SMART Y EXPLORACIÓN FÍSICA)
@@ -734,6 +786,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .otros-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
         .otros-row .lbl { font-weight: bold; font-size: 11px; color: var(--utc-blue); }
 
+        /* Ajuste: margin-top: auto empuja el footer hasta el borde inferior */
         .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 5px; }
         .page-num-p2 { font-size: 14px; font-weight: bold; }
 
@@ -749,6 +802,9 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
                 padding: 10mm 15mm !important;
                 print-color-adjust: exact !important;
                 -webkit-print-color-adjust: exact !important;
+                /* Ajuste para impresión sin desborde */
+                transform: scale(0.96);
+                transform-origin: top center;
             }
         }
       `}</style>
@@ -1005,7 +1061,9 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
   onBack, 
   onNext,
   isSaving, 
-  setIsSaving
+  setIsSaving,
+  historialId // <--- 4a. ASEGÚRATE DE RECIBIR ESTA PROP AQUÍ
+
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -1040,54 +1098,62 @@ const appointmentId = params.id || params.appointmentId;
 
   // --- LÓGICA DE GUARDADO FINAL EN BASE DE DATOS ---
   const handleFinalizarYGuardar = async () => {
-  try {
-    setIsSaving(true); 
+    try {
+      setIsSaving(true); 
 
-    // 1. Extraemos los valores de forma segura
-    const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || 1;
-    const pNombre = accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre";
-    const aId = appointmentId ? parseInt(appointmentId) : null;
+      // 1. Extraemos los valores de forma segura (usamos paciente_id de la p1)
+      const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
+      const pNombre = accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre";
+      const aId = appointmentId ? parseInt(appointmentId) : null;
 
-    const payload = {
-      paciente_id: pId,
-      paciente_nombre: pNombre,
-      tipo: 'fisioterapia',
-      datos: accumulatedData, 
-      creado_por: user?.id || 2, 
-      creado_por_nombre: user?.nombre || user?.name || "Practicante UTC",
-      appointment_id: aId 
-    };
+      const payload = {
+        paciente_id: pId,
+        paciente_nombre: pNombre,
+        tipo: 'fisioterapia',
+        datos: accumulatedData, 
+        creado_por: user?.id || (user as any)?.id || 1, 
+        creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Fisioterapia",
+        appointment_id: aId 
+      };
 
-    const response = await fetch('http://localhost:3001/api/historiales', {
-  method: 'POST',
-  headers: { 
-    'Content-Type': 'application/json',
-    'email': user?.email || '' // <--- ESTO ES LA LLAVE DE ACCESO ✅
-  },
-  body: JSON.stringify(payload)
-});
-    if (response.ok) {
-      toast.success('¡Historial guardado con éxito!');
+      // 2. LÓGICA CONDICIONAL DINÁMICA: PUT SI YA EXISTE, POST SI ES NUEVO
+      const url = historialId 
+          ? `http://localhost:3001/api/historiales/${historialId}` 
+          : 'http://localhost:3001/api/historiales';
+        
+      const method = historialId ? 'PUT' : 'POST';
+
+      // 3. Ejecución de la petición
+      const response = await fetch(url, {
+        method: method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'email': user?.email || '' // LLAVE DE ACCESO PARA TU MIDDLEWARE
+        },
+        body: JSON.stringify({ ...payload, tipo: 'fisioterapia' }) // Aseguramos enviar el tipo
+      });
       
-      // LA CORRECCIÓN:
-      // Redirigimos a '/dashboard'. Tu routes.tsx ya sabe redirigir 
-      // automáticamente al panel correcto (Admin o Practicante).
-      setTimeout(() => {
-        navigate('/dashboard'); 
-      }, 1500);
+      if (response.ok) {
+        toast.success('¡Historial guardado/actualizado con éxito!');
+        
+        // REDIRECCIÓN INTELIGENTE AL EXPEDIENTE DEL PACIENTE
+        setTimeout(() => {
+          // AGREGA EL { replace: true } AQUÍ
+          navigate(`/historial/${pId}/fisioterapia`, { replace: true }); 
+        }, 1500);
 
-    } else {
-      const errorData = await response.json();
-      console.error("Error del servidor:", errorData);
-      toast.error(`Error: ${errorData.error || 'Revisa la conexión con la API'}`);
+      } else {
+        const errorData = await response.json();
+        console.error("Error del servidor:", errorData);
+        toast.error(`Error: ${errorData.error || 'Revisa la conexión con la API'}`);
+      }
+    } catch (error) {
+      console.error("Error en el guardado final:", error);
+      toast.error('Fallo crítico al conectar con el servidor.');
+    } finally {
+      setIsSaving(false);
     }
-  } catch (error) {
-    console.error("Error en el guardado final:", error);
-    toast.error('Fallo crítico al conectar con el servidor.');
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   return (
     <>
