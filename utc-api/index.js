@@ -902,9 +902,50 @@ app.get('/api/citas/paciente/:id', async (req, res) => {
   }
 });
 
-app.post('/api/citas',requireAuth,requireRole(['paciente','admin','master' ]),async (req, res) => {
-  const { paciente_id, paciente_nombre, tipo, fecha, hora, estado } = req.body;
+/**
+ * ----------------------------------------------------------------------------
+ * OBTENER DISPONIBILIDAD DE HORARIOS (BLOQUEO POR ÁREA)
+ * ----------------------------------------------------------------------------
+ */
+app.get('/api/citas/disponibilidad', async (req, res) => {
+  const { fecha, tipo } = req.query; // tipo = 'nutricion' o 'fisioterapia'
+  
+  if (!fecha || !tipo) {
+    return res.status(400).json({ error: "Faltan parámetros de fecha o tipo" });
+  }
+
   try {
+    // Buscamos las citas programadas para esa fecha y esa área específica
+    const result = await pool.query(
+      `SELECT hora FROM citas 
+       WHERE fecha = $1 AND tipo = $2 AND estado IN ('programada', 'confirmada')`,
+      [fecha, tipo.toLowerCase()]
+    );
+    
+    // Extraemos solo un arreglo de strings con las horas ['08:00', '09:00']
+    const horasOcupadas = result.rows.map(row => row.hora);
+    
+    res.json(horasOcupadas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/citas', requireAuth, requireRole(['paciente','admin','master']), async (req, res) => {
+  const { paciente_id, paciente_nombre, tipo, fecha, hora, estado } = req.body;
+  
+  try {
+    // 1. VALIDACIÓN ESTRICTA: ¿Ya existe una cita a esta hora y en esta área?
+    const check = await pool.query(
+      "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'confirmada')",
+      [fecha, hora, tipo.toLowerCase()]
+    );
+
+    if (check.rows.length > 0) {
+      return res.status(409).json({ error: "Este horario ya fue ocupado en esta área. Por favor elige otro." });
+    }
+
+    // 2. Si está libre, insertamos
     const result = await pool.query(
       'INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [paciente_id, paciente_nombre, tipo, fecha, hora, estado || 'programada']
@@ -924,16 +965,22 @@ app.post('/api/citas',requireAuth,requireRole(['paciente','admin','master' ]),as
  */
 app.put('/api/citas/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { fecha, hora, estado } = req.body;
+  const { fecha, hora, tipo, estado } = req.body; // Asegúrate de mandar el 'tipo' desde el frontend al editar
   
-  // Opcional: Si quieres mantener canModifyAppointment, asegúrate que dentro de ese middleware 
-  // exista la excepción: if (req.user.rol === 'admin' || req.user.rol === 'master') return next();
-  // Si no tienes esa excepción, mejor quita canModifyAppointment y valida manualmente aquí.
-
   try {
+    // 1. VALIDACIÓN ESTRICTA: Ignoramos la cita actual (id != $4) para que el paciente pueda conservar su misma hora si lo desea
+    const check = await pool.query(
+      "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'confirmada') AND id != $4",
+      [fecha, hora, tipo.toLowerCase(), id]
+    );
+
+    if (check.rows.length > 0) {
+      return res.status(409).json({ error: "Este horario ya está ocupado. Elige otro." });
+    }
+
+    // 2. Actualizamos
     const result = await pool.query(
-      `UPDATE citas SET fecha = $1, hora = $2, estado = $3 
-       WHERE id = $4 RETURNING *`,
+      `UPDATE citas SET fecha = $1, hora = $2, estado = $3 WHERE id = $4 RETURNING *`,
       [fecha, hora, estado || 'programada', id]
     );
     
@@ -1025,6 +1072,25 @@ app.get('/api/historiales/verificar/:pacienteId/:area', async (req, res) => {
   }
 });
 
+app.put('/api/historiales/:id', requireAuth, async (req, res) => {
+  const { id } = req.params; // ID del registro en la tabla de historiales
+  const { datos } = req.body;
+  
+  // Determinamos la tabla por el tipo (puedes pasarlo desde el frontend)
+  const { tipo } = req.body; 
+  const tabla = tipo === 'nutricion' ? 'historiales_nutricion' : 'historiales_fisioterapia';
+
+  try {
+    const result = await pool.query(
+      `UPDATE ${tabla} SET datos = $1 WHERE id = $2 RETURNING *`,
+      [JSON.stringify(datos), id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * OBTENER HISTORIALES POR PACIENTE Y ÁREA
  * Estos endpoints alimentan directamente al componente MedicalHistoryViewer_v2.
@@ -1033,46 +1099,24 @@ app.get('/api/historiales/verificar/:pacienteId/:area', async (req, res) => {
  * ENDPOINT: Obtener datos específicos de un historial por ID de Cita
  * Utilizado para el auto-rellenado de formularios guardados.
  */
-app.get('/api/historiales-nutricion/detalle/:appointmentId',requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
-  const { appointmentId } = req.params;
-  try {
-    const result = await pool.query(
-      'SELECT datos FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1',
-      [appointmentId]
-    );
-    
-    if (result.rows.length > 0) {
-      let datosCrudos = result.rows[0].datos;
-      // Pequeño seguro por si postgres lo devuelve como texto en vez de JSON
-      if (typeof datosCrudos === 'string') {
-        datosCrudos = JSON.parse(datosCrudos);
-      }
-      res.json(datosCrudos);
-    } else {
-      res.status(404).json({ error: "No se encontraron datos para esta cita." });
-    }
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+
 /**
- * ENDPOINT: Obtener datos específicos de un historial de FISIOTERAPIA por ID de Cita
+ * ENDPOINT: Obtener datos específicos de un historial de NUTRICIÓN
  */
-app.get('/api/historiales-fisioterapia/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
-  // ... resto de tu código
+app.get('/api/historiales-nutricion/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
   const { appointmentId } = req.params;
   try {
     const result = await pool.query(
-      'SELECT datos FROM historiales_fisioterapia WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1',
+      'SELECT * FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', // <-- SELECT *
       [appointmentId]
     );
     
     if (result.rows.length > 0) {
-      let datosCrudos = result.rows[0].datos;
-      if (typeof datosCrudos === 'string') {
-        datosCrudos = JSON.parse(datosCrudos);
+      let fila = result.rows[0];
+      if (typeof fila.datos === 'string') {
+        fila.datos = JSON.parse(fila.datos);
       }
-      res.json(datosCrudos);
+      res.json(fila); // <-- Devolvemos toda la fila
     } else {
       res.status(404).json({ error: "No se encontraron datos para esta cita." });
     }
@@ -1081,40 +1125,61 @@ app.get('/api/historiales-fisioterapia/detalle/:appointmentId', requireAuth, req
   }
 });
 
+/**
+ * ENDPOINT: Obtener datos específicos de un historial de FISIOTERAPIA
+ */
+app.get('/api/historiales-fisioterapia/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
+  const { appointmentId } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM historiales_fisioterapia WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', // <-- SELECT *
+      [appointmentId]
+    );
+    
+    if (result.rows.length > 0) {
+      let fila = result.rows[0];
+      if (typeof fila.datos === 'string') {
+        fila.datos = JSON.parse(fila.datos);
+      }
+      res.json(fila); // <-- Devolvemos toda la fila
+    } else {
+      res.status(404).json({ error: "No se encontraron datos para esta cita." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * ENDPOINT: Obtener todos los historiales de NUTRICIÓN de un paciente
+ */
+app.get('/api/historiales-nutricion/paciente/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM historiales_nutricion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC', 
+      [id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * ENDPOINT: Obtener todos los historiales de FISIOTERAPIA de un paciente
+ */
 app.get('/api/historiales-fisioterapia/paciente/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      'SELECT * FROM historiales_fisioterapia WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      'SELECT * FROM historiales_fisioterapia WHERE paciente_id = $1 ORDER BY fecha_creacion DESC', 
       [id]
     );
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-});
-
-app.get('/api/historiales-nutricion/paciente/:id', async (req, res) => {
-
-  const { id } = req.params;
-
-  try {
-
-    const result = await pool.query(
-      'SELECT * FROM historiales_nutricion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
-      [id]
-    );
-
-    res.json(result.rows);
-
-  } catch (error) {
-
-    res.status(500).json({
-      error: error.message
-    });
-
-  }
-
 });
 
 /**
