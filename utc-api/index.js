@@ -1254,16 +1254,95 @@ app.post('/api/historiales', async (req, res) => {
   }
 });
 
-app.post('/api/notas-evolucion', async (req, res) => {
-  const { paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area } = req.body;
+/**
+ * OBTENER HOJA EVOLUTIVA POR ID DE CITA
+ * Recupera el JSON guardado para rellenar la vista del frontend.
+ */
+app.get('/api/notas-evolucion/:id', requireAuth, async (req, res) => {
+  const { id } = req.params; // El frontend envía el ID de la cita en la URL
   try {
     const result = await pool.query(
-      `INSERT INTO notas_evolucion (paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area || 'nutricion']
+      'SELECT * FROM notas_evolucion WHERE appointment_id = $1 ORDER BY fecha_elaboracion DESC LIMIT 1',
+      [id]
     );
-    res.status(201).json(result.rows[0]);
+    
+    if (result.rows.length > 0) {
+      let fila = result.rows[0];
+      // Si PostgreSQL lo devuelve como texto, lo parseamos a JSON
+      if (typeof fila.cuadro_evolucion === 'string') {
+        fila.cuadro_evolucion = JSON.parse(fila.cuadro_evolucion);
+      }
+      res.json(fila);
+    } else {
+      // Devolvemos un objeto vacío para que el frontend no falle si es la primera vez
+      res.status(200).json({ cuadro_evolucion: {} }); 
+    }
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GUARDAR HOJA EVOLUTIVA
+ * Ahora protegido con requireAuth
+ */
+app.post('/api/notas-evolucion', requireAuth, async (req, res) => {
+  let { paciente_id, practicante_id, appointment_id, nombre_completo, numero_expediente, edad, fecha_elaboracion, cuadro_evolucion, area } = req.body;
+  
+  try {
+    // 1. CONVERSIÓN ESTRICTA A ENTEROS (integer)
+    // Para evitar que PostgreSQL rechace textos ('15' -> 15)
+    const apptIdInt = parseInt(appointment_id, 10) || null;
+    const practIdInt = parseInt(practicante_id, 10) || null;
+    let pacIdInt = parseInt(paciente_id, 10) || null;
+
+    // 2. AUTO-COMPLETADO DEL PACIENTE
+    if (apptIdInt) {
+      const citaResult = await pool.query('SELECT paciente_id, paciente_nombre FROM citas WHERE id = $1', [apptIdInt]);
+      
+      if (citaResult.rows.length > 0) {
+        pacIdInt = parseInt(citaResult.rows[0].paciente_id, 10);
+        
+        if (!nombre_completo || nombre_completo === 'Sin nombre') {
+          nombre_completo = citaResult.rows[0].paciente_nombre;
+        }
+      }
+    }
+
+    // 3. INSERCIÓN BLINDADA (Agregamos fecha_creacion con NOW())
+    const result = await pool.query(
+      `INSERT INTO notas_evolucion (
+        paciente_id, 
+        practicante_id, 
+        appointment_id, 
+        nombre_completo, 
+        numero_expediente, 
+        edad, 
+        fecha_elaboracion, 
+        cuadro_evolucion, 
+        area, 
+        fecha_creacion
+      ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING *`,
+      [
+        pacIdInt,                  // $1 (integer)
+        practIdInt,                // $2 (integer)
+        apptIdInt,                 // $3 (integer)
+        nombre_completo,           // $4 (character varying)
+        numero_expediente,         // $5 (character varying)
+        parseInt(edad, 10) || 0,   // $6 (integer)
+        fecha_elaboracion,         // $7 (timestamp)
+        JSON.stringify(cuadro_evolucion || {}), // $8 (text - json)
+        area || 'nutricion'        // $9 (character varying)
+        // El $10 lo maneja directamente NOW() en la consulta
+      ]
+    );
+    
+    res.status(201).json(result.rows[0]);
+
+  } catch (error) {
+    // Si la consola arroja código 23503, es porque la cita (appointment_id) no existe en tu tabla 'citas'
+    console.error("❌ Error BD notas-evolucion:", error.message);
     res.status(500).json({ error: error.message });
   }
 });

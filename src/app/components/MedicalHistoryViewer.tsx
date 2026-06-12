@@ -271,7 +271,9 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
             <TabsContent value="evolucion">
               <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8"><CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle></CardHeader>
+                <CardHeader className="bg-slate-50 border-b p-8">
+                  <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
+                </CardHeader>
                 <CardContent className="p-8">
                   {filteredHistories.length === 0 ? (
                     <div className="text-center py-12">
@@ -288,9 +290,24 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                             <div className={`absolute left-3 top-8 bottom-0 w-0.5 ${history.tipo === 'fisioterapia' ? 'bg-blue-200' : 'bg-green-200'}`}></div>
                             <div className={`absolute left-0 top-0 w-6 h-6 rounded-full ${history.tipo === 'fisioterapia' ? 'bg-blue-600' : 'bg-green-600'} border-4 border-white shadow-lg`}></div>
                             <div className={`border ${history.tipo === 'fisioterapia' ? 'border-blue-200' : 'border-green-200'} rounded-2xl p-6 bg-white shadow-sm`}>
-                              <h4 className={`font-black text-lg ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>Consulta de {history.tipo} #{filteredHistories.length - index}</h4>
+                              
+                              <h4 className={`font-black text-lg ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>
+                                Nota evolutiva de {history.tipo} #{filteredHistories.length - index}
+                              </h4>
+                              
                               <p className="text-sm text-slate-700 mt-2">{motivo}</p>
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)} className="mt-4 font-bold border-slate-200">VER FORMULARIO COMPLETO</Button>
+                              
+                              <div className="flex gap-3 mt-4">
+                                <Button size="sm" variant="outline" onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)} className="font-bold border-slate-200">
+                                  VER FORMULARIO COMPLETO
+                                </Button>
+                                
+                                <Button size="sm" onClick={() => navigate(`/hoja-evolutiva/${history.appointment_id}`)} className={`font-bold text-white shadow-sm transition-colors ${history.tipo === 'fisioterapia' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+  <FileText className="w-4 h-4 mr-2" />
+  VER NOTA
+</Button>
+                              </div>
+
                             </div>
                           </div>
                         );
