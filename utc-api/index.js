@@ -819,7 +819,7 @@ app.delete('/api/usuarios/:id',requireAuth,requireRole(['admin', 'master']),requ
 
 app.get('/api/practicantes',  requireAuth, requireRole([ 'admin', 'master' ]), async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM practicantes_autorizados ORDER BY fecha_timestamp DESC');
+    const result = await pool.query("SELECT * FROM usuarios WHERE rol = 'practicante' ORDER BY fecha_creacion DESC");
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -827,13 +827,31 @@ app.get('/api/practicantes',  requireAuth, requireRole([ 'admin', 'master' ]), a
 });
 
 app.post('/api/practicantes', async (req, res) => {
-  const { nombre, email, area, estado, fecha_autorizacion } = req.body;
+  const { nombre, email, matricula, area, estado, fecha_autorizacion } = req.body;
+
+  const passwordTemporal = `UTC${matricula}`;
+
+  const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+
   try {
-    const result = await pool.query(
-      'INSERT INTO practicantes_autorizados (nombre, email, area, estado, fecha_autorizacion) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [nombre.trim(), email.trim().toLowerCase(), area, estado || 'activo', fecha_autorizacion || new Date()]
-    );
-    res.status(201).json(result.rows[0]);
+  const result = await pool.query(
+  `INSERT INTO usuarios
+  (nombre, email, password, rol, area, matricula, status, primer_inicio)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  RETURNING *`,
+  [
+    nombre.trim(),
+    email.trim().toLowerCase(),
+    passwordHash,
+    'practicante',
+    area,
+    matricula,
+    'activo',
+    true
+  ]
+);
+
+res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
