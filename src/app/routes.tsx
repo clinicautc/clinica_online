@@ -31,6 +31,10 @@ import ManagePractitionersPage from './pages/ManagePractitionersPage';
 // --- NUEVA IMPORTACIÓN: VISOR DE HISTORIALES ---
 import MedicalHistoryViewer from './components/MedicalHistoryViewer'; 
 
+// --Nueva pagina de Notas Evolutivas
+// --- NUEVA IMPORTACIÓN: HOJA EVOLUTIVA ---
+import HojaEvolutiva from './pages/HojaEvolutiva'; // (Ajusta la carpeta si lo guardaste en /components)
+
 /**
  * COMPONENTE: ProtectedRoute
  */
@@ -209,5 +213,17 @@ export const router = createBrowserRouter([
   {
     path: '*',
     element: <Navigate to="/login" replace />
+  },
+
+  /**
+   * RUTA: HOJA EVOLUTIVA
+   */
+  {
+    path: '/hoja-evolutiva/:appointmentId', 
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <HojaEvolutiva />
+      </ProtectedRoute>
+    )
   }
 ]);
