@@ -29,6 +29,7 @@ export default function ManagePractitionersPage() {
   const [nuevoD, setNuevoD] = useState({
     nombre: '',
     email: '',
+    matricula: '',
     area: '' as 'nutricion' | 'fisioterapia' | '',
   });
 
@@ -55,7 +56,9 @@ export default function ManagePractitionersPage() {
         ? `http://localhost:3001/api/practicantes?area=${user.area}` 
         : 'http://localhost:3001/api/practicantes';
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+       headers: {email: user?.email || ''}
+      });
       if (response.ok) {
         const data = await response.json();
         // Sincronización con las columnas de la tabla 'practicantes_autorizados'
@@ -78,7 +81,7 @@ export default function ManagePractitionersPage() {
   const handleAgregarDocente = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!nuevoD.nombre || !nuevoD.email || !nuevoD.area) {
+    if (!nuevoD.nombre || !nuevoD.email  ||  !nuevoD.matricula || !nuevoD.area) {
       toast.error('Brah, faltan datos: Nombre, Email y Área son obligatorios');
       return;
     }
@@ -95,10 +98,11 @@ export default function ManagePractitionersPage() {
        */
       const response = await fetch('http://localhost:3001/api/practicantes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify({
           nombre: nuevoD.nombre.trim(), // Nombre exacto que pide el INSERT en index.js
           email: nuevoD.email.trim().toLowerCase(), 
+          matricula: nuevoD.matricula.trim(),
           area: nuevoD.area,
           estado: 'activo',
           fecha_autorizacion: new Date().toISOString().split('T')[0]
@@ -106,10 +110,11 @@ export default function ManagePractitionersPage() {
       });
 
       if (response.ok) {
-        toast.success(`Practicante autorizado en la base de datos PostgreSQL`);
+        toast.success(`Practicante autorizado correctamente.\nContraseña temporal: UTC${nuevoD.matricula}`);
         setNuevoD({ 
           nombre: '', 
           email: '', 
+          matricula: '',
           area: (user?.area || '') as any 
         });
         setMostrandoFormulario(false);
@@ -132,7 +137,7 @@ export default function ManagePractitionersPage() {
     try {
       const response = await fetch(`http://localhost:3001/api/practicantes/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json',email: user?.email || ''},
         body: JSON.stringify({ estado: nuevoEstado })
       });
 
@@ -149,7 +154,10 @@ export default function ManagePractitionersPage() {
   const handleEliminarDocente = async (id: string) => {
     if (!window.confirm('¿Eliminar definitivamente la autorización?')) return;
     try {
-      const response = await fetch(`http://localhost:3001/api/practicantes/${id}`, { method: 'DELETE' });
+      const response = await fetch(`http://localhost:3001/api/practicantes/${id}`, { 
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json', email: user?.email || ''},
+       });
       if (response.ok) {
         toast.success('Autorización removida de PostgreSQL');
         cargarDocentes();
@@ -211,6 +219,10 @@ export default function ManagePractitionersPage() {
                 <div className="space-y-2">
                   <Label className="text-blue-900 font-bold">Correo Institucional (@utc.edu.mx)</Label>
                   <Input type="email" value={nuevoD.email} onChange={(e) => setNuevoD({...nuevoD, email: e.target.value})} placeholder="alumno@utc.edu.mx" required className="bg-white border-blue-900/20" />
+                </div>
+                <div className="space-y-2">
+                 <Label className="text-blue-900 font-bold"> Matrícula</Label>
+                 <Input value={nuevoD.matricula}onChange={(e) =>setNuevoD({...nuevoD,matricula: e.target.value.replace(/\D/g, '').slice(0, 9)})} placeholder="Matricula 9 digitos" maxLength={9} required className="bg-white border-blue-900/20"/>
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-blue-900 font-bold">Área de Práctica</Label>
