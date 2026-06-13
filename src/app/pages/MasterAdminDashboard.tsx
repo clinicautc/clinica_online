@@ -55,8 +55,10 @@ export default function ManageAdminPage() {
 
   // ESTADOS PRINCIPALES
   const [practicantes, setPracticantes] = useState<any[]>([]); // Cambiado a any para acceder a rol y área
-  const [searchTerm, setSearchTerm] = useState('');
-  const [areaFilter, setAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+  // ... otros estados
+const [searchTerm, setSearchTerm] = useState('');
+const [areaFilter, setAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>('todos'); // <-- AGREGAR ESTO
 
   // ESTADOS PARA COMUNICADOS SEGMENTADOS
   const [notaNueva, setNotaNueva] = useState({
@@ -150,9 +152,10 @@ export default function ManageAdminPage() {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesArea = areaFilter === 'todos' ? true : p.area === areaFilter;
-    return matchesSearch && matchesArea;
-  });
+  const matchesRole = roleFilter === 'todos' ? true : p.rol === roleFilter;
 
+  return matchesSearch && matchesArea && matchesRole;
+});
   /**
    * CAMBIAR ESTADO (ACTIVAR/DESACTIVAR)
    */
@@ -377,9 +380,8 @@ export default function ManageAdminPage() {
                 <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
                   <Users className="w-4 h-4" /> Pacientes
                 </TabsTrigger>
-                <TabsTrigger value="histories" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <FileText className="w-4 h-4" /> Historiales
-                </TabsTrigger>
+               
+              
                 <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
                   <BarChart3 className="w-4 h-4" /> Estadísticas
                 </TabsTrigger>
@@ -392,15 +394,37 @@ export default function ManageAdminPage() {
             {/* CONTENIDO: GESTIÓN DE DOCENTES */}
             <TabsContent value="practitioners" className="animate-in fade-in duration-500">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50/80 p-6">
-                  <div>
-                    <CardTitle className="text-blue-900 font-extrabold text-xl">Base de Datos: Personal Académico</CardTitle>
-                    <CardDescription className="text-gray-500 font-medium italic">Sincronización en tiempo real con PostgreSQL</CardDescription>
-                  </div>
-                  <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105">
-                    Registrar Nuevo Acceso
-                  </Button>
-                </CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-6 gap-4">
+  <div>
+    {/* Ajusté los textos para que coincidan exactamente con tu imagen */}
+    <CardTitle className="text-blue-900 font-extrabold text-xl"> Personal Académico</CardTitle>
+    <CardDescription className="text-gray-500 font-medium italic">Registro y boton filtro de practicantes y docentes</CardDescription>
+  </div>
+  
+  {/* NUEVO CONTENEDOR: Agrupa el filtro y el botón naranja */}
+  <div className="flex items-center gap-3 w-full sm:w-auto">
+    
+    {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
+    <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+      <SelectTrigger className="w-[180px] bg-white border-blue-200 text-blue-900 font-bold h-10 rounded-xl shadow-sm">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-blue-600" />
+          <SelectValue placeholder="Filtrar por Rol" />
+        </div>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="todos" className="font-bold">Todos</SelectItem>
+        <SelectItem value="admin">Docentes </SelectItem>
+        <SelectItem value="practicante">Practicantes</SelectItem>
+      </SelectContent>
+    </Select>
+
+    {/* TU BOTÓN ORIGINAL */}
+    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10 px-4">
+      Registrar Nuevo Acceso
+    </Button>
+  </div>
+</CardHeader>
                 
                 <CardContent className="p-0 overflow-y-auto max-h-[600px]">
                   <Table>
@@ -409,9 +433,9 @@ export default function ManageAdminPage() {
                         <TableHead className="pl-8 py-4 text-blue-900 font-black uppercase text-[11px] tracking-widest">Información del Docente</TableHead>
                         {/* NUEVA CABECERA ROL */}
                         <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest px-4">Rol</TableHead>
-                        <TableHead className="text-blue-900 font-black uppercase text-[11px] tracking-widest text-center">Especialidad</TableHead>
+                        <TableHead className="text-blue-900 font-black uppercase text-[11px] tracking-widest text-center">Area</TableHead>
                         <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest">Estado</TableHead>
-                        <TableHead className="text-right pr-8 text-blue-900 font-black uppercase text-[11px] tracking-widest">Acciones</TableHead>
+                        <TableHead className="text-right pr-8 text-blue-900 font-black uppercase text-[11px] tracking-widest">Activación/Desactivación</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -627,7 +651,7 @@ export default function ManageAdminPage() {
         <footer className="py-16 text-center">
           <div className="inline-block px-6 py-2 border-y border-gray-100">
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.6em] opacity-40">
-              Sistema de Gestión de Academias UTC • Control Master • 2026
+              Sistema de Gestión de Academias UTC • 2026
             </p>
           </div>
         </footer>
@@ -666,7 +690,7 @@ export default function ManageAdminPage() {
             </div>
             <h3 className="text-xl font-bold text-blue-950 text-center">{profileData.nombre}</h3>
             <span className="bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mt-1">
-              Usuario Master
+              Jefa de carrera
             </span>
           </div>
 
