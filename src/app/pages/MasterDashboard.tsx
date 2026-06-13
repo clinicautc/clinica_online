@@ -52,6 +52,8 @@ export default function MasterDashboard() {
   const [practicantes, setPracticantes] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [areaFilter, setAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+  const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>('todos');
+
 
   // ESTADOS PARA COMUNICADOS
   const [notaNueva, setNotaNueva] = useState({
@@ -114,7 +116,10 @@ export default function MasterDashboard() {
     const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesArea = areaFilter === 'todos' ? true : p.area === areaFilter;
-    return matchesSearch && matchesArea;
+    
+    const matchesRole = roleFilter === 'todos' ? true : p.rol === roleFilter;
+
+    return matchesSearch && matchesArea && matchesRole;
   });
 
   const handleCambiarEstado = async (id: string) => {
@@ -208,8 +213,8 @@ export default function MasterDashboard() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold">
-                    <span className="text-blue-900">Control</span>{' '}
-                    <span className="text-orange-600">Master</span>
+                    <span className="text-blue-900">Administrador </span>{' '}
+                    <span className="text-orange-600">Areas</span>
                   </h1>
                   <p className="text-sm text-gray-500 font-medium">Universidad Tres Culturas</p>
                 </div>
@@ -265,15 +270,39 @@ export default function MasterDashboard() {
 
               <TabsContent value="practitioners" className="animate-in fade-in duration-300">
                 <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                  <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50/80 p-6">
-                    <div>
-                      <CardTitle className="text-blue-900 font-extrabold text-xl">Administración de Personal</CardTitle>
-                      <CardDescription className="text-gray-500 font-medium italic">Gestión de practicantes y docentes en PostgreSQL</CardDescription>
-                    </div>
-                    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl">
-                      <UserCheck className="w-4 h-4 mr-2" /> Registrar Acceso
-                    </Button>
-                  </CardHeader>
+                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-6 gap-4">
+  <div>
+    {/* Ajusté los textos para que coincidan exactamente con tu imagen */}
+    <CardTitle className="text-blue-900 font-extrabold text-xl"> Personal Académico</CardTitle>
+   
+  </div>
+  
+  {/* NUEVO CONTENEDOR: Agrupa el filtro y el botón naranja */}
+  <div className="flex items-center gap-3 w-full sm:w-auto">
+    
+    {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
+   {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
+<Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+  <SelectTrigger className="w-[180px] bg-white border-blue-200 text-blue-900 font-bold h-10 rounded-xl shadow-sm">
+
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-blue-600" />
+          <SelectValue placeholder="Filtrar por Rol" />
+        </div>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="todos" className="font-bold">Todos los Roles</SelectItem>
+        <SelectItem value="admin">Docentes Titulares</SelectItem>
+        <SelectItem value="practicante">Practicantes</SelectItem>
+      </SelectContent>
+    </Select>
+
+    {/* TU BOTÓN ORIGINAL */}
+    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10 px-4">
+      Registrar Nuevo Acceso
+    </Button>
+  </div>
+</CardHeader>
                   <CardContent className="p-0 overflow-y-auto max-h-[600px]">
                     <Table>
                       <TableHeader className="bg-white sticky top-0 z-20 border-b shadow-sm">
@@ -429,7 +458,7 @@ export default function MasterDashboard() {
 
           <footer className="py-12 text-center opacity-40">
             <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-400">
-              Sistema de Gestión Clínica UTC • Versión Master Centralizada • 2026
+              Sistema de Gestión Clínica UTC  • 2026
             </p>
           </footer>
         </div>

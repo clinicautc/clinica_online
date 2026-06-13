@@ -178,4 +178,24 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
 }
+
+/* =========================================================
+   FORZAR CURSOR DE MANITA EN ELEMENTOS INTERACTIVOS (TAILWIND)
+   ========================================================= */
+button, 
+[role="tab"], 
+[role="combobox"], 
+[role="option"], 
+[role="menuitem"],
+[role="dialog"] button,
+summary {
+  cursor: pointer !important;
+}
+
