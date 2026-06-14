@@ -709,32 +709,46 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Nombre Completo</Label>
-                <div className="relative flex items-center">
-                  <User className="w-4 h-4 text-blue-400 absolute left-4" />
-                  <input 
-                    type="text" 
-                    value={profileData.nombre}
-                    onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
-                    disabled={!isEditingProfile}
-                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
-                  />
-                </div>
-              </div>
+  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Nombre Completo</Label>
+  <div className="relative flex items-center">
+    <User className="w-4 h-4 text-blue-400 absolute left-4" />
+    <input 
+      type="text" 
+      maxLength={40} // <-- 1. Límite estricto de 40 caracteres
+      value={profileData.nombre}
+      onChange={(e) => {
+        // 2. Esta línea elimina cualquier cosa que NO sea letra, acento, ñ, o espacio
+        const soloLetras = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+        
+        // Opcional: Si quieres que no puedan poner múltiples espacios seguidos, puedes usar:
+        // const nombreLimpio = soloLetras.replace(/\s{2,}/g, ' ');
+        
+        setProfileData({...profileData, nombre: soloLetras});
+      }}
+      disabled={!isEditingProfile}
+      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+    />
+  </div>
+</div>
 
-              <div className="space-y-1">
-                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Número Personal</Label>
-                <div className="relative flex items-center">
-                  <Phone className="w-4 h-4 text-blue-400 absolute left-4" />
-                  <input 
-                    type="text" 
-                    value={profileData.telefono}
-                    onChange={(e) => setProfileData({...profileData, telefono: e.target.value})}
-                    disabled={!isEditingProfile}
-                    className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
-                  />
-                </div>
-              </div>
+             <div className="space-y-1">
+  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Número Personal</Label>
+  <div className="relative flex items-center">
+    <Phone className="w-4 h-4 text-blue-400 absolute left-4" />
+    <input 
+      type="tel" // <-- 1. Cambiado a 'tel'
+      maxLength={15} // <-- 2. Límite estricto de 15 dígitos
+      value={profileData.telefono}
+      onChange={(e) => {
+        // 3. Esta línea elimina cualquier carácter que NO sea un dígito (\D)
+        const soloNumeros = e.target.value.replace(/\D/g, '');
+        setProfileData({...profileData, telefono: soloNumeros});
+      }}
+      disabled={!isEditingProfile}
+      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+    />
+  </div>
+</div>
 
               {(profileData.rol === 'practicante' || profileData.rol === 'paciente') && (
                 <div className="space-y-1">
