@@ -232,13 +232,20 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
             </Label>
             <div className="border border-blue-900/20 rounded-lg p-4 bg-white flex justify-center">
               <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(newDate) => { setDate(newDate); setTime(''); }}
-                disabled={isDateDisabled || isSaving}
-                locale={es}
-                className="rounded-md"
-              />
+  mode="single"
+  selected={date}
+  onSelect={(newDate) => { setDate(newDate); setTime(''); }}
+  // 👇 MODIFICA ESTA LÍNEA 👇
+  disabled={(date) => {
+    const esFinDeSemana = date.getDay() === 0 || date.getDay() === 6;
+    const esDiaDeshabilitado = typeof isDateDisabled === 'function' ? isDateDisabled(date) : isDateDisabled;
+    
+    return esFinDeSemana || esDiaDeshabilitado || isSaving;
+  }}
+  // 👆 ==================== 👆
+  locale={es}
+  className="rounded-md"
+/>
             </div>
             {isSelectedDateToday && (
               <p className="text-xs text-red-500 font-bold text-center mt-2">
