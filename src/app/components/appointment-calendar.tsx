@@ -195,19 +195,31 @@ export function AppointmentCalendar({ userId }: AppointmentCalendarProps) {
               ))}
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const day = i + 1;
+                
+                // 1. CALCULAMOS EL DÍA DE LA SEMANA (0 = Domingo, 6 = Sábado)
+                const dayOfWeek = (startingDayOfWeek + i) % 7;
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
                 const dayAppointments = getAppointmentsForDate(day);
-                const hasAppointments = dayAppointments.length > 0;
+                // Si es fin de semana, ignoramos las citas para no mostrar puntos naranjas
+                const hasAppointments = dayAppointments.length > 0 && !isWeekend;
 
                 return (
                   <button
                     key={day}
-                    onClick={() => handleDayClick(day)}
+                    onClick={() => !isWeekend && handleDayClick(day)} // Previene el clic
+                    disabled={isWeekend} // Deshabilita el botón en HTML nativo
                     className={`
                       aspect-square rounded-lg flex flex-col items-center justify-center text-sm
                       transition-all duration-200 relative
-                      ${isSelected(day) ? 'bg-blue-900 text-white shadow-lg scale-105' : ''}
-                      ${isToday(day) && !isSelected(day) ? 'bg-orange-100 border-2 border-orange-500 text-blue-900' : ''}
-                      ${!isSelected(day) && !isToday(day) ? 'bg-white border-2 border-blue-100 text-blue-900 hover:bg-blue-50 hover:border-blue-300' : ''}
+                      
+                      /* 2. ESTILOS PARA FIN DE SEMANA (Bloqueado) */
+                      ${isWeekend ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60 border-2 border-gray-200' : ''}
+                      
+                      /* 3. ESTILOS NORMALES (Ocultos si es fin de semana) */
+                      ${isSelected(day) && !isWeekend ? 'bg-blue-900 text-white shadow-lg scale-105' : ''}
+                      ${isToday(day) && !isSelected(day) && !isWeekend ? 'bg-orange-100 border-2 border-orange-500 text-blue-900' : ''}
+                      ${!isSelected(day) && !isToday(day) && !isWeekend ? 'bg-white border-2 border-blue-100 text-blue-900 hover:bg-blue-50 hover:border-blue-300' : ''}
                     `}
                   >
                     <span className="font-semibold">{day}</span>
