@@ -15,12 +15,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { 
   FileText, Calendar, User, Activity, Utensils, 
   Search, Loader2, BookOpen, 
-  ClipboardList, ArrowLeft, TrendingUp
+  ClipboardList, ArrowLeft, TrendingUp, MessageSquare
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import NutritionRecommendations from './NutritionRecommendations';
 
 interface MedicalHistory {
   id: string | number;
@@ -38,13 +39,22 @@ interface MedicalHistoryViewerProps {
 }
 
 export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewerProps) {
-  /**
-   * 1. CAPTURA DE PARÁMETROS DINÁMICOS
-   */
   const { id, area } = useParams<{ id: string; area: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
+
+  // 1. RESTRICCIÓN ESTRICTA DE ROLES Y ÁREA
+  const isMaster = user?.rol === 'master';
+
+  const getAreaAutorizada = (): 'nutricion' | 'fisioterapia' => {
+    if (isMaster) {
+      // El master puede ver el área de la URL, el prop o por defecto nutrición
+      return (area as any) || filterType || 'nutricion';
+    }
+    // Si es docente o practicante, ignoramos la URL y forzamos SU área real
+    return (user?.area?.toLowerCase() as 'nutricion' | 'fisioterapia') || 'nutricion';
+  };
 
   // --- ESTADOS ---
   const [histories, setHistories] = useState<MedicalHistory[]>([]);
@@ -53,18 +63,26 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
   const [expandedId, setExpandedId] = useState<string | number | null>(null);
   const [patientName, setPatientName] = useState(''); 
   
-  // Sincronización visual con el área de la URL o el filtro prop
-  const [detectedArea, setDetectedArea] = useState<'fisioterapia' | 'nutricion'>((area as any) || 'nutricion');
+  // Usamos el área autorizada calculada arriba
+  const [selectedArea, setSelectedArea] = useState<'nutricion' | 'fisioterapia'>(getAreaAutorizada());
+  const [detectedArea, setDetectedArea] = useState<'fisioterapia' | 'nutricion'>(selectedArea);
   
-  // Selector de área para usuarios MASTER
-  const [selectedArea, setSelectedArea] = useState<'nutricion' | 'fisioterapia'>((area as any) || filterType || 'nutricion');
-  
+  // 2. PROTECCIÓN CONTRA TRAMPAS EN LA URL
   useEffect(() => {
-    if (filterType) {
+    // Si un practicante o docente intenta escribir otra área en la barra de direcciones, lo regresamos a la suya
+    if (!isMaster && area && area.toLowerCase() !== user?.area?.toLowerCase()) {
+       toast.error(`Acceso denegado. Solo puedes ver historiales de tu área asignada.`);
+       navigate(`/historial/${id}/${user?.area?.toLowerCase()}`, { replace: true });
+    }
+  }, [area, isMaster, user, navigate, id]);
+
+  useEffect(() => {
+    // Solo el master puede cambiar de área mediante las props/botones externos
+    if (filterType && isMaster) {
       setSelectedArea(filterType);
     }
-  }, [filterType]);
-  
+  }, [filterType, isMaster]);
+
   /**
    * 2. CARGA DE DATOS SINCRONIZADA (USUARIO + HISTORIALES)
    */
@@ -74,7 +92,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
       try {
         setLoading(true);
-        
+      
         // PASO 1: Traer el nombre real del usuario por su ID de Postgres
         // Esto garantiza que el encabezado no diga "Cargando" o "Sin Nombre"
         const userRes = await fetch(`http://localhost:3001/api/usuarios/${id}`);
@@ -159,8 +177,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
       : 'data-[state=active]:bg-green-700 data-[state=active]:text-white'
   };
 
-  const isMaster = user?.rol === 'master' || user?.rol === 'admin';
-
+  
   return (
     <div className={`min-h-screen ${theme.bgGradient}`} style={arialStyle}>
       {/* Header */}
@@ -219,6 +236,8 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
             <TabsList className="bg-white/80 border shadow-sm p-1 h-auto gap-1 rounded-xl">
               <TabsTrigger value="historiales" className={`${theme.tabActive} font-bold`}><FileText className="w-4 h-4 mr-2" />Historial Médico</TabsTrigger>
               <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Evolución</TabsTrigger>
+              <TabsTrigger value="recomendaciones" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Recomendaciones</TabsTrigger>
+             
             </TabsList>
 
             <TabsContent value="historiales">
@@ -304,7 +323,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                 
                                 <Button size="sm" onClick={() => navigate(`/hoja-evolutiva/${history.appointment_id}`)} className={`font-bold text-white shadow-sm transition-colors ${history.tipo === 'fisioterapia' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
   <FileText className="w-4 h-4 mr-2" />
-  VER NOTA
+  Ver Notas Evolutivas
 </Button>
                               </div>
 
@@ -317,6 +336,29 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                 </CardContent>
               </Card>
             </TabsContent>
+
+                    <TabsContent value="recomendaciones">
+              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
+                <CardHeader className="bg-slate-50 border-b p-8">
+                  <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
+                    <MessageSquare className="w-6 h-6" /> 
+                    Recomendaciones de {detectedArea === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
+                  </CardTitle>
+                  <CardDescription className="font-bold italic text-slate-500">
+                    Planes y sugerencias asignadas a {patientName}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-8">
+                  {/* Aquí inyectas tu componente pasándole las variables dinámicas */}
+                  <NutritionRecommendations 
+                    pacienteId={id || ''} 
+                    pacienteNombre={patientName}
+                    area={selectedArea}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
           </Tabs>
         )}
       </main>

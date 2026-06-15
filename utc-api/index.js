@@ -1453,3 +1453,46 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(` API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO ${PORT}`);
 });
+
+
+
+
+/**
+ * Api de las recomendaciones
+ * 
+ */
+
+// --- Endpoint para GUARDAR (POST) ---
+app.post('/api/recomendaciones', requireAuth, async (req, res) => {
+  const { paciente_id, paciente_nombre, contenido, creado_por_id, creado_por_nombre, area } = req.body;
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO recomendaciones_nutricion 
+      (paciente_id, paciente_nombre, contenido, creado_por_id, creado_por_nombre, area) 
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [paciente_id, paciente_nombre, contenido, creado_por_id, creado_por_nombre, area]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al guardar en recomendaciones_nutricion:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Endpoint para OBTENER (GET) ---
+app.get('/api/recomendaciones/paciente/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { area } = req.query;
+  
+  try {
+    const result = await pool.query(
+      'SELECT * FROM recomendaciones_nutricion WHERE paciente_id = $1 AND area = $2 ORDER BY fecha_creacion DESC',
+      [id, area]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener de recomendaciones_nutricion:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});

@@ -138,12 +138,17 @@ export default function PhysiotherapyPractitionerDashboard() {
     setProfileData(backupProfile);
     setIsEditingProfile(false);
   };
-
-  const handleSaveProfile = async () => {
+const handleSaveProfile = async () => {
     if (!user?.id || !user?.email) {
       toast.error("Error de sesión: No se pudo identificar al usuario.");
       return;
     }
+
+    // 1. LIMPIEZA DE DATOS (Prevención del Error de Constraint Único)
+    // Dejamos solo números en el teléfono
+    const telefonoLimpio = profileData.telefono ? profileData.telefono.replace(/\D/g, '') : null;
+    // Si la matrícula está en blanco, enviamos 'null' para que Postgres no lo cuente como duplicado
+    const matriculaLimpia = profileData.matricula && profileData.matricula.trim() !== '' ? profileData.matricula.trim() : null;
 
     try {
       const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
@@ -153,9 +158,9 @@ export default function PhysiotherapyPractitionerDashboard() {
           'email': user.email
         },
         body: JSON.stringify({
-          nombre: profileData.nombre,
-          telefono: profileData.telefono,
-          matricula: profileData.matricula
+          nombre: profileData.nombre.trim(),
+          telefono: telefonoLimpio,
+          matricula: matriculaLimpia // <-- Aquí se aplica la solución
         })
       });
 
@@ -247,9 +252,7 @@ export default function PhysiotherapyPractitionerDashboard() {
             <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
               <Users className="w-4 h-4 mr-2" /> Pacientes
             </TabsTrigger>
-            <TabsTrigger value="histories" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <FileText className="w-4 h-4 mr-2" /> Historiales
-            </TabsTrigger>
+            
             <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
               <FileText className="w-4 h-4 mr-2" /> Notas del Docente
             </TabsTrigger>
