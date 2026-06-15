@@ -1,8 +1,7 @@
 /**
  * ============================================================================
  * ARCHIVO: NutritionRecommendations.tsx
- * PROPÓSITO: Componente para que el nutricionista escriba recomendaciones
- * DISEÑO: Color azul siguiendo el estilo del sistema
+ * PROPÓSITO: Componente para que el profesional escriba recomendaciones y el paciente las lea.
  * ============================================================================
  */
 
@@ -15,7 +14,6 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
-
 
 interface Recommendation {
   id: number;
@@ -32,12 +30,14 @@ interface NutritionRecommendationsProps {
   pacienteId: string | number;
   pacienteNombre: string;
   area?: 'nutricion' | 'fisioterapia';
+  readOnly?: boolean;
 }
 
 export default function NutritionRecommendations({ 
   pacienteId, 
   pacienteNombre,
-  area = 'nutricion' 
+  area = 'nutricion',
+  readOnly = false 
 }: NutritionRecommendationsProps) {
   const { user } = useAuth();
   const [recomendaciones, setRecomendaciones] = useState('');
@@ -45,136 +45,122 @@ export default function NutritionRecommendations({
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Configuración de tema dinámico corregida
   const theme = {
     color: area === 'fisioterapia' ? 'text-blue-900' : 'text-green-800',
     colorAlt: area === 'fisioterapia' ? 'text-blue-600' : 'text-green-600',
     border: area === 'fisioterapia' ? 'border-blue-900/20' : 'border-green-700/20',
     bgLight: area === 'fisioterapia' ? 'bg-blue-50' : 'bg-green-50',
-    bgGradient: area === 'fisioterapia' 
-      ? 'bg-gradient-to-br from-blue-50 to-blue-100' 
-      : 'bg-gradient-to-br from-green-50 to-green-100',
     bgIcon: area === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100',
-    btn: area === 'fisioterapia' 
-      ? 'bg-blue-900 hover:bg-blue-800' 
-      : 'bg-green-700 hover:bg-green-800',
-    badge: area === 'fisioterapia'
-      ? 'bg-blue-900 text-white'
-      : 'bg-green-700 text-white'
+    btn: area === 'fisioterapia' ? 'bg-blue-900 hover:bg-blue-800' : 'bg-green-700 hover:bg-green-800',
   };
 
-  // Cargar historial de recomendaciones
   useEffect(() => {
     fetchRecommendations();
   }, [pacienteId, area]);
 
   const fetchRecommendations = async () => {
-  try {
-    setLoadingHistory(true);
-    const response = await fetch(`http://localhost:3001/api/recomendaciones/paciente/${pacienteId}?area=${area}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'email': user?.email || '' // <--- ESTO ES LO QUE FALTA
+    try {
+      setLoadingHistory(true);
+      const response = await fetch(`http://localhost:3001/api/recomendaciones/paciente/${pacienteId}?area=${area}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'email': user?.email || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setHistorialRecomendaciones(data);
       }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      setHistorialRecomendaciones(data);
+    } catch (error) {
+      console.error('Error al cargar recomendaciones:', error);
+    } finally {
+      setLoadingHistory(false);
     }
-  } catch (error) {
-    console.error('Error al cargar recomendaciones:', error);
-  } finally {
-    setLoadingHistory(false);
-  }
-};
+  };
 
   const handleSave = async () => {
-  if (!recomendaciones.trim()) {
-    toast.error('Por favor escribe una recomendación');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const response = await fetch('http://localhost:3001/api/recomendaciones', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'email': user?.email || '' // Vital para tu middleware
-      },
-      body: JSON.stringify({
-        paciente_id: pacienteId,
-        paciente_nombre: pacienteNombre,
-        contenido: recomendaciones, // Asegúrate de que coincida con el backend
-        creado_por_id: (user as any)?.id,
-        creado_por_nombre: (user as any)?.nombre,
-        area: area
-      })
-    });
-
-    if (response.ok) {
-      toast.success('Guardado correctamente');
-      setRecomendaciones(''); // Limpia el editor
-      fetchRecommendations(); // Recarga el historial
+    if (!recomendaciones.trim()) {
+      toast.error('Por favor escribe una recomendación');
+      return;
     }
-  } catch (error) {
-    toast.error('Error de conexión');
-  } finally {
-    setLoading(false);
-  }
-};
-
-   
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3001/api/recomendaciones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'email': user?.email || ''
+        },
+        body: JSON.stringify({
+          paciente_id: pacienteId,
+          paciente_nombre: pacienteNombre,
+          contenido: recomendaciones,
+          creado_por_id: (user as any)?.id,
+          creado_por_nombre: (user as any)?.nombre,
+          area: area
+        })
+      });
+      if (response.ok) {
+        toast.success('Guardado correctamente');
+        setRecomendaciones('');
+        fetchRecommendations();
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Formulario para nueva recomendación */}
-      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-        <CardHeader className={`${theme.bgLight} border-b p-8`}>
-          <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
-            <MessageSquare className="w-7 h-7" />
-            Nueva Recomendación
-          </CardTitle>
-          <CardDescription className="font-bold italic text-slate-500">
-            Escribe las recomendaciones para {pacienteNombre}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-8">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-black text-slate-700 mb-2 block uppercase tracking-wider">
-                Recomendaciones de {area}
-              </label>
-              <Textarea
-                value={recomendaciones}
-                onChange={(e) => setRecomendaciones(e.target.value)}
-                placeholder={`Escribe aquí las recomendaciones de ${area} para el paciente...`}
-                className="min-h-[200px] rounded-2xl border-2 border-blue-900/10 focus:border-blue-900/30 resize-none text-sm"
-                disabled={loading}
-              />
+      {!readOnly && (
+        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
+          <CardHeader className={`${theme.bgLight} border-b p-8`}>
+            <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
+              <MessageSquare className="w-7 h-7" />
+              Nueva Recomendación
+            </CardTitle>
+            <CardDescription className="font-bold italic text-slate-500">
+              Escribe las recomendaciones para {pacienteNombre}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-black text-slate-700 mb-2 block uppercase tracking-wider">
+                  Recomendaciones de {area}
+                </label>
+                <Textarea
+                  value={recomendaciones}
+                  onChange={(e) => setRecomendaciones(e.target.value)}
+                  placeholder={`Escribe aquí las recomendaciones de ${area} para el paciente...`}
+                  className="min-h-[200px] rounded-2xl border-2 border-blue-900/10 focus:border-blue-900/30 resize-none text-sm"
+                  disabled={loading}
+                />
+              </div>
+              <Button
+                onClick={handleSave}
+                disabled={loading || !recomendaciones.trim()}
+                className={`${theme.btn} text-white font-black px-8 py-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl`}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    Guardar Recomendación
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleSave}
-              disabled={loading || !recomendaciones.trim()}
-              className={`${theme.btn} text-white font-black px-8 py-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" />
-                  Guardar Recomendación
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Historial de recomendaciones */}
       <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
@@ -231,14 +217,13 @@ export default function NutritionRecommendations({
                       </div>
                     </div>
                   </div>
-               
-<div className={`${theme.bgLight} rounded-xl p-4`}>
-  <div 
-    className="text-sm text-slate-700 prose max-w-none" 
-    // Asegúrate de usar "contenido" si así se llama en tu base de datos
-    dangerouslySetInnerHTML={{ __html: rec.contenido || '' }} 
-  />
-</div>
+                  
+                  <div className={`${theme.bgLight} rounded-xl p-4`}>
+                    <div 
+                      className="text-sm text-slate-700 prose max-w-none" 
+                      dangerouslySetInnerHTML={{ __html: rec.contenido || '' }} 
+                    />
+                  </div>
                 </div>
               ))}
             </div>
