@@ -172,6 +172,10 @@ export default function PatientDashboard() {
       return;
     }
 
+    // 1. LIMPIEZA DE DATOS ANTES DE ENVIAR
+    // Quitamos cualquier carácter que no sea un dígito para evitar problemas en la BD
+    const telefonoLimpio = profileData.telefono.replace(/\D/g, '');
+
     try {
       const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
         method: 'PATCH',
@@ -180,9 +184,9 @@ export default function PatientDashboard() {
           'email': user.email
         },
         body: JSON.stringify({
-          nombre: profileData.nombre, // El nombre se manda pero no cambia por la interfaz
-          telefono: profileData.telefono,
-          matricula: profileData.matricula
+          nombre: profileData.nombre || '', 
+          telefono: telefonoLimpio || null, // Enviamos null si está vacío para que COALESCE funcione
+          matricula: profileData.matricula || null
         })
       });
 
