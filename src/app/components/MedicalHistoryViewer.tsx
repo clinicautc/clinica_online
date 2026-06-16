@@ -278,7 +278,20 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                           </div>
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={() => toggleExpand(history.id)} className="font-bold rounded-xl">DETALLES</Button>
-                            <Button size="sm" className={`${history.tipo === 'fisioterapia' ? 'bg-blue-900' : 'bg-green-700'} text-white font-black`} onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)}>VER EXPEDIENTE</Button>
+                            <Button 
+  size="sm" 
+  className={`${history.tipo === 'fisioterapia' ? 'bg-blue-900' : 'bg-green-700'} text-white font-black`} 
+  onClick={() => {
+    // NUEVA VALIDACIÓN: Solo navegar si existe el ID
+    if (history.appointment_id) {
+      navigate(`/forms/${history.tipo}/${history.appointment_id}`);
+    } else {
+      toast.error("No se puede abrir: Este historial no está vinculado a ninguna cita.");
+    }
+  }}
+>
+  VER EXPEDIENTE
+</Button>
                           </div>
                         </div>
                       ))}
@@ -321,7 +334,18 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                   VER FORMULARIO COMPLETO
                                 </Button>
                                 
-                                <Button size="sm" onClick={() => navigate(`/hoja-evolutiva/${history.appointment_id}`)} className={`font-bold text-white shadow-sm transition-colors ${history.tipo === 'fisioterapia' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                               <Button 
+  size="sm" 
+  onClick={() => {
+    
+    if (history.appointment_id) {
+      navigate(`/hoja-evolutiva/${history.appointment_id}`);
+    } else {
+      toast.error("No se pueden ver notas evolutivas: Falta el ID de la cita.");
+    }
+  }} 
+  className={`font-bold text-white shadow-sm transition-colors ${history.tipo === 'fisioterapia' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}
+>
   <FileText className="w-4 h-4 mr-2" />
   Ver Notas Evolutivas
 </Button>

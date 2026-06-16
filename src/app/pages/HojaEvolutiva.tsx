@@ -2,33 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Save, Loader2 } from 'lucide-react'; 
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner'; // 👈 ¡AGREGA ESTA LÍNEA!
 
 type FormDataState = Record<string, string | boolean>;
 
 const HojaEvolutiva: React.FC = () => {
-  // 1. CAMBIO CLAVE: Leer 'appointmentId' en lugar de 'id'
-  const { appointmentId } = useParams(); 
+  // 1. CAMBIO CLAVE: Copiamos la lógica infalible del NutritionMasterForm
+  const params = useParams();
+  const appointmentId = params.id || params.appointmentId; 
+  
   const navigate = useNavigate();
   const { user } = useAuth();
   
   const [formData, setFormData] = useState<FormDataState>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [notaId, setNotaId] = useState<number | null>(null);
 
   useEffect(() => {
-    // 2. Usar appointmentId en la validación
-    if (!appointmentId) {
+    // 2. Usar appointmentId en la validación (¡PROTEGIDO CONTRA TEXTO "null" y "undefined"!)
+    if (!appointmentId || appointmentId === 'null' || appointmentId === 'undefined') {
       console.warn("⚠️ No se detectó el appointmentId en la URL.");
+      toast.error("Este historial no tiene una cita vinculada, no se pueden cargar datos.");
       setIsLoading(false);
       return;
     }
 
-    if (!user) return; 
+    if (!user) return;
 
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // 3. Usar appointmentId en el fetch
         const res = await fetch(`http://localhost:3001/api/notas-evolucion/${appointmentId}`, {
           headers: { 
             'email': user?.email || '', 
@@ -38,8 +42,22 @@ const HojaEvolutiva: React.FC = () => {
         
         if (res.ok) {
           const data = await res.json();
-          if (data && data.cuadro_evolucion && Object.keys(data.cuadro_evolucion).length > 0) {
-            setFormData(data.cuadro_evolucion);
+          
+          if (data && data.id) {
+            setNotaId(data.id); 
+          }
+
+          // 👈 HIDRATACIÓN INTELIGENTE (COMO EN NUTRITION MASTER FORM)
+          // Combinamos los datos previos con el JSON de la BD y rescatamos las columnas principales
+          if (data) {
+             setFormData((prev) => ({
+                ...prev,
+                ...(data.cuadro_evolucion || {}),
+                // Rescatamos los datos del auto-completado de Node.js
+                paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || '',
+                paciente_expediente: data.cuadro_evolucion?.paciente_expediente || data.numero_expediente || ''
+             }));
+             toast.success("Datos de evolución cargados correctamente");
           }
         }
       } catch (error) {
@@ -50,7 +68,7 @@ const HojaEvolutiva: React.FC = () => {
     };
     
     loadData();
-  }, [appointmentId, user]); // 4. Actualizar la dependencia del useEffect
+  }, [appointmentId, user]);
 
   // --- FUNCIÓN PARA SALIR CON CONFIRMACIÓN ---
   const handleVolver = () => {
@@ -65,10 +83,12 @@ const HojaEvolutiva: React.FC = () => {
  const handleSave = async () => {
     setIsSaving(true);
     try {
+      const aId = appointmentId ? parseInt(appointmentId as string, 10) : null;
+
       const payload = {
-        paciente_id: id, 
+        paciente_id: null, 
         practicante_id: user?.id,
-        appointment_id: id, 
+        appointment_id: aId, 
         nombre_completo: formData.paciente_nombre || 'Sin nombre',
         numero_expediente: formData.paciente_expediente || 'S/N',
         edad: null, 
@@ -77,27 +97,36 @@ const HojaEvolutiva: React.FC = () => {
         area: user?.area || 'nutricion'
       };
 
-      const response = await fetch(`http://localhost:3001/api/notas-evolucion`, {
-        method: 'POST', 
+      const url = notaId 
+        ? `http://localhost:3001/api/notas-evolucion/${notaId}` 
+        : `http://localhost:3001/api/notas-evolucion`;          
+      
+      const method = notaId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method, 
         headers: {
-          'email': user?.email || '', // ✅ Header de seguridad añadido
+          'email': user?.email || '', 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
-        alert("¡Hoja Evolutiva guardada correctamente en la tabla notas_evolucion!");
-        navigate(-1); 
+        toast.success(notaId ? "¡Hoja Evolutiva actualizada!" : "¡Hoja Evolutiva creada correctamente!"); 
+        
+        // 👈 REDIRECCIÓN TEMPORIZADA (COMO EN NUTRITION MASTER FORM)
+        setTimeout(() => {
+          navigate(-1); 
+        }, 1000);
+
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Respuesta fallida del servidor");
       }
    } catch (error: any) {
       console.error("Error al guardar:", error);
-      // 👇 Ahora la alerta imprimirá el error real del servidor
-      
-      alert(`Ocurrió un error al guardar: ${error.message}`);
+      toast.error(`Error al guardar: ${error.message}`);
     } finally {
       setIsSaving(false);
     }

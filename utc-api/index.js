@@ -1123,9 +1123,15 @@ app.put('/api/historiales/:id', requireAuth, async (req, res) => {
  */
 app.get('/api/historiales-nutricion/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
   const { appointmentId } = req.params;
+
+  // 1. NUEVA VALIDACIÓN: Bloquear 'undefined' o valores que no sean números
+  if (!appointmentId || appointmentId === 'undefined' || isNaN(parseInt(appointmentId))) {
+    return res.status(400).json({ error: "ID de cita inválido o no proporcionado." });
+  }
+
   try {
     const result = await pool.query(
-      'SELECT * FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', // <-- SELECT *
+      'SELECT * FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', 
       [appointmentId]
     );
     
@@ -1146,13 +1152,20 @@ app.get('/api/historiales-nutricion/detalle/:appointmentId', requireAuth, requir
 /**
  * ENDPOINT: Obtener datos específicos de un historial de FISIOTERAPIA
  */
-app.get('/api/historiales-fisioterapia/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
+app.get('/api/historiales-nutricion/detalle/:appointmentId', requireAuth, requireRole(['practicante', 'admin', 'master']), async (req, res) => {
   const { appointmentId } = req.params;
+
+  // 1. NUEVA VALIDACIÓN: Bloquear 'undefined' o valores que no sean números
+  if (!appointmentId || appointmentId === 'undefined' || isNaN(parseInt(appointmentId))) {
+    return res.status(400).json({ error: "ID de cita inválido o no proporcionado." });
+  }
+
   try {
     const result = await pool.query(
-      'SELECT * FROM historiales_fisioterapia WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', // <-- SELECT *
+      'SELECT * FROM historiales_nutricion WHERE appointment_id = $1 ORDER BY id DESC LIMIT 1', 
       [appointmentId]
     );
+    
     
     if (result.rows.length > 0) {
       let fila = result.rows[0];
@@ -1346,6 +1359,37 @@ app.post('/api/notas-evolucion', requireAuth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+/**
+ * ACTUALIZAR HOJA EVOLUTIVA (PUT)
+ * Evita duplicados actualizando el registro existente
+ */
+app.put('/api/notas-evolucion/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { cuadro_evolucion, fecha_elaboracion } = req.body;
+  
+  try {
+    const result = await pool.query(
+      `UPDATE notas_evolucion 
+       SET cuadro_evolucion = $1, fecha_elaboracion = $2
+       WHERE id = $3 RETURNING *`,
+      [JSON.stringify(cuadro_evolucion || {}), fecha_elaboracion, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No se encontró la nota evolutiva a actualizar." });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("❌ Error BD notas-evolucion (PUT):", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+
 
 /**
  * ----------------------------------------------------------------------------
