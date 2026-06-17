@@ -1506,25 +1506,6 @@ app.get('/', (req, res) => {
 // RUTA TEMPORAL DE PRUEBA DEL EMAIL SERVICE
 // =====================================================
 
-app.get('/api/test-email-service', async (req, res) => {
-
-  await enviarCorreo(
-    'prueba@edu.utc.mx',
-    'Prueba',
-    '<h1>Prueba</h1>'
-  );
-
-  await enviarCorreo(
-    'usuario@gmail.com',
-    'Prueba',
-    '<h1>Prueba</h1>'
-  );
-
-  res.json({
-    success: true
-  });
-
-});
 
 app.listen(PORT, () => {
   console.log(` API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO ${PORT}`);
