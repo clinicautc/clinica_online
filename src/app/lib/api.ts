@@ -224,25 +224,74 @@ export const authAPI = {
 
   async validateSession(email: string) {
 
-    const response = await fetch(
-      `${API_BASE_URL}/auth/validate-session`,
-      {
-        method: 'GET',
-        headers: {
-          email
-        }
+  const response = await fetch(
+    `${API_BASE_URL}/auth/validate-session`,
+    {
+      method: 'GET',
+      headers: {
+        email
       }
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      result.error || 'Sesión inválida'
     );
+  }
 
-    const result = await response.json();
+  return result;
 
-    if (!response.ok) {
-      throw new Error(
-        result.error || 'Sesión inválida'
-      );
+},
+
+// =========================================================
+// REENVIAR CÓDIGO
+// =========================================================
+
+async resendCode(data: {
+
+  email: string;
+
+  tipo: string;
+
+}){
+
+  const response = await fetch(
+
+    `${API_BASE_URL}/auth/resend-code`,
+
+    {
+
+      method: 'POST',
+
+      headers: {
+
+        'Content-Type': 'application/json'
+
+      },
+
+      body: JSON.stringify(data)
+
     }
 
-    return result;
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+
+    throw new Error(
+
+      result.error || 'Error reenviando código'
+
+    );
+
   }
+
+  return result;
+
+},
 
 };

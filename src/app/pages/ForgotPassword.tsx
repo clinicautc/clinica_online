@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Check,Mail,Lock,KeyRound,Eye,EyeOff} from 'lucide-react';
+import { Check,Mail,Lock,KeyRound,Eye,EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 
 import { Input } from '../components/ui/input';
@@ -20,6 +21,7 @@ export default function ForgotPassword() {
   const [showPassword, setShowPassword] = useState(false);const [ showConfirmPassword,setShowConfirmPassword] = useState(false);
 
   const [emailError, setEmailError] = useState('');
+  const [isSendingCode, setIsSendingCode] = useState(false);
   const [codeError, setCodeError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
@@ -52,7 +54,26 @@ const passwordsMatch =
   };
 
   const handleBackToLogin = () => navigate('/');
+  const handleResendCode = async () => {
 
+    try {
+
+      setCodeError('');
+
+      await authAPI.resendCode({
+        email,
+        tipo: 'password'
+      });
+
+      toast.success('Código reenviado correctamente.');
+
+    } catch (err: any) {
+
+      setCodeError('Error al reenviar el código');
+
+    }
+
+  };
   // ===============================
   // SUCCESS
   // ===============================
@@ -204,14 +225,25 @@ const passwordsMatch =
                 setEmailError(err);
                 if (err) return;
 
-                try {
-          await authAPI.forgotPassword(email);
+              try {
 
-          setCurrentStep('code');
+                setIsSendingCode(true);
 
-                } catch {
-                  setEmailError('Error de conexión');
-                }
+                await authAPI.forgotPassword(email);
+
+                toast.success('Código enviado a tu Correo.');
+
+                setCurrentStep('code');
+
+              } catch (err: any) {
+
+                setEmailError(err.message || 'Error de conexión');
+
+              } finally {
+
+                setIsSendingCode(false);
+
+              }
               }}
               className="space-y-4"
             >
@@ -232,8 +264,8 @@ const passwordsMatch =
 
               {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
 
-              <Button type="submit" className="w-full cursor-pointer bg-blue-900 hover:bg-blue-800">
-                Enviar código
+              <Button type="submit"disabled={isSendingCode}className={`w-full cursor-pointer bg-blue-900 hover:bg-blue-800 ${isSendingCode ? 'opacity-60 cursor-not-allowed' : ''}`}> 
+                {isSendingCode ? 'Enviando...' : 'Enviar código'}
               </Button>
             </form>
           )}
@@ -294,6 +326,28 @@ setCurrentStep('password');
               >
                 Verificar
               </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  className="
+                    text-xs
+                    font-black
+                    text-slate-500
+                    hover:text-blue-900
+                    tracking-wide
+                    cursor-pointer
+                    transition-colors
+                    duration-200
+                  "
+                >
+
+                  ¿No recibiste el código?
+                  <br />
+                  Reenviar código
+
+                </button>
+              </div>
             </form>
           )}
 

@@ -10,11 +10,15 @@
 
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const pool = require('./db');
 require('dotenv').config();
 const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const authRoutes = require('./routes/authRoutes');
+
+const {enviarCorreo,reenviarCorreo} = require('./services/emailService'); // Importamos el servicio centralizado de correo
+const {crearHtmlCodigoVerificacion,crearHtmlRecuperacionPassword} = require('./services/emailTemplates'); // Importamos el servicio centralizado para generar el HTML del correo de verificación
 
 const {requireAuth,requireRole,requireSameArea,canModifyAppointment} = require('./middleware/authMiddleware');
 
@@ -26,16 +30,6 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
-
-// --- CONFIGURACIÓN DE POSTGRESQL (RENDER) ---
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false } 
-});
 
 // --- RUTA DE SALUD (ACTUALIZADA PARA MONITOREO) ---
 app.get('/api/health', async (req, res) => {
@@ -93,170 +87,19 @@ if (existingUser.rows.length > 0) {
       [name, email.trim().toLowerCase(), hashedPassword, codigo]
     );
 
-    // PASO 2: Envío por Resend con manejo de errores específico
-    const { data, error } = await resend.emails.send({
-      from: 'Clinica UTC <notificaciones@clinicautc.com>',
-      to: [email.trim().toLowerCase()],
-      subject: 'Código de Verificación - Clínica UTC',
-html: `
-<div style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,sans-serif;">
+// PASO 2: Envío por Resend con manejo de errores específico
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 10px;background:#ffffff;">
-    <tr>
-      <td align="center">
+await enviarCorreo(
 
-        <table width="100%" cellpadding="0" cellspacing="0" style="
-          max-width:600px;
-          background:#ffffff;
-          border-radius:18px;
-          overflow:hidden;
-          box-shadow:0 2px 10px rgba(0,0,0,0.05);
-          border:1px solid #e5e7eb;
-        ">
+  email.trim().toLowerCase(),
 
-          <!-- HEADER -->
-          <tr>
-            <td align="center" style="
-              background:linear-gradient(135deg,#dbeafe,#eff6ff);
-              padding:35px 20px;
-            ">
+  'Código de Verificación - Clínica UTC',
 
-              <h1 style="
-                margin:0;
-                font-size:34px;
-                font-weight:900;
-                color:#1e3a8a;
-              ">
-                Clínica UTC
-              </h1>
-
-              <p style="
-                margin-top:10px;
-                font-size:14px;
-                color:#475569;
-              ">
-                Sistema Clínico Universitario
-              </p>
-
-            </td>
-          </tr>
-
-          <!-- BODY -->
-          <tr>
-            <td style="padding:35px 25px;">
-
-              <h2 style="
-                margin-top:0;
-                color:#111827;
-                font-size:28px;
-                line-height:1.3;
-              ">
-                Hola, ${name} 👋
-              </h2>
-
-              <p style="
-                color:#4b5563;
-                font-size:16px;
-                line-height:1.8;
-                margin-bottom:30px;
-              ">
-                Recibimos una solicitud para crear una cuenta dentro del sistema clínico de la Universidad Tres Culturas (UTC).
-              </p>
-
-              <!-- CAJA CODIGO -->
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-
-                    <div style="
-                      background:#eff6ff;
-                      border:2px solid #2563eb;
-                      border-radius:18px;
-                      padding:30px 15px;
-                    ">
-
-                      <p style="
-                        margin:0;
-                        color:#64748b;
-                        font-size:14px;
-                      ">
-                        Tu código de verificación es:
-                      </p>
-
-                      <div style="
-                        margin-top:15px;
-                        font-size:48px;
-                        font-weight:900;
-                        letter-spacing:10px;
-                        color:#1e3a8a;
-                        line-height:1.1;
-                        word-break:break-word;
-                      ">
-                        ${codigo}
-                      </div>
-
-                    </div>
-
-                  </td>
-                </tr>
-              </table>
-
-              <p style="
-                color:#6b7280;
-                font-size:14px;
-                line-height:1.7;
-                margin-top:30px;
-              ">
-                Este código expirará en 15 minutos por motivos de seguridad.
-              </p>
-
-              <p style="
-                color:#6b7280;
-                font-size:14px;
-                line-height:1.7;
-              ">
-                Si tú no realizaste esta solicitud, puedes ignorar este correo.
-              </p>
-
-            </td>
-          </tr>
-
-          <!-- FOOTER -->
-          <tr>
-            <td align="center" style="
-              background:#ffffff;
-              border-top:1px solid #e5e7eb;
-              padding:20px;
-            ">
-
-              <p style="
-                margin:0;
-                color:#94a3b8;
-                font-size:12px;
-              ">
-                Clínica UTC · Sistema Institucional
-              </p>
-
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</div>
-`
-    });
-
-    // Si Resend falla por el tema del correo no autorizado
-    if (error) {
-      console.error("⚠️ Resend bloqueó el envío:", error.message);
-      return res.status(403).json({ 
-        error: "Restricción de Resend: Solo puedes enviar códigos al correo registrado en la API Key mientras estés en modo prueba." 
-      });
-    }
+  crearHtmlCodigoVerificacion(
+  name,
+  codigo
+     )
+  );
 
     res.status(200).json({ message: "Código enviado con éxito." });
   } catch (error) {
@@ -399,102 +242,23 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       ]
     );
 
-    // 4. Enviar correo
-    const { error } = await resend.emails.send({
+// 4. Enviar correo
 
-      from: 'Clinica UTC <noreply@clinicautc.com>',
+await enviarCorreo(
 
-      to: [email.trim().toLowerCase()],
+  email.trim().toLowerCase(),
 
-      subject: 'Recuperación de contraseña - Clínica UTC',
+  'Recuperación de contraseña - Clínica UTC',
 
-      html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 600px;
-          margin: auto;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 18px;
-          overflow: hidden;
-        ">
+  crearHtmlRecuperacionPassword(
 
-          <div style="
-            background: linear-gradient(135deg, #1e3a8a, #2563eb);
-            padding: 30px;
-            text-align: center;
-          ">
-            <h1 style="
-              color: white;
-              margin: 0;
-              font-size: 28px;
-              font-weight: bold;
-            ">
-              Clínica UTC
-            </h1>
-          </div>
+    userResult.rows[0].nombre,
 
-          <div style="padding: 40px 30px;">
+    codigo
 
-            <h2 style="
-              color: #1e3a8a;
-              margin-top: 0;
-            ">
-              Recuperación de contraseña
-            </h2>
+  )
 
-            <p style="
-              color: #374151;
-              font-size: 16px;
-              line-height: 1.6;
-            ">
-              Recibimos una solicitud para restablecer tu contraseña.
-            </p>
-
-            <div style="
-              background: #eff6ff;
-              border: 2px solid #2563eb;
-              border-radius: 16px;
-              padding: 25px;
-              text-align: center;
-              margin: 30px 0;
-            ">
-              <p style="
-                margin: 0 0 10px 0;
-                color: #1e3a8a;
-                font-weight: bold;
-              ">
-                Tu código de recuperación es:
-              </p>
-
-              <div style="
-                font-size: 42px;
-                font-weight: bold;
-                letter-spacing: 8px;
-                color: #ea580c;
-              ">
-                ${codigo}
-              </div>
-            </div>
-
-            <p style="
-              color: #6b7280;
-              font-size: 14px;
-              line-height: 1.5;
-            ">
-              Este código expirará en 15 minutos.
-            </p>
-
-          </div>
-        </div>
-      `
-    });
-
-    if (error) {
-      return res.status(500).json({
-        error: 'Error enviando correo.'
-      });
-    }
+);
 
     res.status(200).json({
       message: 'Código enviado correctamente.'
@@ -513,6 +277,188 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
+/**
+ * ----------------------------------------------------------------------------
+ * REENVIAR CÓDIGO DE REGISTRO
+ * ----------------------------------------------------------------------------
+ */
+
+app.post('/api/auth/resend-code', async (req, res) => {
+
+  const { email, tipo } = req.body;
+
+  try {
+
+    // =====================================================
+    // BUSCAR REGISTRO TEMPORAL
+    // =====================================================
+
+    let temporal;
+
+    if (tipo === 'registro') {
+
+      temporal = await pool.query(
+        `
+        SELECT *
+        FROM registro_temporal
+        WHERE email = $1
+        `,
+        [email.trim().toLowerCase()]
+      );
+
+    }
+
+    else if (tipo === 'password') {
+
+      temporal = await pool.query(
+        `
+        SELECT *
+        FROM password_resets
+        WHERE email = $1
+        `,
+        [email.trim().toLowerCase()]
+      );
+
+    }
+
+    if (temporal.rows.length === 0) {
+
+      return res.status(404).json({
+        error:
+          tipo === 'registro'
+            ? 'No existe una solicitud de registro pendiente.'
+            : 'No existe una solicitud de recuperación pendiente.'
+      });
+
+    }
+
+    // =====================================================
+    // GENERAR NUEVO CÓDIGO
+    // =====================================================
+
+    const codigo = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    // =====================================================
+    // ACTUALIZAR CÓDIGO Y EXPIRACIÓN
+    // =====================================================
+
+    if (tipo === 'registro') {
+
+      await pool.query(
+        `
+        UPDATE registro_temporal
+        SET
+          codigo_verificacion = $1,
+          expira_en = NOW() + interval '15 minutes'
+        WHERE email = $2
+        `,
+        [
+          codigo,
+          email.trim().toLowerCase()
+        ]
+      );
+
+    }
+
+    else if (tipo === 'password') {
+
+      await pool.query(
+        `
+        UPDATE password_resets
+        SET
+          codigo_verificacion = $1,
+          expira_en = NOW() + interval '15 minutes'
+        WHERE email = $2
+        `,
+        [
+          codigo,
+          email.trim().toLowerCase()
+        ]
+      );
+
+    }
+
+    // =====================================================
+    // OBTENER NOMBRE
+    // =====================================================
+
+    let nombre = 'Usuario';
+
+    if (tipo === 'registro') {
+
+      nombre = temporal.rows[0].nombre;
+
+    }
+
+    else if (tipo === 'password') {
+
+      const usuario = await pool.query(
+        `
+        SELECT nombre
+        FROM usuarios
+        WHERE email = $1
+        `,
+        [email.trim().toLowerCase()]
+      );
+
+      if (usuario.rows.length > 0) {
+
+        nombre = usuario.rows[0].nombre;
+
+      }
+
+    }
+
+    // =====================================================
+    // ENVIAR CORREO
+    // =====================================================
+
+      await reenviarCorreo(
+
+        email.trim().toLowerCase(),
+
+        tipo === 'registro'
+          ? 'Código de Verificación - Clínica UTC'
+          : 'Recuperación de contraseña - Clínica UTC',
+
+        tipo === 'registro'
+
+          ? crearHtmlCodigoVerificacion(
+              nombre,
+              codigo
+            )
+
+          : crearHtmlRecuperacionPassword(
+              nombre,
+              codigo
+            )
+
+      );
+
+    res.status(200).json({
+
+      message: 'Código reenviado correctamente.'
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error resend-code:',
+      error.message
+    );
+
+    res.status(500).json({
+
+      error: 'Error interno del servidor.'
+
+    });
+
+  }
+
+});
 /**
  * ----------------------------------------------------------------------------
  * VERIFY RESET CODE
@@ -834,6 +780,69 @@ app.post('/api/practicantes', async (req, res) => {
   const passwordHash = await bcrypt.hash(passwordTemporal, 10);
 
   try {
+  
+// =====================================================
+// DETECTAR DOMINIO DEL CORREO
+// =====================================================
+
+const dominio = email
+  .trim()
+  .toLowerCase()
+  .split('@')[1];
+
+// =====================================================
+// DOMINIOS PÚBLICOS CONOCIDOS
+// =====================================================
+
+const dominiosPublicos = [
+  'gmail.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'yahoo.com',
+  'icloud.com',
+  'proton.me',
+  'protonmail.com'
+];
+
+// =====================================================
+// SI NO ES UN DOMINIO PÚBLICO
+// =====================================================
+
+if (!dominiosPublicos.includes(dominio)) {
+
+  // =====================================================
+// VERIFICAR SI EL DOMINIO YA EXISTE
+// =====================================================
+
+const dominioExistente = await pool.query(
+  `
+  SELECT *
+  FROM correos_especiales
+  WHERE dominio = $1
+  `,
+  [dominio]
+);
+
+// =====================================================
+// SI EL DOMINIO NO EXISTE, REGISTRARLO
+// =====================================================
+
+if (dominioExistente.rows.length === 0) {
+
+  await pool.query(
+    `
+    INSERT INTO correos_especiales
+    (dominio, proveedor, origen)
+    VALUES ($1, $2, $3)
+    `,
+    [dominio, 'nodemailer', 'alta_practicante']
+  );
+
+}
+
+}
+
   const result = await pool.query(
   `INSERT INTO usuarios
   (nombre, email, password, rol, area, matricula, status, primer_inicio)
@@ -892,7 +901,6 @@ app.get('/api/citas', async (req, res) => {
   }
 });
 
-// Reemplaza este endpoint en tu index.js
 /**
  * OBTENER CITAS POR PACIENTE
  * Se eliminó el filtro de CURRENT_DATE para que el paciente 
@@ -1492,6 +1500,30 @@ app.get('/api/stats/dashboard',requireAuth,requireRole(['admin','master']),async
 
 app.get('/', (req, res) => {
   res.send(' Servidor UTC Activo - API funcionando correctamente.');
+});
+
+// =====================================================
+// RUTA TEMPORAL DE PRUEBA DEL EMAIL SERVICE
+// =====================================================
+
+app.get('/api/test-email-service', async (req, res) => {
+
+  await enviarCorreo(
+    'prueba@edu.utc.mx',
+    'Prueba',
+    '<h1>Prueba</h1>'
+  );
+
+  await enviarCorreo(
+    'usuario@gmail.com',
+    'Prueba',
+    '<h1>Prueba</h1>'
+  );
+
+  res.json({
+    success: true
+  });
+
 });
 
 app.listen(PORT, () => {
