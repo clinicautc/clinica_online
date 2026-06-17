@@ -32,6 +32,7 @@ export default function Register() {
   // ESTADOS DE FLUJO DE VERIFICACIÓN
   const [error, setError] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isResendingCode, setIsResendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -59,7 +60,7 @@ await authAPI.sendRegisterCode({
 
       
 
-      toast.success('Datos retenidos. Código enviado a tu Gmail.');
+      toast.success(' Código enviado a tu Correo.');
       setCodeSent(true);
 
     } catch (err: any) {
@@ -68,6 +69,37 @@ await authAPI.sendRegisterCode({
       setIsSendingCode(false);
     }
 };
+
+const handleResendCode = async () => {
+
+  try {
+
+    setIsResendingCode(true);
+
+await authAPI.resendCode({
+
+  email,
+
+  tipo: 'registro'
+
+});
+
+    toast.success(
+      'Código reenviado correctamente.'
+    );
+
+  } catch (err: any) {
+
+    setError(err.message);
+
+  } finally {
+
+    setIsResendingCode(false);
+
+  }
+
+};
+
   // --- 2. LÓGICA DE REGISTRO FINAL ---
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -347,15 +379,19 @@ await authAPI.verifyRegister({
                 )}
               </Button>
             ) : (
-              <div className="text-center">
-                <button 
-                  type="button" 
-                  onClick={() => setCodeSent(false)} 
-                  className="text-xs font-black text-slate-500 hover:text-blue-900 tracking-wide cursor-pointer transition-colors duration-200"
-                >
-                  ¿No recibiste el codigo?   <br /> 
-                   intenta con otro correo
+                <div className="text-center space-y-2">
+
+                <button type="button" onClick={handleResendCode} disabled={isResendingCode} className="text-xs font-black text-orange-600 hover:text-orange-700 tracking-wide cursor-pointer transition-colorsduration-200">
+                 ¿No recibiste el código?
+                 <br/>
+                  Reenviar código
                 </button>
+                <div>
+               <button type="button" onClick={() => setCodeSent(false)} className="text-xs font-black text-slate-500 hover:text-blue-900 tracking-wide cursor-pointer transition-colors duration-200">
+                 Cambiar correo
+                </button>
+                </div>
+
               </div>
             )}
 
