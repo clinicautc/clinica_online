@@ -59,8 +59,7 @@
     <img 
       src="/logo.png" 
       alt="Logo UTC"
-      className="w-10 h-10 object-contain"
-    />
+      className="w-10 h-10 object-contain"/>
   </div>
             <CardTitle className="text-2xl font-bold text-blue-900">
               Clínica Universitaria
@@ -96,7 +95,7 @@
                   placeholder="tu@email.com"
                   required
                   className="pl-10 border-blue-900/20 focus:border-blue-900 focus:ring-blue-900" // className="pl-10  mueve el texto para que no choque con el icono
-                />
+ />
                 </div>
               </div>
               
@@ -113,13 +112,11 @@
                   onChange={(e) => setPassword(e.target.value)} // Actualiza el estado al escribir
                   placeholder="Tu contraseña"
                   required
-                  className="pl-10 border-blue-900/20 focus:border-blue-900 focus:ring-blue-900"
-                />
+                  className="pl-10 border-blue-900/20 focus:border-blue-900 focus:ring-blue-900" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 transition-opacity"
-                  >
+                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 transition-opacity">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
 
@@ -127,8 +124,7 @@
               </div>
               <div className="text-right">
                 <Link to="/forgot-password"
-                className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity"
-                  >
+                className="text-sm text-blue-900 underline cursor-pointer hover:opacity-80 transition-opacity font-bold">
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
@@ -136,22 +132,20 @@
               {/* Botón de acceso con el color azul institucional */}
               <Button 
                 type="submit" 
-                className="w-full transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-              >
+                className="w-full transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                 Iniciar Sesión
               </Button>
 
               {/* SECCIÓN DE REGISTRO: Para usuarios nuevos */}
               <div className="text-center pt-4 border-t border-blue-900/10">
-                <p className="text-sm text-blue-900/70 mb-2">
+                <p className="text-sm text-blue-900/70 mb-2 font-bold">
                   ¿No estás registrado?
                 </p>
                 <Link to="/register">
                   <Button 
                     type="button" 
                     variant="outline"
-                    className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 hover:text-orange-700 transition-all duration-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                  >
+                    className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 hover:text-orange-700 transition-all duration-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                     Regístrate aquí
                   </Button>
                 </Link>
@@ -159,12 +153,8 @@
 
               {/* AYUDA DE DESARROLLO: Lista de credenciales para pruebas rápidas */}
               <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-900/70 mb-2 font-semibold">Usuarios de prueba:</p>
+                <p className="text-[14px] text-blue-900/70 mb-2 font-bold">    versión 1.2.1   </p>
                 <div className="text-xs text-blue-900/60 space-y-1">
-                  <p><strong>Admin Nutrición:</strong> docente.nutricion@utc.edu.mx / admin123</p>
-                  <p><strong>Admin Fisioterapia:</strong> docente.fisioterapia@utc.edu.mx / admin123</p>
-                  <p><strong>Practicante:</strong> practicante1@utc.edu.mx / prac123</p>
-                  <p><strong>Paciente:</strong> paciente1@gmail.com / pac123</p>
                 </div>
               </div>
             </form>
