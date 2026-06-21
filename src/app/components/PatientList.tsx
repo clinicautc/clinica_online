@@ -16,7 +16,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { endpoints } from '../lib/api';
+import { usuariosAPI } from '../lib/api';
 
 // Tipado sincronizado con PostgreSQL
 interface Patient {
@@ -43,14 +43,10 @@ export default function PatientList() {
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const response = await fetch(endpoints.usuarios);
-
-      if (response.ok) {
-        const allUsers: Patient[] = await response.json();
-        // Filtramos estrictamente a los pacientes
-        const patientUsers = allUsers.filter(user => user.rol === 'paciente');
-        setPatients(patientUsers);
-      }
+      const allUsers: Patient[] = await usuariosAPI.getAll();
+      // Filtramos estrictamente a los pacientes
+      const patientUsers = allUsers.filter(user => user.rol === 'paciente');
+      setPatients(patientUsers);
     } catch (error) {
       toast.error("Error al sincronizar lista de pacientes");
     } finally {
@@ -65,16 +61,11 @@ export default function PatientList() {
     if (!window.confirm('¿Deseas eliminar permanentemente este expediente? Esta acción no se puede deshacer.')) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, { 
-        method: 'DELETE' 
-      });
-      
-      if (response.ok) { 
-        toast.success('Expediente eliminado correctamente'); 
-        fetchPatients(); 
-      }
-    } catch (error) { 
-      toast.error('Error al intentar eliminar el registro'); 
+      await usuariosAPI.remove(id);
+      toast.success('Expediente eliminado correctamente');
+      fetchPatients();
+    } catch (error) {
+      toast.error('Error al intentar eliminar el registro');
     }
   };
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Save, Loader2 } from 'lucide-react'; 
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner'; // 👈 ¡AGREGA ESTA LÍNEA!
+import { notasAPI } from '../lib/api';
 
 type FormDataState = Record<string, string | boolean>;
 
@@ -33,32 +34,23 @@ const HojaEvolutiva: React.FC = () => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`http://localhost:3001/api/notas-evolucion/${appointmentId}`, {
-          headers: { 
-            'email': user?.email || '', 
-            'Content-Type': 'application/json' 
-          }
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          
-          if (data && data.id) {
-            setNotaId(data.id); 
-          }
+        const data = await notasAPI.getEvolucion(appointmentId as string);
 
-          // 👈 HIDRATACIÓN INTELIGENTE (COMO EN NUTRITION MASTER FORM)
-          // Combinamos los datos previos con el JSON de la BD y rescatamos las columnas principales
-          if (data) {
-             setFormData((prev) => ({
-                ...prev,
-                ...(data.cuadro_evolucion || {}),
-                // Rescatamos los datos del auto-completado de Node.js
-                paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || '',
-                paciente_expediente: data.cuadro_evolucion?.paciente_expediente || data.numero_expediente || ''
-             }));
-             toast.success("Datos de evolución cargados correctamente");
-          }
+        if (data && data.id) {
+          setNotaId(data.id);
+        }
+
+        // 👈 HIDRATACIÓN INTELIGENTE (COMO EN NUTRITION MASTER FORM)
+        // Combinamos los datos previos con el JSON de la BD y rescatamos las columnas principales
+        if (data) {
+           setFormData((prev) => ({
+              ...prev,
+              ...(data.cuadro_evolucion || {}),
+              // Rescatamos los datos del auto-completado de Node.js
+              paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || '',
+              paciente_expediente: data.cuadro_evolucion?.paciente_expediente || data.numero_expediente || ''
+           }));
+           toast.success("Datos de evolución cargados correctamente");
         }
       } catch (error) {
         console.error("Error al cargar:", error);
@@ -97,33 +89,19 @@ const HojaEvolutiva: React.FC = () => {
         area: user?.area || 'nutricion'
       };
 
-      const url = notaId 
-        ? `http://localhost:3001/api/notas-evolucion/${notaId}` 
-        : `http://localhost:3001/api/notas-evolucion`;          
-      
-      const method = notaId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method, 
-        headers: {
-          'email': user?.email || '', 
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        toast.success(notaId ? "¡Hoja Evolutiva actualizada!" : "¡Hoja Evolutiva creada correctamente!"); 
-        
-        // 👈 REDIRECCIÓN TEMPORIZADA (COMO EN NUTRITION MASTER FORM)
-        setTimeout(() => {
-          navigate(-1); 
-        }, 1000);
-
+      if (notaId) {
+        await notasAPI.updateEvolucion(notaId, payload);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Respuesta fallida del servidor");
+        await notasAPI.createEvolucion(payload);
       }
+
+      toast.success(notaId ? "¡Hoja Evolutiva actualizada!" : "¡Hoja Evolutiva creada correctamente!");
+
+      // 👈 REDIRECCIÓN TEMPORIZADA (COMO EN NUTRITION MASTER FORM)
+      setTimeout(() => {
+        navigate(-1);
+      }, 1000);
+
    } catch (error: any) {
       console.error("Error al guardar:", error);
       toast.error(`Error al guardar: ${error.message}`);

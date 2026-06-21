@@ -6,8 +6,9 @@
    */
   import React, { useState, useEffect } from 'react';
   import { useNavigate, useParams } from 'react-router'; 
-  import { useAuth } from '../contexts/AuthContext'; 
+  import { useAuth } from '../contexts/AuthContext';
   import { toast } from 'sonner';
+  import { apiFetch, historialesAPI } from '../lib/api';
   // IMPORTACIÓN DE LA IMAGEN
   import bristolImg from './bristol.jpg';
 
@@ -49,14 +50,8 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     if (!appointmentId) return; 
 
     try {
-      const response = await fetch(`http://localhost:3001/api/historiales-nutricion/detalle/${appointmentId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'email': user?.email || '' // <--- SE AGREGÓ EL HEADER PARA AUTORIZACIÓN
-        }
-      });
-      
+      const response = await apiFetch(`/historiales-nutricion/detalle/${appointmentId}`);
+
      if (response.ok) {
         const filaCompleta = await response.json();
         console.log("¡FILA COMPLETA RECUPERADA!", filaCompleta);
@@ -1819,37 +1814,19 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
     // LÓGICA DE ACTUALIZACIÓN:
     // Si ya tienes un historialId guardado en el estado del componente, usamos PUT (Actualizar)
     // Si no tienes ID (es un formulario nuevo), usamos POST (Crear nuevo)
-  const url = historialId 
-        ? `http://localhost:3001/api/historiales/${historialId}` 
-        : 'http://localhost:3001/api/historiales';
-      
-      const method = historialId ? 'PUT' : 'POST';
+    // 'tipo' necesario para el backend
+    await historialesAPI.guardar(historialId, { ...payload, tipo: 'nutricion' });
 
-    const response = await fetch(url, {
-      method: method,
-      headers: { 
-        'Content-Type': 'application/json',
-        'email': user?.email || ''
-      },
-      body: JSON.stringify({ ...payload, tipo: 'nutricion' }) // 'tipo' necesario para el backend
-    });
+    toast.success("Expediente guardado/actualizado correctamente");
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Detalle del error:", errorData);
-      toast.error("Error al guardar en la base de datos.");
-    } else {
-      toast.success("Expediente guardado/actualizado correctamente");
-      
-     // REDIRECCIÓN INTELIGENTE:
-      setTimeout(() => {
-        // AGREGA EL { replace: true } AQUÍ
-        navigate(`/historial/${pId}/nutricion`, { replace: true });
-      }, 1000);
-    }
+    // REDIRECCIÓN INTELIGENTE:
+    setTimeout(() => {
+      // AGREGA EL { replace: true } AQUÍ
+      navigate(`/historial/${pId}/nutricion`, { replace: true });
+    }, 1000);
   } catch (error) {
     console.error("Error crítico:", error);
-    toast.error("Error de conexión.");
+    toast.error("Error al guardar en la base de datos.");
   } finally {
     setIsSaving(false);
   }

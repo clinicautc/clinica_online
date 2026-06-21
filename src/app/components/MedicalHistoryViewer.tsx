@@ -21,6 +21,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 import NutritionRecommendations from './NutritionRecommendations';
 
 interface MedicalHistory {
@@ -95,16 +96,15 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
       
         // PASO 1: Traer el nombre real del usuario por su ID de Postgres
         // Esto garantiza que el encabezado no diga "Cargando" o "Sin Nombre"
-        const userRes = await fetch(`http://localhost:3001/api/usuarios/${id}`);
+        const userRes = await apiFetch(`/usuarios/${id}`);
         if (userRes.ok) {
           const userData = await userRes.json();
-          setPatientName(userData.nombre); 
+          setPatientName(userData.nombre);
         }
 
         // PASO 2: Traer los historiales clínicos según el área seleccionada
-        const endpoint = `http://localhost:3001/api/historiales-${selectedArea}/paciente/${id}`;
-        const response = await fetch(endpoint);
-        
+        const response = await apiFetch(`/historiales-${selectedArea}/paciente/${id}`);
+
         if (response.ok) {
           const data: MedicalHistory[] = await response.json();
           setHistories(data);

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { citasAPI, historialesAPI, usuariosAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -79,36 +80,29 @@ export default function NutritionPractitionerDashboard() {
       try {
         setIsLoadingCitas(true);
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const response = await fetch(`http://localhost:3001/api/citas`);
-        
-        if (response.ok) {
-          const allAppointments: Appointment[] = await response.json();
-          const filtered = allAppointments.filter((apt) => {
-            const cleanAptDate = apt.fecha.split('T')[0];
-            return (
-              cleanAptDate === todayStr && 
-              apt.tipo === 'nutricion' && 
-              apt.estado === 'programada'
-            );
-          });
+        const allAppointments: Appointment[] = await citasAPI.getAll();
+        const filtered = allAppointments.filter((apt) => {
+          const cleanAptDate = apt.fecha.split('T')[0];
+          return (
+            cleanAptDate === todayStr &&
+            apt.tipo === 'nutricion' &&
+            apt.estado === 'programada'
+          );
+        });
 
-          setTodayAppointments(filtered);
+        setTodayAppointments(filtered);
 
-          // VERIFICACIÓN DE RECURRENCIA
-          const recurrenceData: Record<number, boolean> = {};
-          await Promise.all(filtered.map(async (apt) => {
-            if (apt.paciente_id) {
-              try {
-                const res = await fetch(`http://localhost:3001/api/historiales/verificar/${apt.paciente_id}/nutricion`);
-                if (res.ok) {
-                  const data = await res.json();
-                  recurrenceData[apt.paciente_id] = data.existe;
-                }
-              } catch (err) { console.error("Error verificando recurrencia:", err); }
-            }
-          }));
-          setRecurrenceMap(recurrenceData);
-        }
+        // VERIFICACIÓN DE RECURRENCIA
+        const recurrenceData: Record<number, boolean> = {};
+        await Promise.all(filtered.map(async (apt) => {
+          if (apt.paciente_id) {
+            try {
+              const data = await historialesAPI.verificarRecurrencia(apt.paciente_id, 'nutricion');
+              recurrenceData[apt.paciente_id] = data.existe;
+            } catch (err) { console.error("Error verificando recurrencia:", err); }
+          }
+        }));
+        setRecurrenceMap(recurrenceData);
       } catch (error) {
         console.error("❌ Error de conexión Practicante Nutrición:", error);
         toast.error("Error al sincronizar la agenda del día");
@@ -146,29 +140,17 @@ export default function NutritionPractitionerDashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user.email
-        },
-        body: JSON.stringify({
-          nombre: profileData.nombre,
-          telefono: profileData.telefono,
-          matricula: profileData.matricula // <-- Modificación de Matrícula Integrada
-        })
+      await usuariosAPI.updateProfile(user.id, {
+        nombre: profileData.nombre,
+        telefono: profileData.telefono,
+        matricula: profileData.matricula // <-- Modificación de Matrícula Integrada
       });
 
-      if (response.ok) {
-        setIsEditingProfile(false);
-        toast.success("Tu perfil se actualizó correctamente en el sistema.");
-      } else {
-        const data = await response.json();
-        toast.error(data.error || "El servidor no pudo procesar la actualización.");
-      }
-    } catch (error) {
+      setIsEditingProfile(false);
+      toast.success("Tu perfil se actualizó correctamente en el sistema.");
+    } catch (error: any) {
       console.error("Error actualizando perfil:", error);
-      toast.error("Error de conexión con la base de datos.");
+      toast.error(error.message || "Error de conexión con la base de datos.");
     }
   };
 

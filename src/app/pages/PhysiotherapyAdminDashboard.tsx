@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -98,19 +99,16 @@ export default function PhysiotherapyAdminDashboard() {
       try {
         setIsLoadingCitas(true);
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const response = await fetch(`http://localhost:3001/api/citas`);
-        if (response.ok) {
-          const allAppointments: Appointment[] = await response.json();
-          const filtered = allAppointments.filter((apt) => {
-            const cleanAptDate = apt.fecha.split('T')[0];
-            return (
-              cleanAptDate === todayStr && 
-              apt.tipo === 'fisioterapia' && 
-              apt.estado === 'programada'
-            );
-          });
-          setTodayAppointments(filtered);
-        }
+        const allAppointments: Appointment[] = await citasAPI.getAll();
+        const filtered = allAppointments.filter((apt) => {
+          const cleanAptDate = apt.fecha.split('T')[0];
+          return (
+            cleanAptDate === todayStr &&
+            apt.tipo === 'fisioterapia' &&
+            apt.estado === 'programada'
+          );
+        });
+        setTodayAppointments(filtered);
       } catch (error) {
         console.error("❌ Error Admin Fisio -> PostgreSQL:", error);
       } finally {
@@ -120,16 +118,13 @@ export default function PhysiotherapyAdminDashboard() {
 
     const cargarPracticantesEnVivo = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/usuarios');
-        if (response.ok) {
-          const data = await response.json();
-          const lista = data.filter((u: any) => 
-            u.rol === 'practicante' && 
-            u.area?.toLowerCase() === 'fisioterapia' &&
-            (u.estado === 'activo' || u.status === 'activo')
-          );
-          setPracticantesArea(lista);
-        }
+        const data = await usuariosAPI.getAll();
+        const lista = data.filter((u: any) =>
+          u.rol === 'practicante' &&
+          u.area?.toLowerCase() === 'fisioterapia' &&
+          (u.estado === 'activo' || u.status === 'activo')
+        );
+        setPracticantesArea(lista);
       } catch (error) {
         console.error("Error cargando personal para el select:", error);
       }
@@ -173,34 +168,23 @@ export default function PhysiotherapyAdminDashboard() {
 
     try {
       setIsAssigning(true);
-      const response = await fetch(`http://localhost:3001/api/citas/${selectedAppointment.id}/asignar`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify({ 
-          practicante_id: selectedPractitioner.id,
-          practicante_nombre: selectedPractitioner.nombre 
-        })
+      await citasAPI.asignar(selectedAppointment.id, {
+        practicante_id: selectedPractitioner.id,
+        practicante_nombre: selectedPractitioner.nombre
       });
 
-      if (response.ok) {
-        toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
-        setIsModalOpen(false); 
-        setSelectedPractitioner(null);
-        setSelectedAppointment(null);
+      toast.success(`Cita asignada a ${selectedPractitioner.nombre} correctamente.`);
+      setIsModalOpen(false);
+      setSelectedPractitioner(null);
+      setSelectedAppointment(null);
 
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const res = await fetch(`http://localhost:3001/api/citas`);
-        if (res.ok) {
-          const all = await res.json();
-          const filtered = all.filter((a: any) => {
-            const cleanDate = a.fecha.split('T')[0];
-            return cleanDate === todayStr && a.tipo === 'fisioterapia' && a.estado === 'programada';
-          });
-          setTodayAppointments(filtered);
-        }
-      } else {
-        toast.error("El servidor no pudo procesar la asignación.");
-      }
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const all = await citasAPI.getAll();
+      const filtered = all.filter((a: any) => {
+        const cleanDate = a.fecha.split('T')[0];
+        return cleanDate === todayStr && a.tipo === 'fisioterapia' && a.estado === 'programada';
+      });
+      setTodayAppointments(filtered);
     } catch (error) {
       console.error("Error al asignar:", error);
       toast.error("Error de conexión con el servidor.");
@@ -226,18 +210,12 @@ export default function PhysiotherapyAdminDashboard() {
         destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
       };
 
-      const response = await fetch('http://localhost:3001/api/notas_universitarias', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify(payload)
-      });
+      await notasAPI.createUniversitaria(payload);
 
-      if (response.ok) {
-        toast.success("Comunicado emitido correctamente.");
-        setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
-        setIsNotaModalOpen(false);
-        setRefreshKey(prev => prev + 1);
-      }
+      toast.success("Comunicado emitido correctamente.");
+      setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
+      setIsNotaModalOpen(false);
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       toast.error("Error al conectar con el servidor.");
     } finally {
@@ -263,29 +241,17 @@ export default function PhysiotherapyAdminDashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user.email 
-        },
-        body: JSON.stringify({
-          nombre: profileData.nombre,
-          telefono: profileData.telefono,
-          matricula: profileData.matricula
-        })
+      await usuariosAPI.updateProfile(user.id, {
+        nombre: profileData.nombre,
+        telefono: profileData.telefono,
+        matricula: profileData.matricula
       });
 
-      if (response.ok) {
-        setIsEditingProfile(false);
-        toast.success("Tu perfil se actualizó correctamente.");
-      } else {
-        const data = await response.json();
-        toast.error(data.error || "Error al actualizar perfil.");
-      }
-    } catch (error) {
+      setIsEditingProfile(false);
+      toast.success("Tu perfil se actualizó correctamente.");
+    } catch (error: any) {
       console.error("Error actualizando perfil:", error);
-      toast.error("Error de conexión con la base de datos.");
+      toast.error(error.message || "Error de conexión con la base de datos.");
     }
   };
 

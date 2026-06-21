@@ -16,6 +16,7 @@ import { format, isBefore, startOfDay, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Clock, Loader2 } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 
 interface Appointment {
   id?: number;
@@ -83,22 +84,18 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       const fetchDisponibilidad = async () => {
         try {
           const dateStr = format(date, 'yyyy-MM-dd');
-          const response = await fetch(`http://localhost:3001/api/citas/disponibilidad?fecha=${dateStr}&tipo=${type}`);
-          
-          if (response.ok) {
-            const ocupadasDesdeDB = await response.json(); // Array de strings: ['08:00', '09:30']
-            
-            // Si estamos reagendando, DEBEMOS excluir la hora original de la cita 
-            // de la lista de ocupadas, solo si estamos consultando el mismo día original.
-            if (isRescheduling && existingAppointment && existingAppointment.fecha.substring(0, 10) === dateStr) {
-              const horaOriginalCorta = existingAppointment.hora.substring(0, 5);
-              const filtradas = ocupadasDesdeDB.filter((h: string) => h.substring(0, 5) !== horaOriginalCorta);
-              
-              // Map para asegurar formato '08:00'
-              setHorasOcupadas(filtradas.map((h: string) => h.substring(0, 5)));
-            } else {
-              setHorasOcupadas(ocupadasDesdeDB.map((h: string) => h.substring(0, 5)));
-            }
+          const ocupadasDesdeDB = await citasAPI.getDisponibilidad(dateStr, type);
+
+          // Si estamos reagendando, DEBEMOS excluir la hora original de la cita
+          // de la lista de ocupadas, solo si estamos consultando el mismo día original.
+          if (isRescheduling && existingAppointment && existingAppointment.fecha.substring(0, 10) === dateStr) {
+            const horaOriginalCorta = existingAppointment.hora.substring(0, 5);
+            const filtradas = ocupadasDesdeDB.filter((h: string) => h.substring(0, 5) !== horaOriginalCorta);
+
+            // Map para asegurar formato '08:00'
+            setHorasOcupadas(filtradas.map((h: string) => h.substring(0, 5)));
+          } else {
+            setHorasOcupadas(ocupadasDesdeDB.map((h: string) => h.substring(0, 5)));
           }
         } catch (error) {
           console.error("Error al consultar disponibilidad:", error);
@@ -138,22 +135,19 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
       // ---------------------------------------------------------
       // MAGIA HÍBRIDA: Decide dinámicamente si es POST o PUT
       // ---------------------------------------------------------
-      const endpoint = isRescheduling 
-        ? `http://localhost:3001/api/citas/${existingAppointment?.id}` 
-        : 'http://localhost:3001/api/citas';
-        
+      const endpoint = isRescheduling
+        ? `/citas/${existingAppointment?.id}`
+        : '/citas';
+
       const method = isRescheduling ? 'PUT' : 'POST';
-      
-      const payload = isRescheduling 
+
+      const payload = isRescheduling
         ? { fecha: dateStr, hora: time, tipo: type, estado: 'programada' } // Añadimos tipo al PUT
         : { paciente_id: Number(patientId), paciente_nombre: patientName, tipo: type, fecha: dateStr, hora: time, estado: 'programada' };
 
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          email: user?.email || '' // Usado por tus middlewares backend
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 

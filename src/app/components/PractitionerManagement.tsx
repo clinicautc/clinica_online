@@ -4,7 +4,6 @@
  * PROPÓSITO: Gestión administrativa de practicantes (Estatus y Eliminación)
  * ============================================================================
  */
-import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -22,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
+import { usuariosAPI } from '../lib/api';
 
 interface Practitioner {
   id: string;
@@ -38,7 +38,6 @@ interface PractitionerManagementProps {
 }
 
 export default function PractitionerManagement({ area }: PractitionerManagementProps) {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [practitioners, setPracticantes] = useState<Practitioner[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,27 +55,23 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
   const fetchPractitioners = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/usuarios');
-      
-      if (response.ok) {
-        const allUsers: any[] = await response.json();
-        
-        // Filtramos para asegurar que el Admin de área solo vea lo que le corresponde
-        const filtered = allUsers.filter(u => 
-          u.rol === 'practicante' && 
-          u.area?.toLowerCase() === area.toLowerCase()
-        ).map(p => ({
-          id: p.id.toString(),
-          nombre: p.nombre || 'Sin Nombre',
-          email: p.email || 'sin@correo.com',
-          area: p.area,
-          rol: p.rol,
-          status: p.estado || p.status || 'activo' // Mapeo de columna 'estado' de la BD
-        }));
+      const allUsers: any[] = await usuariosAPI.getAll();
 
-        filtered.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-        setPracticantes(filtered);
-      }
+      // Filtramos para asegurar que el Admin de área solo vea lo que le corresponde
+      const filtered = allUsers.filter(u =>
+        u.rol === 'practicante' &&
+        u.area?.toLowerCase() === area.toLowerCase()
+      ).map(p => ({
+        id: p.id.toString(),
+        nombre: p.nombre || 'Sin Nombre',
+        email: p.email || 'sin@correo.com',
+        area: p.area,
+        rol: p.rol,
+        status: p.estado || p.status || 'activo' // Mapeo de columna 'estado' de la BD
+      }));
+
+      filtered.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      setPracticantes(filtered);
     } catch (error) {
       console.error("Error cargando practicantes:", error);
       toast.error("Error de conexión con el servidor PostgreSQL");
@@ -92,18 +87,9 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
     const nuevoEstado = currentStatus === 'activo' ? 'inactivo' : 'activo';
     
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${practitionerId}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify({ estado: nuevoEstado }) // 'estado' coincide con tu index.js
-      });
-
-      if (response.ok) {
-        toast.success(`Estatus actualizado: ${nuevoEstado.toUpperCase()}`);
-        fetchPractitioners(); // Recarga la lista en vivo
-      } else {
-        throw new Error();
-      }
+      await usuariosAPI.updateStatus(practitionerId, nuevoEstado);
+      toast.success(`Estatus actualizado: ${nuevoEstado.toUpperCase()}`);
+      fetchPractitioners(); // Recarga la lista en vivo
     } catch (error) {
       toast.error("No se pudo actualizar el estatus en la base de datos");
     }
@@ -118,16 +104,9 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${practitionerId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        toast.success("Practicante eliminado correctamente");
-        fetchPractitioners(); // Actualiza la vista eliminando el registro
-      } else {
-        throw new Error();
-      }
+      await usuariosAPI.remove(practitionerId);
+      toast.success("Practicante eliminado correctamente");
+      fetchPractitioners(); // Actualiza la vista eliminando el registro
     } catch (error) {
       toast.error("Error al intentar eliminar el registro de la base de datos");
     }
