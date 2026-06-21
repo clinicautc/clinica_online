@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { citasAPI } from '../lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge'; 
@@ -39,17 +40,14 @@ export default function AppointmentManager() {
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/citas');
-      if (response.ok) {
-        const data = await response.json();
-        // Orden cronológico descendente
-        const sorted = data.sort((a: AppointmentDB, b: AppointmentDB) => {
-          const dateA = new Date(`${a.fecha.substring(0, 10)}T${a.hora.substring(0, 5)}`);
-          const dateB = new Date(`${b.fecha.substring(0, 10)}T${b.hora.substring(0, 5)}`);
-          return dateB.getTime() - dateA.getTime();
-        });
-        setAppointments(sorted);
-      }
+      const data = await citasAPI.getAll();
+      // Orden cronológico descendente
+      const sorted = data.sort((a: AppointmentDB, b: AppointmentDB) => {
+        const dateA = new Date(`${a.fecha.substring(0, 10)}T${a.hora.substring(0, 5)}`);
+        const dateB = new Date(`${b.fecha.substring(0, 10)}T${b.hora.substring(0, 5)}`);
+        return dateB.getTime() - dateA.getTime();
+      });
+      setAppointments(sorted);
     } catch (error) {
       console.error("Error al cargar citas:", error);
       toast.error("No se pudieron cargar las citas del servidor.");
@@ -63,19 +61,11 @@ export default function AppointmentManager() {
       const currentApt = appointments.find(a => a.id === id);
       if (!currentApt) return;
 
-      const response = await fetch(`http://localhost:3001/api/citas/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        // Enviamos la misma fecha y hora, solo cambiamos el estado
-        body: JSON.stringify({ fecha: currentApt.fecha, hora: currentApt.hora, estado: newStatus })
-      });
+      // Enviamos la misma fecha y hora, solo cambiamos el estado
+      await citasAPI.update(id, { fecha: currentApt.fecha, hora: currentApt.hora, estado: newStatus });
 
-      if (response.ok) {
-        toast.success(`Cita marcada como ${newStatus}`);
-        fetchAppointments(); // Recargamos para reflejar cambios
-      } else {
-        throw new Error('Error en el servidor');
-      }
+      toast.success(`Cita marcada como ${newStatus}`);
+      fetchAppointments(); // Recargamos para reflejar cambios
     } catch (error) {
       toast.error('Error al actualizar la cita');
     }
@@ -83,13 +73,9 @@ export default function AppointmentManager() {
 
   const handleDelete = async (id: number) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/citas/${id}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        toast.success('Cita eliminada del sistema');
-        fetchAppointments();
-      }
+      await citasAPI.remove(id);
+      toast.success('Cita eliminada del sistema');
+      fetchAppointments();
     } catch (error) {
       toast.error('Error al eliminar la cita');
     }

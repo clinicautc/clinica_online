@@ -35,13 +35,18 @@
 
       // Intentamos iniciar sesión con los datos ingresados
       // Usamos 'await' porque ahora la validación se hace en la base de datos externa
-      const success = await login(email, password);
+      try {
+        const success = await login(email, password);
 
-      if (success) {
-        // Si los datos coinciden, mandamos al usuario al panel principal
-        navigate('/dashboard');
-      } else {
-        // Si fallan, activamos el mensaje de error en pantalla
+        if (success) {
+          // Si los datos coinciden, mandamos al usuario al panel principal
+          navigate('/dashboard');
+        } else {
+          // Si fallan, activamos el mensaje de error en pantalla
+          setError('Correo o contraseña incorrectos');
+        }
+      } catch {
+        // login() rechaza la promesa cuando las credenciales son incorrectas
         setError('Correo o contraseña incorrectos');
       }
     };

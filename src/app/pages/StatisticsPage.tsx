@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
+import { citasAPI, metricasAPI } from '../lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -75,17 +76,11 @@ export default function StatisticsPage() {
     const cargarDatos = async () => {
       try {
         // Consultamos citas y logs simultáneamente para coherencia de re-agendados
-        const [resCitas, resLogs] = await Promise.all([
-          fetch('http://localhost:3001/api/citas'),
-          fetch('http://localhost:3001/api/logs')
+        const [dataCitas, dataLogs]: [Appointment[], any[]] = await Promise.all([
+          citasAPI.getAll(),
+          metricasAPI.getLogs()
         ]);
-        
-        let dataCitas: Appointment[] = [];
-        let dataLogs: any[] = [];
-        
-        if (resCitas.ok) dataCitas = await resCitas.json();
-        if (resLogs.ok) dataLogs = await resLogs.json();
-        
+
         setCitas(dataCitas);
         calcularEstadisticasExtendido(dataCitas, dataLogs);
       } catch (error) {

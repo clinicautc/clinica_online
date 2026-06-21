@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { citasAPI, usuariosAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -83,19 +84,16 @@ export default function PatientDashboard() {
     if (!patientId) return;
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/citas/paciente/${patientId}`);
-      if (response.ok) {
-        const data = await response.json();
-        const hoy = startOfDay(new Date());
+      const data = await citasAPI.getByPaciente(patientId);
+      const hoy = startOfDay(new Date());
 
-        // Filtrado: Si la fecha de la cita es antes de hoy, ya no se muestra.
-        const filtradasPorFecha = data.filter((cita: any) => {
-          const fechaCita = startOfDay(parseISO(cita.fecha));
-          return !isBefore(fechaCita, hoy);
-        });
-        
-        setCitasHistoricas(filtradasPorFecha);
-      }
+      // Filtrado: Si la fecha de la cita es antes de hoy, ya no se muestra.
+      const filtradasPorFecha = data.filter((cita: any) => {
+        const fechaCita = startOfDay(parseISO(cita.fecha));
+        return !isBefore(fechaCita, hoy);
+      });
+
+      setCitasHistoricas(filtradasPorFecha);
     } catch (error) {
       console.error("Error al cargar citas:", error);
     } finally {
@@ -110,16 +108,9 @@ export default function PatientDashboard() {
   const handleCancelarCita = async (id: number) => {
     if (!window.confirm("¿Estás seguro de que deseas cancelar esta cita?")) return;
     try {
-      const response = await fetch(`http://localhost:3001/api/citas/${id}`, {
-          method: 'DELETE',
-          headers: {
-            email: user?.email || ''
-          }
-        });
-      if (response.ok) {
-        toast.success("Cita cancelada exitosamente");
-        fetchCitas();
-      }
+      await citasAPI.remove(id);
+      toast.success("Cita cancelada exitosamente");
+      fetchCitas();
     } catch (error) {
       toast.error("Error al cancelar");
     }
@@ -173,29 +164,17 @@ export default function PatientDashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user.email
-        },
-        body: JSON.stringify({
-          nombre: profileData.nombre, // El nombre se manda pero no cambia por la interfaz
-          telefono: profileData.telefono,
-          matricula: profileData.matricula
-        })
+      await usuariosAPI.updateProfile(user.id, {
+        nombre: profileData.nombre, // El nombre se manda pero no cambia por la interfaz
+        telefono: profileData.telefono,
+        matricula: profileData.matricula
       });
 
-      if (response.ok) {
-        setIsEditingProfile(false);
-        toast.success("Tu perfil se actualizó correctamente en el sistema.");
-      } else {
-        const data = await response.json();
-        toast.error(data.error || "El servidor no pudo procesar la actualización.");
-      }
-    } catch (error) {
+      setIsEditingProfile(false);
+      toast.success("Tu perfil se actualizó correctamente en el sistema.");
+    } catch (error: any) {
       console.error("Error actualizando perfil:", error);
-      toast.error("Error de conexión con la base de datos.");
+      toast.error(error.message || "Error de conexión con la base de datos.");
     }
   };
 

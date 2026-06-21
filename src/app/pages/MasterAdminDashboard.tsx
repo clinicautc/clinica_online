@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
+import { usuariosAPI, notasAPI } from '../lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -115,24 +116,21 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
    */
   const cargarPracticantes = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/usuarios');
-      if (response.ok) {
-        const data = await response.json();
-        
-        const listaMapeada = data
-          .filter((u: any) => u.rol === 'practicante' || u.rol === 'admin') 
-          .map((p: any) => ({
-            id: p.id.toString(),
-            name: p.nombre || 'Sin Nombre',
-            email: p.email || 'sin@correo.com',
-            area: p.area ? p.area.toLowerCase() : 'fisioterapia',
-            status: p.estado || p.status || 'activo', 
-            dateAdded: p.fecha_creacion || new Date().toISOString(),
-            rol: p.rol // Sincronizado con la base de datos para mostrar el cargo
-          }));
-        
-        setPracticantes(listaMapeada);
-      }
+      const data = await usuariosAPI.getAll();
+
+      const listaMapeada = data
+        .filter((u: any) => u.rol === 'practicante' || u.rol === 'admin')
+        .map((p: any) => ({
+          id: p.id.toString(),
+          name: p.nombre || 'Sin Nombre',
+          email: p.email || 'sin@correo.com',
+          area: p.area ? p.area.toLowerCase() : 'fisioterapia',
+          status: p.estado || p.status || 'activo',
+          dateAdded: p.fecha_creacion || new Date().toISOString(),
+          rol: p.rol // Sincronizado con la base de datos para mostrar el cargo
+        }));
+
+      setPracticantes(listaMapeada);
     } catch (error) {
       console.error("Error al cargar docentes:", error);
       toast.error('Error de conexión con el servidor PostgreSQL');
@@ -169,15 +167,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     setPracticantes(prev => prev.map(p => p.id === id ? { ...p, status: nuevoEstado } : p));
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-      
-      if (!response.ok) throw new Error('Error en servidor');
-      toast.success(`Estado actualizado a: ${nuevoEstado.toUpperCase()}`); 
-    } catch (error) { 
+      await usuariosAPI.updateStatus(id, nuevoEstado);
+      toast.success(`Estado actualizado a: ${nuevoEstado.toUpperCase()}`);
+    } catch (error) {
       setPracticantes(backup);
       toast.error('No se pudo actualizar el estado en la base de datos'); 
     }
@@ -189,12 +181,10 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   const handleEliminarPracticante = async (id: string) => {
     if (!window.confirm('¿Deseas eliminar permanentemente este registro de la base de datos?')) return;
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`,{method: 'DELETE',headers: {email: user?.email || ''}});
-      if (response.ok) { 
-        toast.success('Registro eliminado correctamente'); 
-        cargarPracticantes(); 
-      }
-    } catch (error) { 
+      await usuariosAPI.remove(id);
+      toast.success('Registro eliminado correctamente');
+      cargarPracticantes();
+    } catch (error) {
       toast.error('Error al eliminar el registro'); 
     }
   };
@@ -210,29 +200,18 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
     try {
       setIsEnviando(true);
-      const response = await fetch('http://localhost:3001/api/notas_universitarias', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user?.email || '' // <--- ESTA ES LA LÍNEA QUE DEBES AGREGAR
-        },
-        body: JSON.stringify({
-          titulo: notaNueva.titulo,
-          contenido: notaNueva.contenido,
-          destino: notaNueva.destino,
-          creado_por: user?.id,
-          creado_por_nombre: user?.nombre || user?.name || "Master UTC",
-          destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
-        })
+      await notasAPI.createUniversitaria({
+        titulo: notaNueva.titulo,
+        contenido: notaNueva.contenido,
+        destino: notaNueva.destino,
+        creado_por: user?.id,
+        creado_por_nombre: user?.nombre || user?.name || "Master UTC",
+        destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
       });
 
-      // ... resto de tu código
-
-      if (response.ok) {
-        toast.success(`Comunicado publicado exitosamente`);
-        setIsNotaModalOpen(false);
-        setNotaNueva({ titulo: '', contenido: '', destino: 'todos', emailDestinatario: 'ninguno' });
-      }
+      toast.success(`Comunicado publicado exitosamente`);
+      setIsNotaModalOpen(false);
+      setNotaNueva({ titulo: '', contenido: '', destino: 'todos', emailDestinatario: 'ninguno' });
     } catch (error) {
       toast.error("Error al publicar en la base de datos");
     } finally {
@@ -258,29 +237,17 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios/${user.id}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user.email 
-        },
-        body: JSON.stringify({
-          nombre: profileData.nombre,
-          telefono: profileData.telefono,
-          matricula: profileData.matricula
-        })
+      await usuariosAPI.updateProfile(user.id, {
+        nombre: profileData.nombre,
+        telefono: profileData.telefono,
+        matricula: profileData.matricula
       });
 
-      if (response.ok) {
-        setIsEditingProfile(false);
-        toast.success("Tu perfil se actualizó correctamente en el sistema.");
-      } else {
-        const data = await response.json();
-        toast.error(data.error || "El servidor no pudo procesar la actualización.");
-      }
-    } catch (error) {
+      setIsEditingProfile(false);
+      toast.success("Tu perfil se actualizó correctamente en el sistema.");
+    } catch (error: any) {
       console.error("Error actualizando perfil:", error);
-      toast.error("Error de conexión con la base de datos.");
+      toast.error(error.message || "Error de conexión con la base de datos.");
     }
   };
 

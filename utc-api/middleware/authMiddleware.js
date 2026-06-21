@@ -1,25 +1,54 @@
 // authMiddleware.js
 
-const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const pool = require('../db');
 
-require('dotenv').config();
-
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false }
-});
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ACCESS_TTL = process.env.JWT_ACCESS_TTL || '15m';
+const REFRESH_TOKEN_TTL_DAYS = 14;
 
 /**
  * ============================================================================
- * REQUIRE AUTH
+ * EMISIÓN DE TOKENS (usado por authRoutes.js en login/refresh)
  * ============================================================================
  */
 
-const requireAuth = async (
+function signAccessToken(usuario) {
+  return jwt.sign(
+    {
+      sub: usuario.id,
+      nombre: usuario.nombre,
+      email: usuario.email,
+      rol: usuario.rol,
+      area: usuario.area
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_ACCESS_TTL }
+  );
+}
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// Genera un refresh token opaco (no JWT) y su fecha de expiración.
+function generateRefreshToken() {
+  const token = crypto.randomBytes(48).toString('hex');
+  const expiraEn = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+  return { token, tokenHash: hashToken(token), expiraEn };
+}
+
+/**
+ * ============================================================================
+ * VERIFY TOKEN / REQUIRE AUTH
+ * Acepta un access token JWT (Authorization: Bearer) y, de forma temporal,
+ * el header legado `email` mientras el frontend termina de migrar (Fase C).
+ * Una vez que ningún fetch() dependa del header `email`, eliminar ese fallback.
+ * ============================================================================
+ */
+
+const verifyToken = async (
   req,
   res,
   next
@@ -27,6 +56,36 @@ const requireAuth = async (
 
   try {
 
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+
+      const token = authHeader.slice(7);
+
+      try {
+
+        const payload = jwt.verify(token, JWT_SECRET);
+
+        req.user = {
+          id: payload.sub,
+          nombre: payload.nombre,
+          email: payload.email,
+          rol: payload.rol,
+          area: payload.area,
+          status: 'activo'
+        };
+
+        return next();
+
+      } catch (jwtError) {
+
+        return res.status(401).json({
+          error: 'Token inválido o expirado'
+        });
+      }
+    }
+
+    // --- FALLBACK TEMPORAL: header `email` heredado (se retira en Fase C) ---
     const email = req.headers.email;
 
     if (!email) {
@@ -83,6 +142,9 @@ const requireAuth = async (
     });
   }
 };
+
+// Mismo nombre que usan todas las rutas de index.js: cero cambios de firma.
+const requireAuth = verifyToken;
 
 /**
  * ============================================================================
@@ -327,7 +389,12 @@ if (user.rol === 'paciente') {
 
 module.exports = {
   requireAuth,
+  verifyToken,
   requireRole,
   requireSameArea,
-  canModifyAppointment
+  canModifyAppointment,
+  signAccessToken,
+  generateRefreshToken,
+  hashToken,
+  REFRESH_TOKEN_TTL_DAYS
 };

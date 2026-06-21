@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
+import { recomendacionesAPI } from '../lib/api';
 
 interface Recommendation {
   id: number;
@@ -61,17 +62,8 @@ export default function NutritionRecommendations({
   const fetchRecommendations = async () => {
     try {
       setLoadingHistory(true);
-      const response = await fetch(`http://localhost:3001/api/recomendaciones/paciente/${pacienteId}?area=${area}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'email': user?.email || ''
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setHistorialRecomendaciones(data);
-      }
+      const data = await recomendacionesAPI.getByPaciente(pacienteId, area);
+      setHistorialRecomendaciones(data);
     } catch (error) {
       console.error('Error al cargar recomendaciones:', error);
     } finally {
@@ -86,26 +78,17 @@ export default function NutritionRecommendations({
     }
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/recomendaciones', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'email': user?.email || ''
-        },
-        body: JSON.stringify({
-          paciente_id: pacienteId,
-          paciente_nombre: pacienteNombre,
-          contenido: recomendaciones,
-          creado_por_id: (user as any)?.id,
-          creado_por_nombre: (user as any)?.nombre,
-          area: area
-        })
+      await recomendacionesAPI.create({
+        paciente_id: pacienteId,
+        paciente_nombre: pacienteNombre,
+        contenido: recomendaciones,
+        creado_por_id: (user as any)?.id,
+        creado_por_nombre: (user as any)?.nombre,
+        area: area
       });
-      if (response.ok) {
-        toast.success('Guardado correctamente');
-        setRecomendaciones('');
-        fetchRecommendations();
-      }
+      toast.success('Guardado correctamente');
+      setRecomendaciones('');
+      fetchRecommendations();
     } catch (error) {
       toast.error('Error de conexión');
     } finally {

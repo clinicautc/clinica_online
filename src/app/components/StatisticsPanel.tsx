@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { citasAPI, historialesAPI, metricasAPI } from '../lib/api';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
@@ -392,15 +393,11 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         setLoading(true);
 
         // 1. Obtención de datos base y analíticos (Consumiendo la nueva tabla metricas)
-        const [resCitas, resHistoriales, resDashboard] = await Promise.all([
-          fetch('http://localhost:3001/api/citas', { headers: { email: user?.email || '' } }),
-          fetch('http://localhost:3001/api/historiales', { headers: { email: user?.email || '' } }),
-          fetch('http://localhost:3001/api/stats/dashboard', { headers: { email: user?.email || '' } }), // NUEVO: Trae datos de la tabla 'metricas'
+        const [citas, historiales, dbStats] = await Promise.all([
+          citasAPI.getAll(),
+          historialesAPI.getAll(),
+          metricasAPI.getDashboardStats() // NUEVO: Trae datos de la tabla 'metricas'
         ]);
-
-        const citas = await resCitas.json();
-        const historiales = await resHistoriales.json();
-        const dbStats = await resDashboard.json();
 
         // --- LÓGICA DE FILTRADO EXISTENTE ---
         let filteredCitas = citas;

@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { ArrowLeft, Plus, Trash2, UserCheck, UserX, Activity, Utensils } from 'lucide-react';
 import { toast } from 'sonner';
+import { practicantesAPI } from '../lib/api';
 
 export default function ManagePractitionersPage() {
   const navigate = useNavigate();
@@ -52,26 +53,17 @@ export default function ManagePractitionersPage() {
   // CARGAR DOCENTES (GET /api/practicantes)
   const cargarDocentes = async () => {
     try {
-      const url = user?.area 
-        ? `http://localhost:3001/api/practicantes?area=${user.area}` 
-        : 'http://localhost:3001/api/practicantes';
-
-      const response = await fetch(url, {
-       headers: {email: user?.email || ''}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Sincronización con las columnas de la tabla 'practicantes_autorizados'
-        const listaMapeada = data.map((d: any) => ({
-          id: d.id.toString(),
-          name: d.nombre, // Cambiado de d.name a d.nombre para coincidir con index.js
-          email: d.email,
-          area: d.area,
-          status: d.estado || 'activo', 
-          dateAdded: d.fecha_autorizacion
-        }));
-        setDocentes(listaMapeada);
-      }
+      const data = await practicantesAPI.getAll(user?.area || undefined);
+      // Sincronización con las columnas de la tabla 'practicantes_autorizados'
+      const listaMapeada = data.map((d: any) => ({
+        id: d.id.toString(),
+        name: d.nombre, // Cambiado de d.name a d.nombre para coincidir con index.js
+        email: d.email,
+        area: d.area,
+        status: d.estado || 'activo',
+        dateAdded: d.fecha_autorizacion
+      }));
+      setDocentes(listaMapeada);
     } catch (error) {
       toast.error('Error de conexión al cargar lista');
     }
@@ -96,35 +88,26 @@ export default function ManagePractitionersPage() {
        * CORRECCIÓN DE DISCREPANCIA:
        * El backend index.js espera { nombre, email, area, estado, fecha_autorizacion }
        */
-      const response = await fetch('http://localhost:3001/api/practicantes', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify({
-          nombre: nuevoD.nombre.trim(), // Nombre exacto que pide el INSERT en index.js
-          email: nuevoD.email.trim().toLowerCase(), 
-          matricula: nuevoD.matricula.trim(),
-          area: nuevoD.area,
-          estado: 'activo',
-          fecha_autorizacion: new Date().toISOString().split('T')[0]
-        })
+      await practicantesAPI.create({
+        nombre: nuevoD.nombre.trim(), // Nombre exacto que pide el INSERT en index.js
+        email: nuevoD.email.trim().toLowerCase(),
+        matricula: nuevoD.matricula.trim(),
+        area: nuevoD.area,
+        estado: 'activo',
+        fecha_autorizacion: new Date().toISOString().split('T')[0]
       });
 
-      if (response.ok) {
-        toast.success(`Practicante autorizado correctamente.\nContraseña temporal: UTC${nuevoD.matricula}`);
-        setNuevoD({ 
-          nombre: '', 
-          email: '', 
-          matricula: '',
-          area: (user?.area || '') as any 
-        });
-        setMostrandoFormulario(false);
-        cargarDocentes(); 
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || 'Error al guardar en BD');
-      }
-    } catch (error) {
-      toast.error('Error de comunicación con el servidor');
+      toast.success(`Practicante autorizado correctamente.\nContraseña temporal: UTC${nuevoD.matricula}`);
+      setNuevoD({
+        nombre: '',
+        email: '',
+        matricula: '',
+        area: (user?.area || '') as any
+      });
+      setMostrandoFormulario(false);
+      cargarDocentes();
+    } catch (error: any) {
+      toast.error(error.message || 'Error de comunicación con el servidor');
     }
   };
 
@@ -135,16 +118,9 @@ export default function ManagePractitionersPage() {
     const nuevoEstado = docente.status === 'activo' ? 'inactivo' : 'activo';
 
     try {
-      const response = await fetch(`http://localhost:3001/api/practicantes/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json',email: user?.email || ''},
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-
-      if (response.ok) {
-        toast.success('Estado actualizado correctamente');
-        cargarDocentes();
-      }
+      await practicantesAPI.updateStatus(id, nuevoEstado);
+      toast.success('Estado actualizado correctamente');
+      cargarDocentes();
     } catch (error) {
       toast.error('No se pudo actualizar el estado');
     }
@@ -154,14 +130,9 @@ export default function ManagePractitionersPage() {
   const handleEliminarDocente = async (id: string) => {
     if (!window.confirm('¿Eliminar definitivamente la autorización?')) return;
     try {
-      const response = await fetch(`http://localhost:3001/api/practicantes/${id}`, { 
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json', email: user?.email || ''},
-       });
-      if (response.ok) {
-        toast.success('Autorización removida de PostgreSQL');
-        cargarDocentes();
-      }
+      await practicantesAPI.remove(id);
+      toast.success('Autorización removida de PostgreSQL');
+      cargarDocentes();
     } catch (error) {
       toast.error('Error al eliminar registro');
     }

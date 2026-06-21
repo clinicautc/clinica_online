@@ -20,6 +20,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { notasAPI } from '../lib/api';
 
 // Interfaz sincronizada con la base de datos PostgreSQL de la Clínica UTC
 interface Note {
@@ -73,21 +74,8 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
   const fetchNotes = async () => {
   try {
     setIsLoading(true);
-    // Agregamos el header 'email' al GET
-    const response = await fetch('http://localhost:3001/api/notas_universitarias', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'email': user?.email || '' // <--- Esto es lo que faltaba
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      setNotes(data);
-    } else {
-      console.error("Error de autenticación:", response.status);
-    }
+    const data = await notasAPI.getUniversitarias();
+    setNotes(data);
   } catch (error) {
     console.error("Error en sincronización de notas:", error);
   } finally {
@@ -128,21 +116,12 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
         ? `${notaActual.respuesta} <BR> ${nuevoComentario}` 
         : nuevoComentario;
 
-      const response = await fetch(`http://localhost:3001/api/notas_universitarias/${noteId}/responder`, {
-        method: 'PUT',
-       headers: { 
-        'Content-Type': 'application/json',
-        'email': user?.email || '' // <--- ESTO ES LO QUE FALTA
-      },
-        body: JSON.stringify({ respuesta: historialCompleto })
-      });
+      await notasAPI.responderUniversitaria(noteId, historialCompleto);
 
-      if (response.ok) {
-        toast.success("Comentario publicado exitosamente.");
-        setReplyTexts(prev => ({ ...prev, [noteId]: '' }));
-        setActiveReplyId(null);
-        fetchNotes(); 
-      }
+      toast.success("Comentario publicado exitosamente.");
+      setReplyTexts(prev => ({ ...prev, [noteId]: '' }));
+      setActiveReplyId(null);
+      fetchNotes();
     } catch (error) {
       toast.error("Error al publicar respuesta.");
     } finally {

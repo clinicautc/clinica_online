@@ -13,7 +13,15 @@ import {
   ReactNode
 } from 'react';
 
-import { authAPI } from '../lib/api';
+import {
+  authAPI,
+  bootstrapSession,
+  clearSession,
+  getAccessToken as getClientAccessToken,
+  setAccessToken as setClientAccessToken,
+  getRefreshToken,
+  setRefreshToken
+} from '../lib/api';
 
 export interface User {
   telefono: string;
@@ -27,6 +35,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
@@ -52,136 +61,37 @@ export function AuthProvider({
   const [user, setUser] =
     useState<User | null>(null);
 
+  const [accessToken, setAccessToken] =
+    useState<string | null>(null);
+
   const [isLoading, setIsLoading] =
     useState(true);
 
   /**
    * ============================================================================
-   * DURACIÓN DE SESIÓN
-   * 24 horas
-   * ============================================================================
-   */
-  const SESSION_DURATION =
-    1000 * 60 * 60 * 24;
-
-  /**
-   * ============================================================================
    * VALIDAR SESIÓN GUARDADA
+   * La sesión persistida es el refresh token (no el usuario completo). Al cargar
+   * la app, se cambia por un access token + los datos de usuario vigentes.
    * ============================================================================
    */
   useEffect(() => {
 
-    const loadStoredUser = async () => {
+    const loadStoredSession = async () => {
 
       try {
 
-        const storedUser =
-          localStorage.getItem(
-            'utc_current_user'
-          );
+        const sessionUser = await bootstrapSession();
 
-        /**
-         * ============================================================================
-         * NO HAY SESIÓN
-         * ============================================================================
-         */
-        if (!storedUser) {
-
-          setIsLoading(false);
-          return;
+        if (sessionUser) {
+          setUser(sessionUser as User);
+          setAccessToken(getClientAccessToken());
         }
 
-        const parsedUser =
-          JSON.parse(storedUser);
-
-        /**
-         * ============================================================================
-         * VALIDAR ESTRUCTURA
-         * ============================================================================
-         */
-        const isValidUser =
-          parsedUser &&
-          typeof parsedUser === 'object' &&
-          parsedUser.id &&
-          parsedUser.nombre &&
-          parsedUser.email &&
-          parsedUser.rol;
-
-        if (!isValidUser) {
-
-          localStorage.removeItem(
-            'utc_current_user'
-          );
-
-          setIsLoading(false);
-          return;
-        }
-
-        /**
-         * ============================================================================
-         * VALIDAR SESIÓN EN BACKEND
-         * ============================================================================
-         */
-        const sessionValidation =
-          await authAPI.validateSession(
-            parsedUser.email
-          );
-
-        if (!sessionValidation.valid) {
-
-          localStorage.removeItem(
-            'utc_current_user'
-          );
-
-          setIsLoading(false);
-          return;
-        }
-
-        /**
-         * ============================================================================
-         * VALIDAR EXPIRACIÓN
-         * ============================================================================
-         */
-        const now = Date.now();
-
-        const sessionAge =
-          now -
-          (parsedUser.sessionCreatedAt || 0);
-
-        const isExpired =
-          sessionAge > SESSION_DURATION;
-
-        if (isExpired) {
-
-          localStorage.removeItem(
-            'utc_current_user'
-          );
-
-          setIsLoading(false);
-          return;
-        }
-
-        /**
-         * ============================================================================
-         * SESIÓN CORRECTA
-         * ============================================================================
-         */
-        setUser(sessionValidation.user);
-
-      console.log(
-      '✅ Usuario validado desde backend:',
-      sessionValidation.user
-);
-        
       } catch (error) {
 
         console.error(
           'Error validando sesión:',
           error
-        );
-
-        localStorage.removeItem(
-          'utc_current_user'
         );
 
       } finally {
@@ -190,7 +100,7 @@ export function AuthProvider({
       }
     };
 
-    loadStoredUser();
+    loadStoredSession();
 
   }, []);
 
@@ -223,18 +133,12 @@ export function AuthProvider({
 
       /**
        * ============================================================================
-       * GUARDAR SESIÓN
+       * GUARDAR SESIÓN (access token en memoria, refresh token persistido)
        * ============================================================================
        */
-      localStorage.setItem(
-        'utc_current_user',
-        JSON.stringify({
-          ...foundUser,
-          sessionCreatedAt: Date.now(),
-          sessionVersion: 1
-        })
-      );
-
+      setClientAccessToken(data.accessToken);
+      setRefreshToken(data.refreshToken);
+      setAccessToken(data.accessToken);
       setUser(foundUser);
 
       return foundUser;
@@ -257,17 +161,22 @@ export function AuthProvider({
    */
   const logout = () => {
 
-    setUser(null);
+    const storedRefreshToken = getRefreshToken();
 
-    localStorage.removeItem(
-      'utc_current_user'
-    );
+    if (storedRefreshToken) {
+      authAPI.logout(storedRefreshToken).catch(() => {});
+    }
+
+    clearSession();
+    setUser(null);
+    setAccessToken(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        accessToken,
         isAuthenticated: !!user,
         isLoading,
         login,

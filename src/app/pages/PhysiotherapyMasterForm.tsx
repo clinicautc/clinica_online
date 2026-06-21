@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'; //
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext'; 
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { apiFetch, historialesAPI } from '../lib/api';
 
 // IMPORTACIÓN DE IMÁGENES
 import caritasImg from './Caritas.png';
@@ -42,15 +43,8 @@ const [historialId, setHistorialId] = useState<number | null>(null); // <--- 2. 
     if (!appointmentId) return; 
 
     try {
-      // Se agregó el objeto de configuración con headers y el email
-      const response = await fetch(`http://localhost:3001/api/historiales-fisioterapia/detalle/${appointmentId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'email': user?.email || '' // <--- ESTO ES LO QUE ESTABA CAUSANDO EL ERROR 401
-        }
-      });
-      
+      const response = await apiFetch(`/historiales-fisioterapia/detalle/${appointmentId}`);
+
       if (response.ok) {
         const dataGuardada = await response.json();
         console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
@@ -95,24 +89,16 @@ setHistorialId(dataGuardada.id)
   const handleFinalSave = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch('http://localhost:3001/api/historiales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paciente_id: formData.paciente_id || 0,
-          tipo: 'fisioterapia',
-          datos: formData,
-          creado_por: user?.id,
-          appointment_id: appointmentId
-        })
+      await historialesAPI.create({
+        paciente_id: formData.paciente_id || 0,
+        tipo: 'fisioterapia',
+        datos: formData,
+        creado_por: user?.id,
+        appointment_id: appointmentId
       });
 
-      if (response.ok) {
-        toast.success('¡Historial clínico de fisioterapia guardado con éxito!');
-        navigate('/physiotherapy-dashboard');
-      } else {
-        toast.error('Error al guardar en el servidor.');
-      }
+      toast.success('¡Historial clínico de fisioterapia guardado con éxito!');
+      navigate('/physiotherapy-dashboard');
     } catch (error) {
       console.error("Error crítico:", error);
       toast.error('Fallo de conexión.');
@@ -1117,39 +1103,19 @@ const appointmentId = params.id || params.appointmentId;
       };
 
       // 2. LÓGICA CONDICIONAL DINÁMICA: PUT SI YA EXISTE, POST SI ES NUEVO
-      const url = historialId 
-          ? `http://localhost:3001/api/historiales/${historialId}` 
-          : 'http://localhost:3001/api/historiales';
-        
-      const method = historialId ? 'PUT' : 'POST';
+      // 3. Ejecución de la petición (Aseguramos enviar el tipo)
+      await historialesAPI.guardar(historialId, { ...payload, tipo: 'fisioterapia' });
 
-      // 3. Ejecución de la petición
-      const response = await fetch(url, {
-        method: method,
-        headers: { 
-          'Content-Type': 'application/json',
-          'email': user?.email || '' // LLAVE DE ACCESO PARA TU MIDDLEWARE
-        },
-        body: JSON.stringify({ ...payload, tipo: 'fisioterapia' }) // Aseguramos enviar el tipo
-      });
-      
-      if (response.ok) {
-        toast.success('¡Historial guardado/actualizado con éxito!');
-        
-        // REDIRECCIÓN INTELIGENTE AL EXPEDIENTE DEL PACIENTE
-        setTimeout(() => {
-          // AGREGA EL { replace: true } AQUÍ
-          navigate(`/historial/${pId}/fisioterapia`, { replace: true }); 
-        }, 1500);
+      toast.success('¡Historial guardado/actualizado con éxito!');
 
-      } else {
-        const errorData = await response.json();
-        console.error("Error del servidor:", errorData);
-        toast.error(`Error: ${errorData.error || 'Revisa la conexión con la API'}`);
-      }
-    } catch (error) {
+      // REDIRECCIÓN INTELIGENTE AL EXPEDIENTE DEL PACIENTE
+      setTimeout(() => {
+        // AGREGA EL { replace: true } AQUÍ
+        navigate(`/historial/${pId}/fisioterapia`, { replace: true });
+      }, 1500);
+    } catch (error: any) {
       console.error("Error en el guardado final:", error);
-      toast.error('Fallo crítico al conectar con el servidor.');
+      toast.error(`Error: ${error.message || 'Revisa la conexión con la API'}`);
     } finally {
       setIsSaving(false);
     }
