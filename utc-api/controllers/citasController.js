@@ -1,5 +1,12 @@
 const pool = require('../db');
 
+// Compara solo la parte de fecha (yyyy-MM-dd), ignorando hora/zona horaria.
+function esFechaPasada(fecha) {
+  const fechaStr = new Date(fecha).toISOString().split('T')[0];
+  const hoyStr = new Date().toISOString().split('T')[0];
+  return fechaStr < hoyStr;
+}
+
 async function getAll(req, res) {
   try {
     const result = await pool.query('SELECT * FROM citas ORDER BY fecha DESC, hora DESC');
@@ -93,6 +100,25 @@ async function update(req, res) {
   const { fecha, hora, tipo, estado } = req.body;
 
   try {
+    const citaActual = await pool.query("SELECT fecha, hora, estado FROM citas WHERE id = $1", [id]);
+
+    if (citaActual.rows.length === 0) {
+      return res.status(404).json({ error: "Cita no encontrada" });
+    }
+
+    const original = citaActual.rows[0];
+    const horaActualStr = original.hora.substring(0, 5);
+    const esReagendamiento = fecha !== original.fecha.toISOString().split('T')[0] || hora.substring(0, 5) !== horaActualStr;
+
+    if (esReagendamiento) {
+      if (original.estado === 'completada') {
+        return res.status(409).json({ error: "No se puede reagendar una cita que ya fue completada." });
+      }
+      if (esFechaPasada(original.fecha)) {
+        return res.status(409).json({ error: "No se puede reagendar una cita de una fecha pasada." });
+      }
+    }
+
     // Ignoramos la cita actual (id != $4) para que el paciente pueda conservar su misma hora si lo desea
     const check = await pool.query(
       "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'confirmada') AND id != $4",
@@ -149,6 +175,21 @@ async function asignar(req, res) {
   const { practicante_id, practicante_nombre } = req.body;
 
   try {
+    const citaActual = await pool.query("SELECT fecha, estado FROM citas WHERE id = $1", [id]);
+
+    if (citaActual.rows.length === 0) {
+      return res.status(404).json({ error: "Cita no encontrada" });
+    }
+
+    const original = citaActual.rows[0];
+
+    if (original.estado === 'completada') {
+      return res.status(409).json({ error: "No se puede asignar un practicante a una cita que ya fue completada." });
+    }
+    if (esFechaPasada(original.fecha)) {
+      return res.status(409).json({ error: "No se puede asignar un practicante a una cita de una fecha pasada." });
+    }
+
     const result = await pool.query(
       `UPDATE citas SET practicante_id = $1, practicante_nombre = $2, estado = 'programada', fecha_asignacion = NOW() WHERE id = $3 RETURNING *`,
       [practicante_id, practicante_nombre, id]

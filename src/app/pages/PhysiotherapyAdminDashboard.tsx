@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
+import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -25,9 +26,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 import PatientList from '../components/PatientList';
+import DateFilterPicker from '../components/DateFilterPicker';
+import MonthFilterPicker from '../components/MonthFilterPicker';
+import ViewModeToggle from '../components/ViewModeToggle';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
@@ -54,6 +59,9 @@ export default function PhysiotherapyAdminDashboard() {
   // ESTADOS DE CITAS
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
   
   // NUEVO: Estado para controlar el despliegue del formulario de re-agendar
   const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
@@ -98,16 +106,20 @@ export default function PhysiotherapyAdminDashboard() {
     const fetchTodayAppointments = async () => {
       try {
         setIsLoadingCitas(true);
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
         const allAppointments: Appointment[] = await citasAPI.getAll();
         const filtered = allAppointments.filter((apt) => {
           const cleanAptDate = apt.fecha.split('T')[0];
+          const matchesFecha = viewMode === 'day'
+            ? cleanAptDate === selectedDate
+            : cleanAptDate.startsWith(selectedMonth);
           return (
-            cleanAptDate === todayStr &&
+            matchesFecha &&
             apt.tipo === 'fisioterapia' &&
             apt.estado === 'programada'
           );
         });
+        // ORDEN DESCENDENTE: más reciente primero (fecha y, dentro del mismo día, hora)
+        filtered.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
         setTodayAppointments(filtered);
       } catch (error) {
         console.error("❌ Error Admin Fisio -> PostgreSQL:", error);
@@ -138,10 +150,10 @@ export default function PhysiotherapyAdminDashboard() {
 
     fetchTodayAppointments();
     cargarPracticantesEnVivo();
-    
+
     const interval = setInterval(cargarPracticantesEnVivo, 30000);
     return () => clearInterval(interval);
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, selectedDate, selectedMonth, viewMode]);
 
   // Sincronizar datos del perfil si el objeto 'user' se actualiza
   useEffect(() => {
@@ -178,12 +190,13 @@ export default function PhysiotherapyAdminDashboard() {
       setSelectedPractitioner(null);
       setSelectedAppointment(null);
 
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
       const all = await citasAPI.getAll();
       const filtered = all.filter((a: any) => {
         const cleanDate = a.fecha.split('T')[0];
-        return cleanDate === todayStr && a.tipo === 'fisioterapia' && a.estado === 'programada';
+        const matchesFecha = viewMode === 'day' ? cleanDate === selectedDate : cleanDate.startsWith(selectedMonth);
+        return matchesFecha && a.tipo === 'fisioterapia' && a.estado === 'programada';
       });
+      filtered.sort((a: any, b: any) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
       setTodayAppointments(filtered);
     } catch (error) {
       console.error("Error al asignar:", error);
@@ -317,7 +330,7 @@ export default function PhysiotherapyAdminDashboard() {
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Calendar className="w-4 h-4 mr-2" /> Agenda de Hoy
+              <Calendar className="w-4 h-4 mr-2" /> Citas Agendadas
             </TabsTrigger>
             <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
               <Settings className="w-4 h-4 mr-2" /> Personal
@@ -336,8 +349,48 @@ export default function PhysiotherapyAdminDashboard() {
           <TabsContent value="today_appointments">
             <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
               <CardHeader className="bg-slate-50/50 border-b p-6">
-                <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
-                <CardDescription className="font-medium italic">Sincronización en vivo con la base de datos de la clínica</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
+                    <CardDescription className="font-medium italic">
+                      {viewMode === 'day'
+                        ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
+                        : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
+                    {viewMode === 'day' ? (
+                      <>
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                        {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                          >
+                            Hoy
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
+                        {selectedMonth !== format(new Date(), 'yyyy-MM') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
+                          >
+                            Este mes
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-3">
@@ -348,7 +401,7 @@ export default function PhysiotherapyAdminDashboard() {
                     </div>
                   ) : todayAppointments.length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
-                      No se registran citas para el día de hoy.
+                      No se registran citas para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.
                     </div>
                   ) : (
                     todayAppointments.map((apt) => (
@@ -362,15 +415,18 @@ export default function PhysiotherapyAdminDashboard() {
                               <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
                               <div className="flex gap-3 items-center">
                                 <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                                   <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
                                 </span>
-                                <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>
                                   {apt.estado}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-6">
                             {apt.practicante_id && (
                               <div className="flex flex-col items-end">
@@ -383,28 +439,32 @@ export default function PhysiotherapyAdminDashboard() {
                               </div>
                             )}
 
-                            {/* NUEVO BOTÓN RE-AGENDAR PARA FISIO */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
-                              onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
-                            >
-                              <Calendar className="w-4 h-4" />
-                              {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
-                            </Button>
+                            {!esCitaBloqueada(apt) && (
+                              <>
+                                {/* NUEVO BOTÓN RE-AGENDAR PARA FISIO */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
+                                >
+                                  <Calendar className="w-4 h-4" />
+                                  {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
+                                </Button>
 
-                            <Button 
-                              onClick={() => handleOpenAssignModal(apt)}
-                              className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
-                                apt.practicante_id 
-                                  ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50" 
-                                  : "bg-blue-600 text-white hover:bg-blue-700"
-                              }`}
-                            >
-                              <UserPlus className="w-4 h-4" />
-                              {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-                            </Button>
+                                <Button
+                                  onClick={() => handleOpenAssignModal(apt)}
+                                  className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
+                                    apt.practicante_id
+                                      ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                                      : "bg-blue-600 text-white hover:bg-blue-700"
+                                  }`}
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                  {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
 

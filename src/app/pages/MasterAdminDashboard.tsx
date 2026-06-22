@@ -10,7 +10,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { usuariosAPI, notasAPI } from '../lib/api';
+import { usuariosAPI, notasAPI, citasAPI } from '../lib/api';
+import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -23,31 +26,48 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
 } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
-import { 
-  Search, 
-  Filter, 
-  GraduationCap, 
-  Users, 
-  FileText, 
-  BarChart3, 
-  FileEdit, 
-  LogOut, 
-  Send, 
-  Trash2, 
-  UserCheck, 
-  UserMinus, 
-  Shield, 
+import {
+  Search,
+  Filter,
+  GraduationCap,
+  Users,
+  FileText,
+  BarChart3,
+  FileEdit,
+  LogOut,
+  Send,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  Shield,
   Target,
-  User, X, Edit2, Phone, Building, AlertTriangle
+  User, X, Edit2, Phone, Building, AlertTriangle,
+  Calendar, Clock, UserPlus, CalendarClock, ChevronUp, Loader2, Utensils, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Importación de tipos y componentes adicionales
 import { Practitioner } from '../lib/mockData';
 import PatientList from '../components/PatientList';
+import DateFilterPicker from '../components/DateFilterPicker';
+import MonthFilterPicker from '../components/MonthFilterPicker';
+import ViewModeToggle from '../components/ViewModeToggle';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
 import NotesViewer from '../components/NotesViewer';
+import AppointmentForm from '../components/AppointmentForm';
+
+interface Appointment {
+  id: number;
+  paciente_id?: number;
+  paciente_nombre: string;
+  tipo: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+  practicante_id?: number | null;
+  practicante_nombre?: string | null;
+}
 
 export default function ManageAdminPage() {
   const navigate = useNavigate();
@@ -66,10 +86,23 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     titulo: '',
     contenido: '',
     destino: 'todos' as 'nutricion' | 'fisioterapia' | 'todos',
-    emailDestinatario: 'ninguno' 
+    emailDestinatario: 'ninguno'
   });
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
+
+  // ESTADOS DE CITAS AGENDADAS
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
+  const [citasAreaFilter, setCitasAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+  const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // ==========================================
   // ESTADOS PARA LA BARRA LATERAL (PERFIL)
@@ -93,9 +126,14 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     cargarPracticantes();
     const interval = setInterval(() => {
       cargarPracticantes();
-    }, 30000); 
+    }, 30000);
     return () => clearInterval(interval);
   }, [user, areaFilter]);
+
+  // EFECTO DE CARGA DE CITAS AGENDADAS (filtra por área, día/mes y fecha elegida)
+  useEffect(() => {
+    cargarCitas();
+  }, [citasAreaFilter, selectedDate, selectedMonth, viewMode]);
 
   // Inicializar datos del perfil cuando el usuario carga
   useEffect(() => {
@@ -138,6 +176,31 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   };
 
   /**
+   * CARGA DE CITAS AGENDADAS (AMBAS ÁREAS, FILTRABLE POR EL SELECTOR DE ÁREA Y FECHA)
+   */
+  const cargarCitas = async () => {
+    try {
+      setIsLoadingCitas(true);
+      const todas: Appointment[] = await citasAPI.getAll();
+      const filtradas = todas.filter((apt) => {
+        const cleanAptDate = apt.fecha.split('T')[0];
+        const matchesArea = citasAreaFilter === 'todos' ? true : apt.tipo === citasAreaFilter;
+        const matchesFecha = viewMode === 'day'
+          ? cleanAptDate === selectedDate
+          : cleanAptDate.startsWith(selectedMonth);
+        return matchesFecha && matchesArea;
+      });
+      // ORDEN DESCENDENTE: más reciente primero (fecha y, dentro del mismo día, hora)
+      filtradas.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
+      setAppointments(filtradas);
+    } catch (error) {
+      console.error("Error Master -> Citas:", error);
+    } finally {
+      setIsLoadingCitas(false);
+    }
+  };
+
+  /**
    * LÓGICA DE FILTRADO PARA EL DESPLEGABLE DE USUARIOS (EN VIVO)
    */
   const adminsDisponibles = practicantes.filter(u => {
@@ -154,6 +217,16 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
   return matchesSearch && matchesArea && matchesRole;
 });
+
+  /**
+   * PRACTICANTES ACTIVOS DEL ÁREA DE LA CITA SELECCIONADA (PARA EL MODAL DE ASIGNACIÓN)
+   */
+  const practicantesParaAsignar = practicantes.filter(p =>
+    p.rol === 'practicante' &&
+    p.area === selectedAppointment?.tipo &&
+    p.status === 'activo'
+  );
+
   /**
    * CAMBIAR ESTADO (ACTIVAR/DESACTIVAR)
    */
@@ -216,6 +289,37 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
       toast.error("Error al publicar en la base de datos");
     } finally {
       setIsEnviando(false);
+    }
+  };
+
+  /**
+   * ASIGNAR / RE-ASIGNAR PRACTICANTE A UNA CITA
+   */
+  const handleOpenAssignModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setSelectedPractitioner(null);
+    setIsAssignModalOpen(true);
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedPractitioner || !selectedAppointment) return;
+
+    try {
+      setIsAssigning(true);
+      await citasAPI.asignar(selectedAppointment.id, {
+        practicante_id: selectedPractitioner.id,
+        practicante_nombre: selectedPractitioner.name
+      });
+
+      toast.success(`Cita asignada a ${selectedPractitioner.name} correctamente.`);
+      setIsAssignModalOpen(false);
+      setSelectedPractitioner(null);
+      setSelectedAppointment(null);
+      cargarCitas();
+    } catch (error) {
+      toast.error("Error de conexión con el servidor.");
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -341,6 +445,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           <Tabs defaultValue="practitioners" className="space-y-6">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-2 border border-gray-100 overflow-x-auto">
               <TabsList className="bg-transparent flex justify-start gap-2 h-auto">
+                <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
+                  <Calendar className="w-4 h-4" /> Citas Agendadas
+                </TabsTrigger>
                 <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
                   <GraduationCap className="w-4 h-4" /> Personal Académico
                 </TabsTrigger>
@@ -357,6 +464,164 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 </TabsTrigger>
               </TabsList>
             </div>
+
+            {/* CONTENIDO: CITAS AGENDADAS (AMBAS ÁREAS) */}
+            <TabsContent value="today_appointments" className="animate-in fade-in duration-500">
+              <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
+                <CardHeader className="bg-gray-50/80 border-b p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-blue-900 font-extrabold">Citas Programadas</CardTitle>
+                      <CardDescription className="text-gray-500 font-medium italic">
+                        {viewMode === 'day'
+                          ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
+                          : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                        {citasAreaFilter !== 'todos' && ` · Área: ${citasAreaFilter}`}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select value={citasAreaFilter} onValueChange={(v: any) => setCitasAreaFilter(v)}>
+                        <SelectTrigger className="w-[160px] bg-white border-blue-200 text-blue-900 font-bold h-11 rounded-xl shadow-sm">
+                          <SelectValue placeholder="Área" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos" className="font-bold">Ambas áreas</SelectItem>
+                          <SelectItem value="nutricion">Solo Nutrición</SelectItem>
+                          <SelectItem value="fisioterapia">Solo Fisioterapia</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
+                      {viewMode === 'day' ? (
+                        <>
+                          <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                          {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                              onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                            >
+                              Hoy
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
+                          {selectedMonth !== format(new Date(), 'yyyy-MM') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                              onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
+                            >
+                              Este mes
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    {isLoadingCitas ? (
+                      <div className="flex flex-col items-center py-12 gap-3">
+                        <Loader2 className="animate-spin text-blue-900" />
+                        <p className="text-sm font-bold text-blue-900/50">Sincronizando agenda...</p>
+                      </div>
+                    ) : appointments.length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
+                        No se registran citas para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.
+                      </div>
+                    ) : (
+                      appointments.map((apt) => (
+                        <div key={apt.id} className="space-y-2">
+                          <div className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-full ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-900'}`}>
+                                {apt.tipo === 'nutricion' ? <Utensils className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
+                                <div className="flex gap-3 items-center">
+                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3" /> {apt.hora.substring(0, 5)} HRS</span>
+                                  <Badge variant="outline" className={`text-[9px] font-black uppercase px-2 py-0.5 ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                    {apt.tipo}
+                                  </Badge>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                              {apt.practicante_id && (
+                                <div className="flex flex-col items-end mr-2">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
+                                  <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2">
+                                    <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                                  </span>
+                                </div>
+                              )}
+
+                              {!esCitaBloqueada(apt) && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                    onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
+                                  >
+                                    <CalendarClock className="w-4 h-4" />
+                                    {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    variant={apt.practicante_id ? "outline" : "default"}
+                                    className={apt.practicante_id
+                                      ? "border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                      : "bg-blue-900 hover:bg-blue-800 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+                                    onClick={() => handleOpenAssignModal(apt)}
+                                  >
+                                    <UserPlus className="w-4 h-4" />
+                                    {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {reagendarCitaId === apt.id && (
+                            <div className="bg-white border border-blue-900/10 rounded-xl p-5 shadow-inner animate-in slide-in-from-top-2 duration-300">
+                              <div className="flex items-center gap-2 mb-5 text-blue-900">
+                                <CalendarClock className="w-5 h-5" />
+                                <span className="text-xs font-black uppercase tracking-widest">
+                                  Nueva Fecha y Hora para {apt.paciente_nombre}
+                                </span>
+                              </div>
+                              <AppointmentForm
+                                patientId={apt.paciente_id?.toString() || ''}
+                                existingAppointment={apt as any}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setReagendarCitaId(null)}
+                                className="w-full mt-3 text-slate-400 text-[10px] font-bold hover:bg-slate-50"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5 mr-1" /> CANCELAR EDICIÓN
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             {/* CONTENIDO: GESTIÓN DE DOCENTES */}
             <TabsContent value="practitioners" className="animate-in fade-in duration-500">
@@ -624,12 +889,70 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         </footer>
       </div>
 
+      {/* MODAL DE ASIGNACIÓN DE PRACTICANTE (CITAS AGENDADAS) */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
+          <DialogHeader>
+            <DialogTitle className="text-blue-900 text-2xl font-black flex items-center gap-3">
+              <UserPlus className="w-6 h-6 text-blue-600" /> Asignar Practicante
+            </DialogTitle>
+            <DialogDescription className="font-bold text-slate-500 italic">
+              Paciente: {selectedAppointment?.paciente_nombre} · Área: {selectedAppointment?.tipo}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1">Seleccionar practicante del área</Label>
+            <Select
+              onValueChange={(val) => {
+                const p = practicantesParaAsignar.find(u => u.id.toString() === val);
+                setSelectedPractitioner(p);
+              }}
+            >
+              <SelectTrigger className="rounded-xl h-14 border-blue-200 font-bold focus:ring-blue-500">
+                <SelectValue placeholder="Buscar en la plantilla..." />
+              </SelectTrigger>
+              <SelectContent>
+                {practicantesParaAsignar.length > 0 ? (
+                  practicantesParaAsignar.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()} className="font-medium italic uppercase">
+                      {p.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-xs font-black text-slate-400 uppercase">No hay practicantes activos en esta área</div>
+                )}
+              </SelectContent>
+            </Select>
+
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mt-2">
+              <p className="text-[11px] text-blue-800 font-bold leading-tight">
+                Una vez asignado, el practicante podrá visualizar la cita en su panel y proceder con la evaluación clínica.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            {selectedPractitioner && (
+              <Button
+                onClick={handleConfirmAssignment}
+                disabled={isAssigning}
+                className="w-full bg-blue-900 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+              >
+                {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
+                CONFIRMAR ASIGNACIÓN
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ========================================== */}
       {/* PANEL LATERAL DEL PERFIL (DRAWER)          */}
       {/* ========================================== */}
-      
+
       {/* Overlay Oscuro */}
-      <div 
+      <div
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out ${isDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsDrawerOpen(false)}
       ></div>

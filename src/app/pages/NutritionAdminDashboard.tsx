@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
+import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -28,9 +29,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 import PatientList from '../components/PatientList';
+import DateFilterPicker from '../components/DateFilterPicker';
+import MonthFilterPicker from '../components/MonthFilterPicker';
+import ViewModeToggle from '../components/ViewModeToggle';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
@@ -59,6 +64,9 @@ export default function NutritionAdminDashboard() {
   // ESTADOS DE CITAS
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
   
   // --- ESTADO PARA RE-AGENDAR (IDÉNTICO AL PACIENTE) ---
   const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
@@ -106,15 +114,19 @@ export default function NutritionAdminDashboard() {
     const fetchTodayAppointments = async () => {
       try {
         setIsLoadingCitas(true);
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
         const allAppointments: Appointment[] = await citasAPI.getAll();
         const filtered = allAppointments.filter((apt) => {
           const cleanAptDate = apt.fecha.split('T')[0];
+          const matchesFecha = viewMode === 'day'
+            ? cleanAptDate === selectedDate
+            : cleanAptDate.startsWith(selectedMonth);
           return (
-            cleanAptDate === todayStr &&
+            matchesFecha &&
             apt.tipo === 'nutricion'
           );
         });
+        // ORDEN DESCENDENTE: más reciente primero (fecha y, dentro del mismo día, hora)
+        filtered.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
         setTodayAppointments(filtered);
       } catch (error) {
         console.error("❌ Error Admin Nutrición -> PostgreSQL:", error);
@@ -148,7 +160,7 @@ export default function NutritionAdminDashboard() {
 
     const interval = setInterval(cargarPracticantesEnVivo, 30000);
     return () => clearInterval(interval);
-  }, [user, authLoading, navigate, refreshKey]);
+  }, [user, authLoading, navigate, refreshKey, selectedDate, selectedMonth, viewMode]);
 
   // Sincronizar datos del perfil si el objeto 'user' se actualiza desde el contexto
   useEffect(() => {
@@ -322,7 +334,7 @@ export default function NutritionAdminDashboard() {
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
-              <Calendar className="w-4 h-4 mr-2" /> Agenda de Hoy
+              <Calendar className="w-4 h-4 mr-2" /> Citas Agendadas
             </TabsTrigger>
             <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
               <Settings className="w-4 h-4 mr-2" /> Personal
@@ -341,15 +353,55 @@ export default function NutritionAdminDashboard() {
           <TabsContent value="today_appointments">
             <Card className="border-orange-200 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
               <CardHeader className="bg-orange-50/50 border-b p-6">
-                <CardTitle className="text-orange-900 font-extrabold">Citas Programadas</CardTitle>
-                <CardDescription className="font-medium italic text-orange-800/60">Consulta de hoy: {format(new Date(), 'dd/MM/yyyy')}</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-orange-900 font-extrabold">Citas Programadas</CardTitle>
+                    <CardDescription className="font-medium italic text-orange-800/60">
+                      {viewMode === 'day'
+                        ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
+                        : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="orange" />
+                    {viewMode === 'day' ? (
+                      <>
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" />
+                        {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
+                            onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                          >
+                            Hoy
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="orange" />
+                        {selectedMonth !== format(new Date(), 'yyyy-MM') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
+                            onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
+                          >
+                            Este mes
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-3">
                   {isLoadingCitas ? (
                     <div className="flex flex-col items-center py-12 gap-3"><Loader2 className="animate-spin text-orange-600" /><p className="text-sm font-bold text-orange-900/50">Sincronizando agenda...</p></div>
                   ) : todayAppointments.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed rounded-3xl border-orange-100 italic text-slate-400">No se registran citas de nutrición para hoy.</div>
+                    <div className="text-center py-12 border-2 border-dashed rounded-3xl border-orange-100 italic text-slate-400">No se registran citas de nutrición para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.</div>
                   ) : (
                     todayAppointments.map((apt) => (
                       <div key={apt.id} className="space-y-2">
@@ -359,12 +411,13 @@ export default function NutritionAdminDashboard() {
                             <div>
                               <p className="font-black text-orange-950 uppercase text-sm">{apt.paciente_nombre}</p>
                               <div className="flex gap-3 items-center">
+                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
                                 <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS</span>
-                                <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-black border border-green-100">{apt.estado}</span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-4">
                             {apt.practicante_id && (
                               <div className="flex flex-col items-end mr-2">
@@ -375,28 +428,32 @@ export default function NutritionAdminDashboard() {
                               </div>
                             )}
 
-                            {/* BOTÓN RE-AGENDAR */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
-                              onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
-                            >
-                              <CalendarClock className="w-4 h-4" />
-                              {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
-                            </Button>
+                            {!esCitaBloqueada(apt) && (
+                              <>
+                                {/* BOTÓN RE-AGENDAR */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
+                                >
+                                  <CalendarClock className="w-4 h-4" />
+                                  {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
+                                </Button>
 
-                            <Button 
-                              size="sm" 
-                              variant={apt.practicante_id ? "outline" : "default"}
-                              className={apt.practicante_id 
-                                ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm" 
-                                : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
-                              onClick={() => handleOpenAssignModal(apt)}
-                            >
-                              <UserPlus className="w-4 h-4" />
-                              {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
-                            </Button>
+                                <Button
+                                  size="sm"
+                                  variant={apt.practicante_id ? "outline" : "default"}
+                                  className={apt.practicante_id
+                                    ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                    : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+                                  onClick={() => handleOpenAssignModal(apt)}
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                  {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
 
