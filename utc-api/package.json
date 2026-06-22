@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "predev": "node scripts/free-port.js",
     "dev": "node --watch index.js"
   },
   "dependencies": {
