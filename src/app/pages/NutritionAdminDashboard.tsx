@@ -296,24 +296,28 @@ export default function NutritionAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 overflow-x-hidden" style={arialStyle}>
-      
-      {/* HEADER SUPERIOR */}
-      <header className="bg-white border-b border-orange-900/10 shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
+      {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-blue-50/60"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
+
+      {/* HEADER SUPERIOR (tarjeta flotante, igual estilo que MasterAdminDashboard) */}
+      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+        <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
+          <div className="flex justify-between items-center px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-400 rounded-full flex items-center justify-center shadow-md">
                 <Utensils className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-orange-900">Clínica UTC - Nutrición</h1>
+                <h1 className="text-2xl font-bold text-orange-900">Clínica UTC - Nutrición</h1>
                 <p className="text-sm text-orange-900/60 font-medium">Panel de Coordinación Académica</p>
               </div>
             </div>
-            
+
             {/* Perfil del Usuario Integrado */}
-            <button 
+            <button
               onClick={() => setIsDrawerOpen(true)}
               className="flex items-center gap-4 text-right hidden sm:flex hover:bg-orange-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
@@ -326,37 +330,37 @@ export default function NutritionAdminDashboard() {
               </div>
             </button>
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-0">
+      <main className="max-w-7xl mx-auto px-4 pb-8 sm:px-6 lg:px-8 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
-          <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
-              <Calendar className="w-4 h-4 mr-2" /> Citas Agendadas
+          <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Calendar className="w-5 h-5 mr-2" /> Citas Agendadas
             </TabsTrigger>
-            <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
-              <Settings className="w-4 h-4 mr-2" /> Personal
+            <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Settings className="w-5 h-5 mr-2" /> Personal
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
-              <BarChart3 className="w-4 h-4 mr-2" /> Métricas
+            <TabsTrigger value="statistics" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <BarChart3 className="w-5 h-5 mr-2" /> Métricas
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold">
-              <Users className="w-4 h-4 mr-2" /> Pacientes
+            <TabsTrigger value="patients" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black">
-              <FileEdit className="w-4 h-4 mr-2" /> Comunicados
+            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-5 py-2.5 text-base">
+              <FileEdit className="w-5 h-5 mr-2" /> Comunicados
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="today_appointments">
             <Card className="border-orange-200 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-              <CardHeader className="bg-orange-50/50 border-b p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardHeader className="bg-orange-50/50 border-b p-7">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                   <div>
-                    <CardTitle className="text-orange-900 font-extrabold">Citas Programadas</CardTitle>
-                    <CardDescription className="font-medium italic text-orange-800/60">
+                    <CardTitle className="text-orange-900 font-extrabold text-xl">Citas Programadas</CardTitle>
+                    <CardDescription className="font-medium italic text-orange-800/60 text-base">
                       {viewMode === 'day'
                         ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                         : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
@@ -405,25 +409,25 @@ export default function NutritionAdminDashboard() {
                   ) : (
                     todayAppointments.map((apt) => (
                       <div key={apt.id} className="space-y-2">
-                        <div className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-orange-300 transition-all shadow-sm">
-                          <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-orange-50 text-orange-600"><Utensils className="w-5 h-5"/></div>
+                        <div className="flex items-center justify-between p-6 border rounded-2xl bg-white hover:border-orange-300 transition-all shadow-sm">
+                          <div className="flex items-center gap-5">
+                            <div className="p-3.5 rounded-full bg-orange-50 text-orange-600"><Utensils className="w-6 h-6"/></div>
                             <div>
-                              <p className="font-black text-orange-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                              <div className="flex gap-3 items-center">
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS</span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
+                              <p className="font-black text-orange-950 uppercase text-base">{apt.paciente_nombre}</p>
+                              <div className="flex gap-3.5 items-center">
+                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3.5 h-3.5"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {apt.hora.substring(0,5)} HRS</span>
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-5">
                             {apt.practicante_id && (
                               <div className="flex flex-col items-end mr-2">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
-                                <span className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 flex items-center gap-2">
-                                  <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
+                                <span className="bg-orange-50 text-orange-700 px-5 py-2 rounded-xl text-sm font-black border border-orange-100 flex items-center gap-2">
+                                  <UserCheck className="w-3.5 h-3.5" /> {apt.practicante_nombre || "Asignado"}
                                 </span>
                               </div>
                             )}
@@ -432,24 +436,22 @@ export default function NutritionAdminDashboard() {
                               <>
                                 {/* BOTÓN RE-AGENDAR */}
                                 <Button
-                                  size="sm"
                                   variant="outline"
-                                  className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  className="h-10 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                   onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                 >
-                                  <CalendarClock className="w-4 h-4" />
+                                  <CalendarClock className="w-5 h-5" />
                                   {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
                                 </Button>
 
                                 <Button
-                                  size="sm"
                                   variant={apt.practicante_id ? "outline" : "default"}
                                   className={apt.practicante_id
-                                    ? "border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
-                                    : "bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+                                    ? "h-10 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                    : "h-10 bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
                                   onClick={() => handleOpenAssignModal(apt)}
                                 >
-                                  <UserPlus className="w-4 h-4" />
+                                  <UserPlus className="w-5 h-5" />
                                   {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
                                 </Button>
                               </>
@@ -585,6 +587,14 @@ export default function NutritionAdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <footer className="py-16 text-center">
+        <div className="inline-block px-7 py-2.5 border-y border-orange-900/10">
+          <p className="text-xs text-orange-900/40 font-black uppercase tracking-[0.6em] opacity-40">
+            Sistema de Gestión de Academias UTC • 2026
+          </p>
+        </div>
+      </footer>
 
       {/* MODAL DE ASIGNACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

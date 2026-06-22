@@ -31,15 +31,15 @@ export default function MonthFilterPicker({ selectedMonth, onChange, theme = 'bl
   };
 
   return (
-    <div className={`h-11 pl-1 pr-3 rounded-xl font-bold flex items-center gap-1 border bg-white ${THEME_CLASSES[theme]}`}>
-      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => goToMonth(-1)}>
-        <ChevronLeft className="w-4 h-4" />
+    <div className={`h-12 pl-1.5 pr-3.5 rounded-xl font-bold flex items-center gap-1.5 border bg-white text-base ${THEME_CLASSES[theme]}`}>
+      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => goToMonth(-1)}>
+        <ChevronLeft className="w-5 h-5" />
       </Button>
-      <span className="px-1 capitalize min-w-[130px] text-center">
+      <span className="px-1 capitalize min-w-[150px] text-center">
         {format(currentDate, 'MMMM yyyy', { locale: es })}
       </span>
-      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => goToMonth(1)}>
-        <ChevronRight className="w-4 h-4" />
+      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => goToMonth(1)}>
+        <ChevronRight className="w-5 h-5" />
       </Button>
     </div>
   );

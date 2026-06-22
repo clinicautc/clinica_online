@@ -19,18 +19,18 @@ const ACTIVE_CLASSES = {
 
 export default function ViewModeToggle({ mode, onChange, theme = 'blue' }: ViewModeToggleProps) {
   return (
-    <div className="h-11 flex items-center bg-white border border-slate-200 rounded-xl p-1 gap-1">
+    <div className="h-12 flex items-center bg-white border border-slate-200 rounded-xl p-1.5 gap-1.5">
       <button
         type="button"
         onClick={() => onChange('day')}
-        className={`px-3 h-full rounded-lg text-xs font-bold transition-colors ${mode === 'day' ? ACTIVE_CLASSES[theme] : 'text-slate-500 hover:bg-slate-50'}`}
+        className={`px-3.5 h-full rounded-lg text-sm font-bold transition-colors ${mode === 'day' ? ACTIVE_CLASSES[theme] : 'text-slate-500 hover:bg-slate-50'}`}
       >
         Día
       </button>
       <button
         type="button"
         onClick={() => onChange('month')}
-        className={`px-3 h-full rounded-lg text-xs font-bold transition-colors ${mode === 'month' ? ACTIVE_CLASSES[theme] : 'text-slate-500 hover:bg-slate-50'}`}
+        className={`px-3.5 h-full rounded-lg text-sm font-bold transition-colors ${mode === 'month' ? ACTIVE_CLASSES[theme] : 'text-slate-500 hover:bg-slate-50'}`}
       >
         Mes
       </button>

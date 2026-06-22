@@ -295,22 +295,27 @@ export default function PhysiotherapyAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 overflow-x-hidden" style={arialStyle}>
-      <header className="bg-white border-b border-blue-900/10 shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
+      {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-blue-50/60"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
+
+      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+        <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
+          <div className="flex justify-between items-center px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
                 <Activity className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-blue-900">Clínica UTC - Fisioterapia</h1>
+                <h1 className="text-2xl font-bold text-blue-900">Clínica UTC - Fisioterapia</h1>
                 <p className="text-sm text-blue-900/60">Panel de Coordinación Administrativa</p>
               </div>
             </div>
-            
+
             {/* Perfil del Usuario Integrado (Botón que abre el Drawer) */}
-            <button 
+            <button
               onClick={() => setIsDrawerOpen(true)}
               className="flex items-center gap-4 text-right hidden sm:flex hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -323,36 +328,36 @@ export default function PhysiotherapyAdminDashboard() {
               </div>
             </button>
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-0">
+      <main className="max-w-7xl mx-auto px-4 pb-8 sm:px-6 lg:px-8 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
-          <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1 h-auto flex-wrap gap-1 shadow-sm rounded-xl">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Calendar className="w-4 h-4 mr-2" /> Citas Agendadas
+          <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Calendar className="w-5 h-5 mr-2" /> Citas Agendadas
             </TabsTrigger>
-            <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Settings className="w-4 h-4 mr-2" /> Personal
+            <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Settings className="w-5 h-5 mr-2" /> Personal
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <BarChart3 className="w-4 h-4 mr-2" /> Métricas
+            <TabsTrigger value="statistics" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <BarChart3 className="w-5 h-5 mr-2" /> Métricas
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Users className="w-4 h-4 mr-2" /> Pacientes
+            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black">
-              <FileEdit className="w-4 h-4 mr-2" /> Comunicados
+            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-5 py-2.5 text-base">
+              <FileEdit className="w-5 h-5 mr-2" /> Comunicados
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="today_appointments">
             <Card className="border-blue-900/10 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-              <CardHeader className="bg-slate-50/50 border-b p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardHeader className="bg-slate-50/50 border-b p-7">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                   <div>
-                    <CardTitle className="text-blue-900 font-extrabold">Citas de Fisioterapia</CardTitle>
-                    <CardDescription className="font-medium italic">
+                    <CardTitle className="text-blue-900 font-extrabold text-xl">Citas de Fisioterapia</CardTitle>
+                    <CardDescription className="font-medium italic text-base">
                       {viewMode === 'day'
                         ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                         : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
@@ -406,35 +411,35 @@ export default function PhysiotherapyAdminDashboard() {
                   ) : (
                     todayAppointments.map((apt) => (
                       <div key={apt.id} className="space-y-2">
-                        <div className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-                          <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-blue-50 text-blue-900">
-                              <Activity className="w-5 h-5"/>
+                        <div className="flex items-center justify-between p-6 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                          <div className="flex items-center gap-5">
+                            <div className="p-3.5 rounded-full bg-blue-50 text-blue-900">
+                              <Activity className="w-6 h-6"/>
                             </div>
                             <div>
-                              <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                              <div className="flex gap-3 items-center">
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
+                              <p className="font-black text-blue-950 uppercase text-base">{apt.paciente_nombre}</p>
+                              <div className="flex gap-3.5 items-center">
+                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                                  <Calendar className="w-3.5 h-3.5"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
                                 </span>
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                  <Clock className="w-3 h-3"/> {apt.hora.substring(0,5)} HRS
+                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5"/> {apt.hora.substring(0,5)} HRS
                                 </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>
                                   {apt.estado}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-7">
                             {apt.practicante_id && (
                               <div className="flex flex-col items-end">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                                   Responsable:
                                 </span>
-                                <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2 shadow-sm">
-                                  <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                                <span className="bg-blue-50 text-blue-700 px-5 py-2 rounded-xl text-sm font-black border border-blue-100 flex items-center gap-2 shadow-sm">
+                                  <UserCheck className="w-3.5 h-3.5" /> {apt.practicante_nombre || "Asignado"}
                                 </span>
                               </div>
                             )}
@@ -443,24 +448,23 @@ export default function PhysiotherapyAdminDashboard() {
                               <>
                                 {/* NUEVO BOTÓN RE-AGENDAR PARA FISIO */}
                                 <Button
-                                  size="sm"
+                                  className="h-11 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                   variant="outline"
-                                  className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
                                   onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                 >
-                                  <Calendar className="w-4 h-4" />
+                                  <Calendar className="w-5 h-5" />
                                   {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
                                 </Button>
 
                                 <Button
                                   onClick={() => handleOpenAssignModal(apt)}
-                                  className={`h-11 rounded-xl font-black transition-all px-6 shadow-md flex items-center gap-2 ${
+                                  className={`h-11 rounded-xl font-black transition-all px-7 shadow-md flex items-center gap-2 ${
                                     apt.practicante_id
                                       ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
                                       : "bg-blue-600 text-white hover:bg-blue-700"
                                   }`}
                                 >
-                                  <UserPlus className="w-4 h-4" />
+                                  <UserPlus className="w-5 h-5" />
                                   {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
                                 </Button>
                               </>
@@ -592,6 +596,14 @@ export default function PhysiotherapyAdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <footer className="py-16 text-center">
+        <div className="inline-block px-7 py-2.5 border-y border-blue-900/10">
+          <p className="text-xs text-blue-900/40 font-black uppercase tracking-[0.6em] opacity-40">
+            Sistema de Gestión de Academias UTC • 2026
+          </p>
+        </div>
+      </footer>
 
       {/* MODAL DE ASIGNACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

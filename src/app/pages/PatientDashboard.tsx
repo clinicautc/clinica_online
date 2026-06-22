@@ -188,43 +188,46 @@ export default function PatientDashboard() {
     : 'U';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 relative">
-      <header className="bg-white border-b border-blue-900/10 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
-                <span className="text-white font-bold text-sm sm:text-base">UTC</span>
-              </div>
-              <div className="overflow-hidden">
-                <h1 className="text-lg font-bold text-blue-900 truncate">Clínica Universitaria</h1>
-                <p className="text-xs text-blue-900/60 truncate">Fisioterapia y Nutrición</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0">
-              <div className="text-left sm:text-right">
-                <p className="text-sm font-semibold text-blue-900 leading-none mb-1">{patientName}</p>
-                <p className="text-[10px] sm:text-xs text-blue-900/60 uppercase tracking-wider">{patientRole}</p>
-              </div>
-              
-              {/* BOTÓN DE PERFIL */}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsDrawerOpen(true)} 
-                className="border-blue-900/20 text-blue-900 hover:bg-blue-50 h-9 flex items-center gap-2"
-              >
-                <User className="w-4 h-4" />
-                <span className="hidden sm:inline">Mi Perfil</span>
-              </Button>
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 via-white to-orange-50/60"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
-              
+      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+        <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
+          <div className="px-6 py-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-white font-bold text-sm">UTC</span>
+                </div>
+                <div className="overflow-hidden">
+                  <h1 className="text-2xl font-bold text-blue-900 truncate">Clínica Universitaria</h1>
+                  <p className="text-sm text-blue-900/60 truncate">Fisioterapia y Nutrición</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0">
+                {/* PERFIL DEL USUARIO (mismo ícono/botón que los demás paneles) */}
+                <button
+                  onClick={() => setIsDrawerOpen(true)}
+                  className="flex items-center gap-4 text-left sm:text-right w-full sm:w-auto justify-between sm:justify-end hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-blue-900 leading-none mb-1">{patientName}</p>
+                    <p className="text-[10px] font-black text-blue-900/60 uppercase tracking-wider">{patientRole}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden shrink-0">
+                    <User className="h-5 w-5 text-blue-600" />
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-4 pb-6 sm:pb-8 sm:px-6 lg:px-8 relative z-10">
         <div className="mb-8 text-center sm:text-left">
           <h2 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">¡Hola, {patientName.split(' ')[0]}!</h2>
           <p className="text-sm sm:text-base text-blue-900/70">Gestiona tus citas y consulta tus planes de tratamiento.</p>
@@ -232,15 +235,15 @@ export default function PatientDashboard() {
 
         <Tabs defaultValue="schedule" className="space-y-6">
           <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
-            <TabsList className="bg-white border border-blue-900/10 inline-flex w-auto min-w-full sm:min-w-0 sm:w-full justify-start sm:justify-center p-1 rounded-xl">
-              <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-4 py-2 font-bold rounded-lg transition-all duration-300">
-                <Calendar className="w-4 h-4 mr-2" /> Agendar Cita
+            <TabsList className="bg-white border border-blue-900/10 inline-flex w-auto min-w-full sm:min-w-0 sm:w-full justify-start sm:justify-center p-1.5 rounded-xl">
+              <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+                <Calendar className="w-5 h-5 mr-2" /> Agendar Cita
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-4 py-2 font-bold rounded-lg transition-all duration-300">
-                <User className="w-4 h-4 mr-2" /> Mis Citas
+              <TabsTrigger value="schedule" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+                <User className="w-5 h-5 mr-2" /> Mis Citas
               </TabsTrigger>
-              <TabsTrigger value="plans" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-4 py-2 font-bold rounded-lg transition-all duration-300">
-                <FileText className="w-4 h-4 mr-2" /> Planes Médicos
+              <TabsTrigger value="plans" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+                <FileText className="w-5 h-5 mr-2" /> Planes Médicos
               </TabsTrigger>
             </TabsList>
           </div>
@@ -283,47 +286,45 @@ export default function PatientDashboard() {
                   citasFinales.map((cita) => (
                     <div key={cita.id} className="space-y-2">
                       <Card className={`border-l-4 ${areaFiltro === 'nutricion' ? 'border-l-orange-500' : 'border-l-blue-600'} shadow-sm bg-white overflow-hidden rounded-xl transition-all duration-300`}>
-                        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 ${areaFiltro === 'nutricion' ? 'bg-orange-50' : 'bg-blue-50'} rounded-full flex items-center justify-center shrink-0`}>
-                               <Clock className={`w-6 h-6 ${areaFiltro === 'nutricion' ? 'text-orange-600' : 'text-blue-600'}`} />
+                        <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                          <div className="flex items-center gap-5">
+                            <div className={`w-14 h-14 ${areaFiltro === 'nutricion' ? 'bg-orange-50' : 'bg-blue-50'} rounded-full flex items-center justify-center shrink-0`}>
+                               <Clock className={`w-7 h-7 ${areaFiltro === 'nutricion' ? 'text-orange-600' : 'text-blue-600'}`} />
                             </div>
                             <div>
                               <div className="flex items-center gap-2 mb-1">
-                                <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                <CalendarDays className="w-4 h-4 text-slate-400" />
+                                <p className="text-xs font-black text-slate-500 uppercase tracking-tighter">
                                   {format(parseISO(cita.fecha), "eeee dd 'de' MMMM", { locale: es })}
                                 </p>
                               </div>
-                              <p className="text-xl font-black text-blue-900">{cita.hora}</p>
+                              <p className="text-2xl font-black text-blue-900">{cita.hora}</p>
                             </div>
                           </div>
-                          
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
+
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
                             <div className="text-left sm:text-right flex-1">
-                              <p className={`font-black text-xs uppercase ${areaFiltro === 'nutricion' ? 'text-orange-600' : 'text-blue-600'}`}>{cita.tipo}</p>
-                              <p className="text-[10px] font-semibold text-slate-500 italic mt-1">
+                              <p className={`font-black text-sm uppercase ${areaFiltro === 'nutricion' ? 'text-orange-600' : 'text-blue-600'}`}>{cita.tipo}</p>
+                              <p className="text-xs font-semibold text-slate-500 italic mt-1">
                                 Atiende: {cita.practicante_nombre || "Por asignar"}
                               </p>
                             </div>
-                            
-                            <div className="flex gap-2 w-full sm:w-auto">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+
+                            <div className="flex gap-2.5 w-full sm:w-auto">
+                              <Button
+                                variant="outline"
                                 onClick={() => setReagendarCitaId(reagendarCitaId === cita.id ? null : cita.id)}
-                                className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-[10px] h-9 gap-2 hover:bg-blue-50"
+                                className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-xs h-10 px-4 gap-2 hover:bg-blue-50"
                               >
-                                <CalendarClock className="w-4 h-4" />
+                                <CalendarClock className="w-5 h-5" />
                                 {reagendarCitaId === cita.id ? "CERRAR" : "RE-AGENDAR"}
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
                                 onClick={() => handleCancelarCita(cita.id)}
-                                className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-[10px] h-9 gap-2"
+                                className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-xs h-10 px-4 gap-2"
                               >
-                                <Trash2 className="w-4 h-4" /> CANCELAR
+                                <Trash2 className="w-5 h-5" /> CANCELAR
                               </Button>
                             </div>
                           </div>
@@ -370,6 +371,14 @@ export default function PatientDashboard() {
           </div>
         </Tabs>
       </main>
+
+      <footer className="py-16 text-center">
+        <div className="inline-block px-7 py-2.5 border-y border-blue-900/10">
+          <p className="text-xs text-blue-900/40 font-black uppercase tracking-[0.6em] opacity-40">
+            Sistema de Gestión de Academias UTC • 2026
+          </p>
+        </div>
+      </footer>
 
       {/* ========================================== */}
       {/* PANEL LATERAL DEL PERFIL (DRAWER)          */}

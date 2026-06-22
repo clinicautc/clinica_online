@@ -148,13 +148,13 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
         </div>
 
         <div className="relative mt-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             type="text"
             placeholder="Buscar por nombre o correo institucional..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`pl-10 border-slate-200 rounded-xl focus:ring-${areaColor}-500`}
+            className={`pl-11 h-11 text-base border-slate-200 rounded-xl focus:ring-${areaColor}-500`}
             style={arialStyle}
           />
         </div>
@@ -178,28 +178,28 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
             {filteredPractitioners.map((practitioner) => (
               <div
                 key={practitioner.id}
-                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 border rounded-[1.2rem] transition-all ${
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 border rounded-[1.2rem] transition-all ${
                   practitioner.status === 'activo' ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 opacity-75 grayscale-[0.5]'
                 } hover:shadow-md group`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-5">
                   <div
-                    className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
+                    className={`w-16 h-16 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
                       practitioner.status === 'activo'
                         ? area === 'nutricion' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-900'
                         : 'bg-gray-100 text-gray-400'
                     }`}
                   >
-                    <AreaIcon className="w-7 h-7" />
+                    <AreaIcon className="w-8 h-8" />
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-black text-slate-900 text-sm uppercase tracking-tight" style={arialStyle}>
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <h3 className="font-black text-slate-900 text-base uppercase tracking-tight" style={arialStyle}>
                         {practitioner.nombre}
                       </h3>
                       <Badge
-                        className={`text-[9px] font-black uppercase tracking-tighter ${
+                        className={`text-[10px] font-black uppercase tracking-tighter ${
                           practitioner.status === 'activo'
                             ? 'bg-green-100 text-green-700 border-green-200'
                             : 'bg-red-100 text-red-700 border-red-200'
@@ -208,17 +208,17 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
                         {practitioner.status}
                       </Badge>
                     </div>
-                    <p className="text-xs text-slate-400 font-bold" style={arialStyle}>{practitioner.email}</p>
+                    <p className="text-sm text-slate-400 font-bold" style={arialStyle}>{practitioner.email}</p>
                   </div>
                 </div>
 
-                <div className="mt-4 sm:mt-0 flex items-center gap-2 w-full sm:w-auto">
+                <div className="mt-5 sm:mt-0 flex items-center gap-2.5 w-full sm:w-auto">
                   {/* BOTÓN CAMBIAR ESTATUS */}
                   <Button
                     variant={practitioner.status === 'activo' ? 'outline' : 'default'}
                     size="sm"
                     onClick={() => handleToggleStatus(practitioner.id, practitioner.status)}
-                    className={`flex-1 sm:flex-none font-black text-[10px] uppercase h-9 px-5 rounded-xl transition-all ${
+                    className={`flex-1 sm:flex-none font-black text-xs uppercase h-10 px-6 rounded-xl transition-all ${
                       practitioner.status === 'activo'
                         ? 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
                         : area === 'nutricion' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-900 hover:bg-blue-800 text-white'
@@ -226,9 +226,9 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
                     style={arialStyle}
                   >
                     {practitioner.status === 'activo' ? (
-                      <><UserX className="w-3.5 h-3.5 mr-2" /> Desactivar</>
+                      <><UserX className="w-4 h-4 mr-2" /> Desactivar</>
                     ) : (
-                      <><UserCheck className="w-3.5 h-3.5 mr-2" /> Activar</>
+                      <><UserCheck className="w-4 h-4 mr-2" /> Activar</>
                     )}
                   </Button>
 
@@ -237,9 +237,9 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeletePractitioner(practitioner.id, practitioner.nombre)}
-                    className="h-9 w-9 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                    className="h-10 w-10 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </Button>
                 </div>
               </div>

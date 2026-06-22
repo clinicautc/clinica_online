@@ -189,7 +189,12 @@ const handleSaveProfile = async () => {
     : 'U';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 relative">
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-blue-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
+
       <header className="bg-white border-b border-blue-900/10 shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
@@ -220,23 +225,23 @@ const handleSaveProfile = async () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-blue-900 mb-2">Panel de Trabajo</h2>
-          <p className="text-blue-900/70">Gestiona pacientes, citas y consulta historiales de fisioterapia</p>
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-10">
+        <div className="mb-7">
+          <h2 className="text-3xl font-bold text-blue-900 mb-2">Panel de Trabajo</h2>
+          <p className="text-blue-900/70 text-base">Gestiona pacientes, citas y consulta historiales de fisioterapia</p>
         </div>
 
         <Tabs defaultValue="today_appointments" className="space-y-6">
-          <TabsList className="bg-white border border-blue-900/10 p-1 h-auto flex-wrap gap-1 shadow-sm">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Calendar className="w-4 h-4 mr-2" /> Citas de Hoy
+          <TabsList className="bg-white border border-blue-900/10 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Calendar className="w-5 h-5 mr-2" /> Citas de Hoy
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <Users className="w-4 h-4 mr-2" /> Pacientes
+            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
-            
-            <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold">
-              <FileText className="w-4 h-4 mr-2" /> Notas del Docente
+
+            <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+              <FileText className="w-5 h-5 mr-2" /> Notas del Docente
             </TabsTrigger>
           </TabsList>
 
@@ -261,32 +266,31 @@ const handleSaveProfile = async () => {
                   </div>
                 ) : (
                   todayAppointments.map((apt) => (
-                    <div key={apt.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow gap-4 border-l-4 border-l-blue-900">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-blue-100 text-blue-900"><Activity className="w-5 h-5"/></div>
+                    <div key={apt.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow gap-4 border-l-4 border-l-blue-900">
+                      <div className="flex items-center gap-5">
+                        <div className="p-3.5 rounded-full bg-blue-100 text-blue-900"><Activity className="w-6 h-6"/></div>
                         <div>
-                          <p className="font-bold text-blue-900 text-lg">{apt.paciente_nombre}</p>
-                          <div className="flex gap-3 mt-1">
-                            <p className="text-sm text-gray-500 font-semibold bg-gray-50 px-2 py-1 rounded">
-                              <Clock className="w-3 h-3 inline mr-1 text-blue-900"/> {apt.hora.substring(0, 5)} hrs
+                          <p className="font-bold text-blue-900 text-xl">{apt.paciente_nombre}</p>
+                          <div className="flex gap-3.5 mt-1">
+                            <p className="text-base text-gray-500 font-semibold bg-gray-50 px-2.5 py-1 rounded">
+                              <Clock className="w-3.5 h-3.5 inline mr-1 text-blue-900"/> {apt.hora.substring(0, 5)} hrs
                             </p>
-                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase border border-green-200">{apt.estado}</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-bold uppercase border border-green-200">{apt.estado}</span>
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* BOTÓN DINÁMICO: Cambia a Púrpura si el paciente ya tiene historial */}
                       <Button
-                        size="sm"
-                        className={`w-full sm:w-auto font-bold text-white shadow-sm ${
+                        className={`h-11 px-5 text-base w-full sm:w-auto font-bold text-white shadow-sm ${
                           recurrenceMap[apt.paciente_id] ? 'bg-purple-700 hover:bg-purple-800' : 'bg-blue-900 hover:bg-blue-800'
                         }`}
                         onClick={() => handleAccessForms(apt)}
                       >
                         {recurrenceMap[apt.paciente_id] ? (
-                          <><History className="w-4 h-4 mr-2" /> Ver Historial / Seguimiento</>
+                          <><History className="w-5 h-5 mr-2" /> Ver Historial / Seguimiento</>
                         ) : (
-                          <><FileText className="w-4 h-4 mr-2" /> Iniciar Evaluación</>
+                          <><FileText className="w-5 h-5 mr-2" /> Iniciar Evaluación</>
                         )}
                       </Button>
                     </div>
@@ -302,9 +306,12 @@ const handleSaveProfile = async () => {
         </Tabs>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-4 py-8 text-center text-slate-400 text-xs">
-        <p>© 2026 Universidad Tres Culturas - Sistema de Gestión de Clínica Universitaria</p>
-        <p className="mt-1 font-serif italic text-[10px]">Carga de trabajo controlada por Coordinación</p>
+      <footer className="py-16 text-center">
+        <div className="inline-block px-7 py-2.5 border-y border-blue-900/10">
+          <p className="text-xs text-blue-900/40 font-black uppercase tracking-[0.6em] opacity-40">
+            Sistema de Gestión de Academias UTC • 2026
+          </p>
+        </div>
       </footer>
 
       {/* ========================================== */}

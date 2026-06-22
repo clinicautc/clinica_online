@@ -417,21 +417,21 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
         <div className="max-w-7xl mx-auto space-y-6">
           {/* BARRA DE BÚSQUEDA Y FILTROS */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-4 flex flex-col md:flex-row items-center gap-4 border border-gray-100">
-            <div className="flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-2.5 w-full bg-white">
-              <Search className="w-5 h-5 text-gray-400" />
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-5 flex flex-col md:flex-row items-center gap-5 border border-gray-100">
+            <div className="flex-1 flex items-center gap-2.5 border border-gray-200 rounded-lg px-5 py-3 w-full bg-white">
+              <Search className="w-6 h-6 text-gray-400" />
               <input
                 type="text"
                 placeholder="Buscar personal académico por nombre o correo..."
-                className="flex-1 outline-none text-sm bg-transparent"
+                className="flex-1 outline-none text-base bg-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-2 min-w-[240px] w-full md:w-auto bg-white">
-              <Filter className="w-5 h-5 text-blue-600" />
-              <select 
-                className="flex-1 outline-none text-sm text-blue-900 bg-transparent font-bold cursor-pointer"
+            <div className="flex items-center gap-2.5 border border-gray-200 rounded-lg px-5 py-2.5 min-w-[276px] w-full md:w-auto bg-white">
+              <Filter className="w-6 h-6 text-blue-600" />
+              <select
+                className="flex-1 outline-none text-base text-blue-900 bg-transparent font-bold cursor-pointer"
                 value={areaFilter}
                 onChange={(e) => setAreaFilter(e.target.value as any)}
               >
@@ -443,24 +443,24 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           </div>
 
           <Tabs defaultValue="practitioners" className="space-y-6">
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-2 border border-gray-100 overflow-x-auto">
-              <TabsList className="bg-transparent flex justify-start gap-2 h-auto">
-                <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <Calendar className="w-4 h-4" /> Citas Agendadas
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-2.5 border border-gray-100 overflow-x-auto">
+              <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
+                <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <Calendar className="w-5 h-5" /> Citas Agendadas
                 </TabsTrigger>
-                <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <GraduationCap className="w-4 h-4" /> Personal Académico
+                <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <GraduationCap className="w-5 h-5" /> Personal Académico
                 </TabsTrigger>
-                <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <Users className="w-4 h-4" /> Pacientes
+                <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <Users className="w-5 h-5" /> Pacientes
                 </TabsTrigger>
-               
-              
-                <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <BarChart3 className="w-4 h-4" /> Estadísticas
+
+
+                <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <BarChart3 className="w-5 h-5" /> Estadísticas
                 </TabsTrigger>
-                <TabsTrigger value="admin_notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-all font-bold">
-                  <FileEdit className="w-4 h-4" /> Comunicados
+                <TabsTrigger value="admin_notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <FileEdit className="w-5 h-5" /> Comunicados
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -468,20 +468,20 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
             {/* CONTENIDO: CITAS AGENDADAS (AMBAS ÁREAS) */}
             <TabsContent value="today_appointments" className="animate-in fade-in duration-500">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="bg-gray-50/80 border-b p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardHeader className="bg-gray-50/80 border-b p-7">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                     <div>
-                      <CardTitle className="text-blue-900 font-extrabold">Citas Programadas</CardTitle>
-                      <CardDescription className="text-gray-500 font-medium italic">
+                      <CardTitle className="text-blue-900 font-extrabold text-xl">Citas Programadas</CardTitle>
+                      <CardDescription className="text-gray-500 font-medium italic text-base">
                         {viewMode === 'day'
                           ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                           : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
                         {citasAreaFilter !== 'todos' && ` · Área: ${citasAreaFilter}`}
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5 flex-wrap">
                       <Select value={citasAreaFilter} onValueChange={(v: any) => setCitasAreaFilter(v)}>
-                        <SelectTrigger className="w-[160px] bg-white border-blue-200 text-blue-900 font-bold h-11 rounded-xl shadow-sm">
+                        <SelectTrigger className="w-[184px] bg-white border-blue-200 text-blue-900 font-bold h-12 rounded-xl shadow-sm text-base">
                           <SelectValue placeholder="Área" />
                         </SelectTrigger>
                         <SelectContent>
@@ -523,12 +523,12 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
+                <CardContent className="p-7">
+                  <div className="space-y-3.5">
                     {isLoadingCitas ? (
                       <div className="flex flex-col items-center py-12 gap-3">
                         <Loader2 className="animate-spin text-blue-900" />
-                        <p className="text-sm font-bold text-blue-900/50">Sincronizando agenda...</p>
+                        <p className="text-base font-bold text-blue-900/50">Sincronizando agenda...</p>
                       </div>
                     ) : appointments.length === 0 ? (
                       <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
@@ -537,30 +537,30 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                     ) : (
                       appointments.map((apt) => (
                         <div key={apt.id} className="space-y-2">
-                          <div className="flex items-center justify-between p-5 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-                            <div className="flex items-center gap-4">
-                              <div className={`p-3 rounded-full ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-900'}`}>
-                                {apt.tipo === 'nutricion' ? <Utensils className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
+                          <div className="flex items-center justify-between p-6 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                            <div className="flex items-center gap-5">
+                              <div className={`p-3.5 rounded-full ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-900'}`}>
+                                {apt.tipo === 'nutricion' ? <Utensils className="w-6 h-6" /> : <Activity className="w-6 h-6" />}
                               </div>
                               <div>
-                                <p className="font-black text-blue-950 uppercase text-sm">{apt.paciente_nombre}</p>
-                                <div className="flex gap-3 items-center">
-                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
-                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3" /> {apt.hora.substring(0, 5)} HRS</span>
-                                  <Badge variant="outline" className={`text-[9px] font-black uppercase px-2 py-0.5 ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                <p className="font-black text-blue-950 uppercase text-base">{apt.paciente_nombre}</p>
+                                <div className="flex gap-3.5 items-center">
+                                  <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                                  <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {apt.hora.substring(0, 5)} HRS</span>
+                                  <Badge variant="outline" className={`text-[10px] font-black uppercase px-2.5 py-1 ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                     {apt.tipo}
                                   </Badge>
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
+                                  <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-5">
                               {apt.practicante_id && (
                                 <div className="flex flex-col items-end mr-2">
-                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
-                                  <span className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-xl text-xs font-black border border-blue-100 flex items-center gap-2">
-                                    <UserCheck className="w-3 h-3" /> {apt.practicante_nombre || "Asignado"}
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsable Actual:</span>
+                                  <span className="bg-blue-50 text-blue-700 px-5 py-2 rounded-xl text-sm font-black border border-blue-100 flex items-center gap-2">
+                                    <UserCheck className="w-3.5 h-3.5" /> {apt.practicante_nombre || "Asignado"}
                                   </span>
                                 </div>
                               )}
@@ -568,24 +568,22 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               {!esCitaBloqueada(apt) && (
                                 <>
                                   <Button
-                                    size="sm"
+                                    className="h-10 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                     variant="outline"
-                                    className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
                                     onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                   >
-                                    <CalendarClock className="w-4 h-4" />
+                                    <CalendarClock className="w-5 h-5" />
                                     {reagendarCitaId === apt.id ? "CERRAR" : "RE-AGENDAR"}
                                   </Button>
 
                                   <Button
-                                    size="sm"
                                     variant={apt.practicante_id ? "outline" : "default"}
                                     className={apt.practicante_id
-                                      ? "border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
-                                      : "bg-blue-900 hover:bg-blue-800 font-bold rounded-xl px-5 flex items-center gap-2 shadow-md"}
+                                      ? "h-10 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                      : "h-10 bg-blue-900 hover:bg-blue-800 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
                                     onClick={() => handleOpenAssignModal(apt)}
                                   >
-                                    <UserPlus className="w-4 h-4" />
+                                    <UserPlus className="w-5 h-5" />
                                     {apt.practicante_id ? "RE-ASIGNAR" : "ASIGNAR"}
                                   </Button>
                                 </>
@@ -626,21 +624,21 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
             {/* CONTENIDO: GESTIÓN DE DOCENTES */}
             <TabsContent value="practitioners" className="animate-in fade-in duration-500">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-6 gap-4">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-7 gap-5">
   <div>
     {/* Ajusté los textos para que coincidan exactamente con tu imagen */}
-    <CardTitle className="text-blue-900 font-extrabold text-xl"> Personal Académico</CardTitle>
-    <CardDescription className="text-gray-500 font-medium italic">Registro y boton filtro de practicantes y docentes</CardDescription>
+    <CardTitle className="text-blue-900 font-extrabold text-2xl"> Personal Académico</CardTitle>
+    <CardDescription className="text-gray-500 font-medium italic text-base">Registro y boton filtro de practicantes y docentes</CardDescription>
   </div>
-  
+
   {/* NUEVO CONTENEDOR: Agrupa el filtro y el botón naranja */}
-  <div className="flex items-center gap-3 w-full sm:w-auto">
-    
+  <div className="flex items-center gap-3.5 w-full sm:w-auto">
+
     {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
     <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
-      <SelectTrigger className="w-[180px] bg-white border-blue-200 text-blue-900 font-bold h-10 rounded-xl shadow-sm">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-blue-600" />
+      <SelectTrigger className="w-[207px] bg-white border-blue-200 text-blue-900 font-bold h-11 rounded-xl shadow-sm text-base">
+        <div className="flex items-center gap-2.5">
+          <Filter className="w-5 h-5 text-blue-600" />
           <SelectValue placeholder="Filtrar por Rol" />
         </div>
       </SelectTrigger>
@@ -652,22 +650,22 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     </Select>
 
     {/* TU BOTÓN ORIGINAL */}
-    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10 px-4">
+    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-11 px-5 text-base">
       Registrar Nuevo Acceso
     </Button>
   </div>
 </CardHeader>
-                
+
                 <CardContent className="p-0 overflow-y-auto max-h-[600px]">
                   <Table>
                     <TableHeader className="bg-white sticky top-0 z-20 border-b">
                       <TableRow>
-                        <TableHead className="pl-8 py-4 text-blue-900 font-black uppercase text-[11px] tracking-widest">Información del Docente</TableHead>
+                        <TableHead className="pl-9 py-5 text-blue-900 font-black uppercase text-xs tracking-widest">Información del Docente</TableHead>
                         {/* NUEVA CABECERA ROL */}
-                        <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest px-4">Rol</TableHead>
-                        <TableHead className="text-blue-900 font-black uppercase text-[11px] tracking-widest text-center">Area</TableHead>
-                        <TableHead className="text-center text-blue-900 font-black uppercase text-[11px] tracking-widest">Estado</TableHead>
-                        <TableHead className="text-right pr-8 text-blue-900 font-black uppercase text-[11px] tracking-widest">Activación/Desactivación</TableHead>
+                        <TableHead className="text-center text-blue-900 font-black uppercase text-xs tracking-widest px-5">Rol</TableHead>
+                        <TableHead className="text-blue-900 font-black uppercase text-xs tracking-widest text-center">Area</TableHead>
+                        <TableHead className="text-center text-blue-900 font-black uppercase text-xs tracking-widest">Estado</TableHead>
+                        <TableHead className="text-right pr-9 text-blue-900 font-black uppercase text-xs tracking-widest">Activación/Desactivación</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -676,38 +674,38 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           key={p.id} 
                           className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
                         >
-                          <TableCell className="pl-8 py-5">
+                          <TableCell className="pl-9 py-6">
                             <div className="flex flex-col">
-                              <span className={`text-sm font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
+                              <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
                                 {p.name}
                               </span>
-                              <span className="text-xs text-gray-400 font-medium italic">{p.email}</span>
+                              <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
                             </div>
                           </TableCell>
 
                           {/* COLUMNA ROL: DISEÑO DE BORDES COLOREADOS SIN FONDO (OUTLINE) */}
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <Badge 
-                                variant="outline" 
-                                className={`bg-transparent px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-1.5 border-2 ${
-                                  p.rol === 'admin' 
-                                    ? "text-purple-700 border-purple-500/40" 
+                              <Badge
+                                variant="outline"
+                                className={`bg-transparent px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 ${
+                                  p.rol === 'admin'
+                                    ? "text-purple-700 border-purple-500/40"
                                     : "text-blue-500 border-blue-400/40"
                                 }`}
                               >
-                                <Shield className="w-3 h-3" />
+                                <Shield className="w-3.5 h-3.5" />
                                 {p.rol === 'admin' ? 'Docente Titular' : 'Practicante'}
                               </Badge>
                             </div>
                           </TableCell>
 
                           <TableCell className="text-center">
-                            <Badge 
-                              variant="outline" 
-                              className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter shadow-sm ${
-                                p.area === 'nutricion' 
-                                ? "bg-orange-100 text-orange-700 border-orange-200" 
+                            <Badge
+                              variant="outline"
+                              className={`px-3.5 py-1.5 rounded-md text-[11px] font-black uppercase tracking-tighter shadow-sm ${
+                                p.area === 'nutricion'
+                                ? "bg-orange-100 text-orange-700 border-orange-200"
                                 : "bg-blue-100 text-blue-700 border-blue-200"
                               }`}
                             >
@@ -716,38 +714,38 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                                p.status === 'activo' 
-                                ? 'bg-green-50 text-green-700 border-green-200' 
+                              <span className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest border ${
+                                p.status === 'activo'
+                                ? 'bg-green-50 text-green-700 border-green-200'
                                 : 'bg-red-50 text-red-700 border-red-200'
                               }`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${p.status === 'activo' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                <div className={`w-2 h-2 rounded-full ${p.status === 'activo' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                                 {p.status}
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right pr-8">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                size="sm" 
+                          <TableCell className="text-right pr-9">
+                            <div className="flex justify-end gap-2.5">
+                              <Button
+                                size="sm"
                                 variant={p.status === 'activo' ? "outline" : "default"}
-                                onClick={() => handleCambiarEstado(p.id)} 
-                                className={`h-9 px-4 flex items-center gap-2 rounded-xl transition-all font-bold ${
-                                  p.status === 'activo' 
-                                  ? "border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white" 
+                                onClick={() => handleCambiarEstado(p.id)}
+                                className={`h-10 px-5 flex items-center gap-2 rounded-xl transition-all font-bold ${
+                                  p.status === 'activo'
+                                  ? "border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
                                   : "bg-green-600 hover:bg-green-700 text-white"
                                 }`}
                               >
-                                {p.status === 'activo' ? <UserMinus className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                                {p.status === 'activo' ? <UserMinus className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
                                 <span>{p.status === 'activo' ? 'Desactivar' : 'Activar'}</span>
                               </Button>
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                onClick={() => handleEliminarPracticante(p.id)} 
-                                className="h-9 w-9 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50"
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEliminarPracticante(p.id)}
+                                className="h-10 w-10 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-5 h-5" />
                               </Button>
                             </div>
                           </TableCell>
@@ -881,8 +879,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         </div>
 
         <footer className="py-16 text-center">
-          <div className="inline-block px-6 py-2 border-y border-gray-100">
-            <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.6em] opacity-40">
+          <div className="inline-block px-7 py-2.5 border-y border-gray-100">
+            <p className="text-xs text-gray-400 font-black uppercase tracking-[0.6em] opacity-40">
               Sistema de Gestión de Academias UTC • 2026
             </p>
           </div>

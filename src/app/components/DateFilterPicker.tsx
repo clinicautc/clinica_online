@@ -48,9 +48,9 @@ export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue
         type="button"
         variant="outline"
         onClick={handleToggle}
-        className={`h-11 px-4 rounded-xl font-bold flex items-center gap-3 ${THEME_CLASSES[theme]}`}
+        className={`h-12 px-5 rounded-xl font-bold flex items-center gap-3 text-base ${THEME_CLASSES[theme]}`}
       >
-        <CalendarDays className="w-6 h-6" />
+        <CalendarDays className="w-7 h-7" />
         {format(new Date(selectedDate + 'T00:00:00'), "dd 'de' MMMM, yyyy", { locale: es })}
       </Button>
 
