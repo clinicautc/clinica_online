@@ -1,6 +1,6 @@
 const pool = require('../db');
 
-const USUARIO_COLUMNAS_SEGURAS = 'id, nombre, email, rol, area, status, telefono, matricula, primer_inicio, fecha_creacion';
+const USUARIO_COLUMNAS_SEGURAS = 'id, nombre, email, rol, area, status, telefono, matricula, numero_empleado, primer_inicio, fecha_creacion';
 
 async function getAll(req, res) {
   try {

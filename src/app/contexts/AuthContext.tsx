@@ -44,6 +44,12 @@ interface AuthContextType {
     password: string
   ) => Promise<User>;
 
+  completarPrimerInicio: (
+    email: string,
+    passwordActual: string,
+    passwordNueva: string
+  ) => Promise<User>;
+
   logout: () => void;
 }
 
@@ -109,6 +115,29 @@ export function AuthProvider({
    * LOGIN
    * ============================================================================
    */
+  /**
+   * Guarda la sesión emitida por login() o por completarPrimerInicio() —
+   * ambos endpoints devuelven la misma forma: { ...usuario, accessToken, refreshToken }.
+   */
+  const aplicarSesion = (data: any): User => {
+
+    const foundUser: User = {
+      id: data.id,
+      nombre: data.nombre,
+      email: data.email,
+      rol: data.rol,
+      area: data.area,
+      estado: data.estado || 'activo'
+    };
+
+    setClientAccessToken(data.accessToken);
+    setRefreshToken(data.refreshToken);
+    setAccessToken(data.accessToken);
+    setUser(foundUser);
+
+    return foundUser;
+  };
+
   const login = async (
     email: string,
     password: string
@@ -122,26 +151,17 @@ export function AuthProvider({
           password
         });
 
-      const foundUser: User = {
-        id: data.id,
-        nombre: data.nombre,
-        email: data.email,
-        rol: data.rol,
-        area: data.area,
-        estado: data.estado || 'activo'
-      };
+      // PRIMER INICIO: credenciales correctas, pero todavía sin sesión real.
+      // Se rechaza la promesa con esta marca para que Login.tsx redirija
+      // al cambio de contraseña obligatorio en vez de avisar un error.
+      if (data.requiereCambioPassword) {
+        return Promise.reject({
+          requiereCambioPassword: true,
+          email: data.email
+        });
+      }
 
-      /**
-       * ============================================================================
-       * GUARDAR SESIÓN (access token en memoria, refresh token persistido)
-       * ============================================================================
-       */
-      setClientAccessToken(data.accessToken);
-      setRefreshToken(data.refreshToken);
-      setAccessToken(data.accessToken);
-      setUser(foundUser);
-
-      return foundUser;
+      return aplicarSesion(data);
 
     } catch (error: any) {
 
@@ -152,6 +172,26 @@ export function AuthProvider({
 
       return Promise.reject(error);
     }
+  };
+
+  /**
+   * ============================================================================
+   * COMPLETAR PRIMER INICIO (cambio de contraseña obligatorio)
+   * ============================================================================
+   */
+  const completarPrimerInicio = async (
+    email: string,
+    passwordActual: string,
+    passwordNueva: string
+  ): Promise<User> => {
+
+    const data = await authAPI.cambiarPasswordInicial({
+      email,
+      passwordActual,
+      passwordNueva
+    });
+
+    return aplicarSesion(data);
   };
 
   /**
@@ -180,6 +220,7 @@ export function AuthProvider({
         isAuthenticated: !!user,
         isLoading,
         login,
+        completarPrimerInicio,
         logout
       }}
     >

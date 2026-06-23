@@ -10,14 +10,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, usuariosAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { 
-  LogOut, Users, FileText, Calendar, Clock, Activity, Loader2, History, 
-  User, X, Edit2, Phone, Building, Trash2, AlertTriangle 
+import {
+  LogOut, Users, FileText, Calendar, Clock, Activity, Loader2, History,
+  User, X, Edit2, Phone, Building, Trash2, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import DateFilterPicker from '../components/DateFilterPicker';
+import MonthFilterPicker from '../components/MonthFilterPicker';
+import ViewModeToggle from '../components/ViewModeToggle';
 import PatientList from '../components/PatientList';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
@@ -38,9 +42,13 @@ interface Appointment {
 export default function PhysiotherapyPractitionerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const arialStyle = { fontFamily: 'Arial, sans-serif' };
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
   const [recurrenceMap, setRecurrenceMap] = useState<Record<number, boolean>>({});
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
 
   // ==========================================
   // ESTADOS DEL DRAWER Y PERFIL
@@ -80,19 +88,22 @@ export default function PhysiotherapyPractitionerDashboard() {
     const fetchTodayAppointments = async () => {
       try {
         setIsLoadingCitas(true);
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
 
         const allAppointments: Appointment[] = await citasAPI.getAll();
 
         const filtered = allAppointments.filter((apt) => {
           const cleanAptDate = apt.fecha.split('T')[0];
+          const matchesFecha = viewMode === 'day'
+            ? cleanAptDate === selectedDate
+            : cleanAptDate.startsWith(selectedMonth);
           return (
-            cleanAptDate === todayStr &&
+            matchesFecha &&
             apt.tipo === 'fisioterapia' &&
             (apt.estado === 'programada' || apt.estado === 'asignada' || apt.estado === 'pendiente') &&
             String(apt.practicante_id) === String(user?.id)
           );
         });
+        filtered.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
 
         setTodayAppointments(filtered);
 
@@ -118,7 +129,7 @@ export default function PhysiotherapyPractitionerDashboard() {
     if (user?.id) {
       fetchTodayAppointments();
     }
-  }, [user]);
+  }, [user, selectedDate, selectedMonth, viewMode]);
 
   // ==========================================
   // FUNCIONES DEL PERFIL (DRAWER)
@@ -167,6 +178,7 @@ const handleSaveProfile = async () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    toast.success('Sesión finalizada');
   };
 
   /**
@@ -187,45 +199,48 @@ const handleSaveProfile = async () => {
   const inicialesAvatar = profileData.nombre
     ? profileData.nombre.split(' ').map(n => n[0]).join('').substring(0, 2)
     : 'U';
+  const partesNombre = (profileData.nombre || user?.nombre || '').trim().split(' ');
+  const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim() || 'Usuario UTC';
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
+    <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
       {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100"></div>
       <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-blue-500 transform rotate-45 opacity-10"></div>
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
-      <header className="bg-white border-b border-blue-900/10 shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
+      <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
+        <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
+          <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center relative text-white">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center relative text-white shadow-md">
                 <Activity />
                 <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full animate-pulse"></span>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-blue-900">Clínica UTC - Fisioterapia</h1>
+                <h1 className="text-2xl font-bold text-blue-900">Clínica UTC - Fisioterapia</h1>
                 <p className="text-sm text-blue-900/60 font-medium">Panel de Practicante</p>
               </div>
             </div>
-            
-            {/* BOTÓN PARA ABRIR EL DRAWER DEL PERFIL */}
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsDrawerOpen(true)} 
-                className="border-blue-900/20 text-blue-900 hover:bg-blue-50 transition-colors flex items-center gap-2"
-              >
-                <User className="w-4 h-4" />
-                <span className="hidden sm:inline">Mi Perfil</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-10">
+            {/* Perfil del Usuario Integrado */}
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex items-center gap-4 text-right hidden sm:flex hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <div>
+                <p className="text-sm font-bold text-blue-900">{nombreCortoDisplay}</p>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Practicante</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
+                <User className="h-5 w-5 text-blue-600" />
+              </div>
+            </button>
+          </div>
+        </header>
+      </div>
+
+      <main className="max-w-[1480px] mx-auto px-4 py-9 sm:px-6 lg:px-6 relative z-10">
         <div className="mb-7">
           <h2 className="text-3xl font-bold text-blue-900 mb-2">Panel de Trabajo</h2>
           <p className="text-blue-900/70 text-base">Gestiona pacientes, citas y consulta historiales de fisioterapia</p>
@@ -233,14 +248,14 @@ const handleSaveProfile = async () => {
 
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white border border-blue-900/10 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Calendar className="w-5 h-5 mr-2" /> Citas de Hoy
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
 
-            <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <FileText className="w-5 h-5 mr-2" /> Notas del Docente
             </TabsTrigger>
           </TabsList>
@@ -248,10 +263,49 @@ const handleSaveProfile = async () => {
           <TabsContent value="today_appointments">
             <Card className="border-blue-900/10 shadow-md">
               <CardHeader>
-                <CardTitle className="text-blue-900 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-blue-700" />
-                  Mis Citas Asignadas - Hoy ({format(new Date(), 'dd/MM/yyyy')})
-                </CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-blue-900 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-blue-700" />
+                      Mis Citas Asignadas
+                    </CardTitle>
+                    <CardDescription className="text-blue-900/60 italic">
+                      {viewMode === 'day'
+                        ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
+                        : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
+                    {viewMode === 'day' ? (
+                      <>
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                        {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
+                          <Button
+                            variant="outline"
+                            className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                          >
+                            Hoy
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
+                        {selectedMonth !== format(new Date(), 'yyyy-MM') && (
+                          <Button
+                            variant="outline"
+                            className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
+                          >
+                            Este mes
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {isLoadingCitas ? (
@@ -262,7 +316,7 @@ const handleSaveProfile = async () => {
                 ) : todayAppointments.length === 0 ? (
                   <div className="text-center py-12 border-2 border-dashed rounded-xl border-blue-100 bg-blue-50/20 italic text-gray-500">
                     <Calendar className="w-12 h-12 text-blue-200 mx-auto mb-3" />
-                    No tienes citas asignadas para hoy.
+                    No tienes citas asignadas para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.
                   </div>
                 ) : (
                   todayAppointments.map((apt) => (
@@ -273,6 +327,9 @@ const handleSaveProfile = async () => {
                           <p className="font-bold text-blue-900 text-xl">{apt.paciente_nombre}</p>
                           <div className="flex gap-3.5 mt-1">
                             <p className="text-base text-gray-500 font-semibold bg-gray-50 px-2.5 py-1 rounded">
+                              <Calendar className="w-3.5 h-3.5 inline mr-1 text-blue-900"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
+                            </p>
+                            <p className="text-base text-gray-500 font-semibold bg-gray-50 px-2.5 py-1 rounded">
                               <Clock className="w-3.5 h-3.5 inline mr-1 text-blue-900"/> {apt.hora.substring(0, 5)} hrs
                             </p>
                             <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-bold uppercase border border-green-200">{apt.estado}</span>
@@ -282,7 +339,7 @@ const handleSaveProfile = async () => {
 
                       {/* BOTÓN DINÁMICO: Cambia a Púrpura si el paciente ya tiene historial */}
                       <Button
-                        className={`h-11 px-5 text-base w-full sm:w-auto font-bold text-white shadow-sm ${
+                        className={`h-10.75 px-5 text-base w-full sm:w-auto font-bold text-white shadow-sm ${
                           recurrenceMap[apt.paciente_id] ? 'bg-purple-700 hover:bg-purple-800' : 'bg-blue-900 hover:bg-blue-800'
                         }`}
                         onClick={() => handleAccessForms(apt)}

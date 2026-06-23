@@ -271,6 +271,7 @@ export default function NutritionAdminDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    toast.success('Sesión finalizada');
   };
 
   const handleConfirmDeleteAccount = () => {
@@ -284,7 +285,7 @@ export default function NutritionAdminDashboard() {
   };
 
   const handleGoToManagePractitioners = () => {
-    navigate('/administrar-practicantes');
+    navigate('/administrar-personal');
   };
 
   if (authLoading) {
@@ -303,9 +304,9 @@ export default function NutritionAdminDashboard() {
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
       {/* HEADER SUPERIOR (tarjeta flotante, igual estilo que MasterAdminDashboard) */}
-      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+      <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
-          <div className="flex justify-between items-center px-6 py-4">
+          <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-400 rounded-full flex items-center justify-center shadow-md">
                 <Utensils className="w-6 h-6 text-white" />
@@ -334,22 +335,22 @@ export default function NutritionAdminDashboard() {
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="max-w-7xl mx-auto px-4 pb-8 sm:px-6 lg:px-8 relative z-0">
+      <main className="max-w-[1480px] mx-auto px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Calendar className="w-5 h-5 mr-2" /> Citas Agendadas
             </TabsTrigger>
-            <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="practitioners" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Settings className="w-5 h-5 mr-2" /> Personal
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="statistics" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <BarChart3 className="w-5 h-5 mr-2" /> Métricas
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="patients" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-5 py-2.5 text-base">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-6 py-1.5 text-base">
               <FileEdit className="w-5 h-5 mr-2" /> Comunicados
             </TabsTrigger>
           </TabsList>
@@ -373,9 +374,8 @@ export default function NutritionAdminDashboard() {
                         <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" />
                         {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
+                            className="h-11.75 px-5 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
                             onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
                           >
                             Hoy
@@ -387,9 +387,8 @@ export default function NutritionAdminDashboard() {
                         <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="orange" />
                         {selectedMonth !== format(new Date(), 'yyyy-MM') && (
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
+                            className="h-11.75 px-5 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold"
                             onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
                           >
                             Este mes
@@ -437,7 +436,7 @@ export default function NutritionAdminDashboard() {
                                 {/* BOTÓN RE-AGENDAR */}
                                 <Button
                                   variant="outline"
-                                  className="h-10 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                  className="h-9.75 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                   onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                 >
                                   <CalendarClock className="w-5 h-5" />
@@ -447,8 +446,8 @@ export default function NutritionAdminDashboard() {
                                 <Button
                                   variant={apt.practicante_id ? "outline" : "default"}
                                   className={apt.practicante_id
-                                    ? "h-10 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
-                                    : "h-10 bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
+                                    ? "h-9.75 border-orange-200 text-orange-600 hover:bg-orange-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                    : "h-9.75 bg-orange-600 hover:bg-orange-700 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
                                   onClick={() => handleOpenAssignModal(apt)}
                                 >
                                   <UserPlus className="w-5 h-5" />
@@ -523,7 +522,7 @@ export default function NutritionAdminDashboard() {
 
                 <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-14 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1 active:scale-95">
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-13.75 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1 active:scale-95">
                       <Send className="w-5 h-5 mr-3 text-white" /> NUEVA NOTA
                     </Button>
                   </DialogTrigger>
@@ -548,7 +547,7 @@ export default function NutritionAdminDashboard() {
                       <div className="space-y-2">
                         <Label className="text-orange-600 font-black text-[11px] uppercase tracking-widest ml-1">Usuario Específico (Opcional)</Label>
                         <Select value={notaNueva.emailDestinatario} onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}>
-                          <SelectTrigger className="rounded-xl h-12 border-orange-300 bg-orange-50/20 font-bold">
+                          <SelectTrigger className="rounded-xl h-11.75 border-orange-300 bg-orange-50/20 font-bold">
                             <SelectValue placeholder="Seleccionar Practicante" />
                           </SelectTrigger>
                           <SelectContent>
@@ -572,7 +571,7 @@ export default function NutritionAdminDashboard() {
                     </div>
                     <DialogFooter className="gap-2">
                        <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
-                       <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-8 h-12 rounded-xl shadow-lg flex-1 active:scale-95">
+                       <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-8 h-11.75 rounded-xl shadow-lg flex-1 active:scale-95">
                         {isEnviando ? "ENVIANDO..." : "PUBLICAR AHORA"}
                       </Button>
                     </DialogFooter>
@@ -616,7 +615,7 @@ export default function NutritionAdminDashboard() {
                 setSelectedPractitioner(p);
               }}
             >
-              <SelectTrigger className="rounded-xl h-14 border-orange-200 font-bold focus:ring-orange-500">
+              <SelectTrigger className="rounded-xl h-13.75 border-orange-200 font-bold focus:ring-orange-500">
                 <SelectValue placeholder="Buscar en la plantilla..." />
               </SelectTrigger>
               <SelectContent>
@@ -644,7 +643,7 @@ export default function NutritionAdminDashboard() {
               <Button 
                 onClick={handleConfirmAssignment} 
                 disabled={isAssigning}
-                className="w-full bg-orange-600 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+                className="w-full bg-orange-600 hover:bg-black text-white font-black h-13.75 rounded-2xl shadow-xl transition-all active:scale-95"
               >
                 {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
                 CONFIRMAR ASIGNACIÓN

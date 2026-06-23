@@ -45,8 +45,17 @@
           // Si fallan, activamos el mensaje de error en pantalla
           setError('Correo o contraseña incorrectos');
         }
-      } catch {
-        // login() rechaza la promesa cuando las credenciales son incorrectas
+      } catch (err: any) {
+        // PRIMER INICIO: login() rechaza la promesa con esta marca en vez de
+        // un error real. Redirigimos al cambio de contraseña obligatorio.
+        if (err?.requiereCambioPassword) {
+          navigate('/cambiar-password-inicial', {
+            state: { email: err.email, passwordActual: password }
+          });
+          return;
+        }
+
+        // En cualquier otro caso, las credenciales son incorrectas
         setError('Correo o contraseña incorrectos');
       }
     };
@@ -99,6 +108,7 @@
                   onChange={(e) => setEmail(e.target.value)} // Actualiza el estado al escribir
                   placeholder="tu@email.com"
                   required
+                  autoComplete="username"
                   className="pl-10 border-blue-900/20 focus:border-blue-900 focus:ring-blue-900" // className="pl-10  mueve el texto para que no choque con el icono
  />
                 </div>
@@ -117,6 +127,7 @@
                   onChange={(e) => setPassword(e.target.value)} // Actualiza el estado al escribir
                   placeholder="Tu contraseña"
                   required
+                  autoComplete="current-password"
                   className="pl-10 border-blue-900/20 focus:border-blue-900 focus:ring-blue-900" />
                   <button
                     type="button"

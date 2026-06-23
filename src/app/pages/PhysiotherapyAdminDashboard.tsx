@@ -271,6 +271,7 @@ export default function PhysiotherapyAdminDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    toast.success('Sesión finalizada');
   };
 
   const handleConfirmDeleteAccount = () => {
@@ -280,7 +281,7 @@ export default function PhysiotherapyAdminDashboard() {
   };
 
   const handleGoToManagePractitioners = () => {
-    navigate('/administrar-practicantes');
+    navigate('/administrar-personal');
   };
 
   if (authLoading) {
@@ -301,9 +302,9 @@ export default function PhysiotherapyAdminDashboard() {
       <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
-      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+      <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
-          <div className="flex justify-between items-center px-6 py-4">
+          <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
                 <Activity className="w-6 h-6 text-white" />
@@ -331,22 +332,22 @@ export default function PhysiotherapyAdminDashboard() {
         </header>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 pb-8 sm:px-6 lg:px-8 relative z-0">
+      <main className="max-w-[1480px] mx-auto px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
-            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Calendar className="w-5 h-5 mr-2" /> Citas Agendadas
             </TabsTrigger>
-            <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Settings className="w-5 h-5 mr-2" /> Personal
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="statistics" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <BarChart3 className="w-5 h-5 mr-2" /> Métricas
             </TabsTrigger>
-            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-5 py-2.5 text-base">
+            <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
               <Users className="w-5 h-5 mr-2" /> Pacientes
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-5 py-2.5 text-base">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-black px-6 py-1.5 text-base">
               <FileEdit className="w-5 h-5 mr-2" /> Comunicados
             </TabsTrigger>
           </TabsList>
@@ -370,9 +371,8 @@ export default function PhysiotherapyAdminDashboard() {
                         <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
                         {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
                             onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
                           >
                             Hoy
@@ -384,9 +384,8 @@ export default function PhysiotherapyAdminDashboard() {
                         <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
                         {selectedMonth !== format(new Date(), 'yyyy-MM') && (
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                            className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
                             onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
                           >
                             Este mes
@@ -448,7 +447,7 @@ export default function PhysiotherapyAdminDashboard() {
                               <>
                                 {/* NUEVO BOTÓN RE-AGENDAR PARA FISIO */}
                                 <Button
-                                  className="h-11 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                  className="h-10.75 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                   variant="outline"
                                   onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                 >
@@ -458,7 +457,7 @@ export default function PhysiotherapyAdminDashboard() {
 
                                 <Button
                                   onClick={() => handleOpenAssignModal(apt)}
-                                  className={`h-11 rounded-xl font-black transition-all px-7 shadow-md flex items-center gap-2 ${
+                                  className={`h-10.75 rounded-xl font-black transition-all px-7 shadow-md flex items-center gap-2 ${
                                     apt.practicante_id
                                       ? "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
                                       : "bg-blue-600 text-white hover:bg-blue-700"
@@ -539,7 +538,7 @@ export default function PhysiotherapyAdminDashboard() {
 
                 <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 h-12 rounded-xl">
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 h-11.75 rounded-xl">
                       <Send className="w-4 h-4 mr-2" /> 
                       NUEVO AVISO
                     </Button>
@@ -565,7 +564,7 @@ export default function PhysiotherapyAdminDashboard() {
                       <div className="space-y-2">
                         <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1 text-orange-600">Usuario Específico (Opcional)</Label>
                         <Select value={notaNueva.emailDestinatario} onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}>
-                          <SelectTrigger className="rounded-xl h-12 border-orange-200 bg-orange-50/20 font-bold">
+                          <SelectTrigger className="rounded-xl h-11.75 border-orange-200 bg-orange-50/20 font-bold">
                             <SelectValue placeholder="Seleccionar Practicante" />
                           </SelectTrigger>
                           <SelectContent>
@@ -581,7 +580,7 @@ export default function PhysiotherapyAdminDashboard() {
                     </div>
                     <DialogFooter className="gap-2">
                        <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
-                       <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-blue-950 text-white font-black px-8 h-12 rounded-xl shadow-lg flex-1">
+                       <Button onClick={handlePublicarNotaAdmin} disabled={isEnviando} className="bg-blue-950 text-white font-black px-8 h-11.75 rounded-xl shadow-lg flex-1">
                         {isEnviando ? "PROCESANDO..." : "PUBLICAR AHORA"}
                       </Button>
                     </DialogFooter>
@@ -625,7 +624,7 @@ export default function PhysiotherapyAdminDashboard() {
                 setSelectedPractitioner(p);
               }}
             >
-              <SelectTrigger className="rounded-xl h-14 border-slate-200 font-bold">
+              <SelectTrigger className="rounded-xl h-13.75 border-slate-200 font-bold">
                 <SelectValue placeholder="Buscar en la plantilla..." />
               </SelectTrigger>
               <SelectContent>
@@ -653,7 +652,7 @@ export default function PhysiotherapyAdminDashboard() {
               <Button 
                 onClick={handleConfirmAssignment} 
                 disabled={isAssigning}
-                className="w-full bg-blue-900 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+                className="w-full bg-blue-900 hover:bg-black text-white font-black h-13.75 rounded-2xl shadow-xl transition-all active:scale-95"
               >
                 {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
                 ASIGNAR AHORA

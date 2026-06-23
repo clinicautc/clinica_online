@@ -19,7 +19,7 @@ const ACTIVE_CLASSES = {
 
 export default function ViewModeToggle({ mode, onChange, theme = 'blue' }: ViewModeToggleProps) {
   return (
-    <div className="h-12 flex items-center bg-white border border-slate-200 rounded-xl p-1.5 gap-1.5">
+    <div className="h-11.75 flex items-center bg-white border border-slate-200 rounded-xl p-1.5 gap-1.5">
       <button
         type="button"
         onClick={() => onChange('day')}

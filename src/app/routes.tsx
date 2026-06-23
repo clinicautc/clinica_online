@@ -20,13 +20,14 @@ import NutritionAdminDashboard from './pages/NutritionAdminDashboard';
 import MasterAdminDashboard from './pages/MasterAdminDashboard'; 
 // --- iMPort para la seccion de olvidar contraseñas --
 import ForgotPassword from './pages/ForgotPassword';
+import CambiarPasswordInicial from './pages/CambiarPasswordInicial';
 
 // --- CORRECCIÓN DE IMPORTACIONES (Sincronizadas con archivos físicos) ---
 import NutritionMasterForm from './pages/NutritionMasterForm';
 import PhysiotherapyMasterForm from './pages/PhysiotherapyMasterForm';
 
 import StatisticsPage from './pages/StatisticsPage';
-import ManagePractitionersPage from './pages/ManagePractitionersPage';
+import ManagePersonnelPage from './pages/ManagePersonnelPage';
 
 // --- NUEVA IMPORTACIÓN: VISOR DE HISTORIALES ---
 import MedicalHistoryViewer from './components/MedicalHistoryViewer'; 
@@ -133,6 +134,10 @@ export const router = createBrowserRouter([
     element: <ForgotPassword />
   },
   {
+    path: '/cambiar-password-inicial',
+    element: <CambiarPasswordInicial />
+  },
+  {
     path: '/register',
     element: <Register />
   },
@@ -203,10 +208,10 @@ export const router = createBrowserRouter([
     )
   },
   {
-    path: '/administrar-practicantes',
+    path: '/administrar-personal',
     element: (
       <ProtectedRoute allowedRoles={['admin', 'master']}>
-        <ManagePractitionersPage />
+        <ManagePersonnelPage />
       </ProtectedRoute>
     )
   },

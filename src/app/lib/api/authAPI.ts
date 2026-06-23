@@ -137,6 +137,23 @@ export const authAPI = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
     });
+  },
+
+  async cambiarPasswordInicial(data: { email: string; passwordActual: string; passwordNueva: string }) {
+
+    const response = await fetch(`${API_BASE_URL}/auth/cambiar-password-inicial`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'No se pudo actualizar la contraseña');
+    }
+
+    return result;
   }
 
 };

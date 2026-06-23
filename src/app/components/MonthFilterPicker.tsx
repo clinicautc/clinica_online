@@ -31,14 +31,14 @@ export default function MonthFilterPicker({ selectedMonth, onChange, theme = 'bl
   };
 
   return (
-    <div className={`h-12 pl-1.5 pr-3.5 rounded-xl font-bold flex items-center gap-1.5 border bg-white text-base ${THEME_CLASSES[theme]}`}>
-      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => goToMonth(-1)}>
+    <div className={`h-11.75 pl-1.5 pr-3.5 rounded-xl font-bold flex items-center gap-1.5 border bg-white text-base ${THEME_CLASSES[theme]}`}>
+      <Button type="button" variant="ghost" size="icon" className="h-8.75 w-8.75" onClick={() => goToMonth(-1)}>
         <ChevronLeft className="w-5 h-5" />
       </Button>
       <span className="px-1 capitalize min-w-[150px] text-center">
         {format(currentDate, 'MMMM yyyy', { locale: es })}
       </span>
-      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => goToMonth(1)}>
+      <Button type="button" variant="ghost" size="icon" className="h-8.75 w-8.75" onClick={() => goToMonth(1)}>
         <ChevronRight className="w-5 h-5" />
       </Button>
     </div>

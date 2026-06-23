@@ -1,0 +1,37 @@
+
+> clinica-utc-frontend@1.0.0 dev
+> concurrently "npm run dev:backend" "npm run dev:frontend"
+
+[0] 
+[0] > clinica-utc-frontend@1.0.0 dev:backend
+[0] > cd utc-api && npm run dev
+[0] 
+[1] 
+[1] > clinica-utc-frontend@1.0.0 dev:frontend
+[1] > vite
+[1] 
+[0] 
+[0] > utc-api-backend@1.0.0 predev
+[0] > node scripts/free-port.js
+[0] 
+[0] 
+[0] > utc-api-backend@1.0.0 dev
+[0] > node --watch index.js
+[0] 
+[1] 
+[1]   [32m[1mVITE[22m v6.3.5[39m  [2mready in [0m[1m837[22m[2m[0m ms[22m
+[1] 
+[1]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[1] [2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[0]  API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO 3001
+[1] [2m1:00:21 a.m.[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [33mwarning: [33mDuplicate key "borderTop" in object literal[33m
+[1] 106|        borderTop: `3px solid ${a.top}`,
+[1] 107|        border: `1px solid ${C.border}`,
+[1] 108|        borderTop: `3px solid ${a.top}`,
+[1]    |        ^
+[1] 109|        boxShadow: C.shadow,
+[1] 110|        borderRadius: 10,
+[1] [39m
+[1]   Plugin: [35mvite:esbuild[39m
+[1]   File: [36mC:/Users/thega/Documents/Projects/clinica_online/src/app/components/StatisticsPanel.tsx[39m
+[1] [2m1:09:49 a.m.[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\thega\Documents\Projects\clinica_online\src\app\pages\ManagePersonnelPage.tsx, /src/styles/index.css[22m

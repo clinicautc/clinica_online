@@ -23,17 +23,24 @@ import AppointmentForm from '../components/AppointmentForm';
 import PatientPlans from '../components/PatientPlans';
 import { Card, CardContent } from '../components/ui/card';
 import { toast } from 'sonner';
-import { format, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import DateFilterPicker from '../components/DateFilterPicker';
+import MonthFilterPicker from '../components/MonthFilterPicker';
+import ViewModeToggle from '../components/ViewModeToggle';
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const arialStyle = { fontFamily: 'Arial, sans-serif' };
 
   // --- ESTADOS PARA GESTIÓN DE CITAS ---
   const [citasHistoricas, setCitasHistoricas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [areaFiltro, setAreaFiltro] = useState<'nutricion' | 'fisioterapia'>('nutricion');
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
   
   /**
    * ESTADO PARA RE-AGENDAR
@@ -85,12 +92,13 @@ export default function PatientDashboard() {
     try {
       setLoading(true);
       const data = await citasAPI.getByPaciente(patientId);
-      const hoy = startOfDay(new Date());
 
-      // Filtrado: Si la fecha de la cita es antes de hoy, ya no se muestra.
+      // Filtrado por el día o mes seleccionado (en vez de "solo futuras").
       const filtradasPorFecha = data.filter((cita: any) => {
-        const fechaCita = startOfDay(parseISO(cita.fecha));
-        return !isBefore(fechaCita, hoy);
+        const cleanFecha = cita.fecha.split('T')[0];
+        return viewMode === 'day'
+          ? cleanFecha === selectedDate
+          : cleanFecha.startsWith(selectedMonth);
       });
 
       setCitasHistoricas(filtradasPorFecha);
@@ -103,7 +111,7 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     fetchCitas();
-  }, [patientId]);
+  }, [patientId, selectedDate, selectedMonth, viewMode]);
 
   const handleCancelarCita = async (id: number) => {
     if (!window.confirm("¿Estás seguro de que deseas cancelar esta cita?")) return;
@@ -124,6 +132,7 @@ export default function PatientDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    toast.success('Sesión finalizada');
   };
 
   /**
@@ -188,15 +197,15 @@ export default function PatientDashboard() {
     : 'U';
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
+    <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
       {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 via-white to-orange-50/60"></div>
       <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
-      <div className="px-4 pt-6 sm:px-6 lg:px-8 relative z-10">
+      <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
-          <div className="px-6 py-4">
+          <div className="px-6 py-3">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
@@ -227,7 +236,7 @@ export default function PatientDashboard() {
         </header>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 pb-6 sm:pb-8 sm:px-6 lg:px-8 relative z-10">
+      <main className="max-w-[1480px] mx-auto px-4 pb-7 sm:pb-9 sm:px-6 lg:px-6 relative z-10">
         <div className="mb-8 text-center sm:text-left">
           <h2 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">¡Hola, {patientName.split(' ')[0]}!</h2>
           <p className="text-sm sm:text-base text-blue-900/70">Gestiona tus citas y consulta tus planes de tratamiento.</p>
@@ -236,13 +245,13 @@ export default function PatientDashboard() {
         <Tabs defaultValue="schedule" className="space-y-6">
           <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
             <TabsList className="bg-white border border-blue-900/10 inline-flex w-auto min-w-full sm:min-w-0 sm:w-full justify-start sm:justify-center p-1.5 rounded-xl">
-              <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+              <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-6 py-1.5 text-base font-bold rounded-lg transition-all duration-300">
                 <Calendar className="w-5 h-5 mr-2" /> Agendar Cita
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+              <TabsTrigger value="schedule" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-6 py-1.5 text-base font-bold rounded-lg transition-all duration-300">
                 <User className="w-5 h-5 mr-2" /> Mis Citas
               </TabsTrigger>
-              <TabsTrigger value="plans" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-5 py-2.5 text-base font-bold rounded-lg transition-all duration-300">
+              <TabsTrigger value="plans" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white whitespace-nowrap px-6 py-1.5 text-base font-bold rounded-lg transition-all duration-300">
                 <FileText className="w-5 h-5 mr-2" /> Planes Médicos
               </TabsTrigger>
             </TabsList>
@@ -277,6 +286,37 @@ export default function PatientDashboard() {
                     Fisioterapia
                   </button>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+                <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
+                {viewMode === 'day' ? (
+                  <>
+                    <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                    {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
+                      <Button
+                        variant="outline"
+                        className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                        onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                      >
+                        Hoy
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
+                    {selectedMonth !== format(new Date(), 'yyyy-MM') && (
+                      <Button
+                        variant="outline"
+                        className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                        onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
+                      >
+                        Este mes
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="grid gap-4">
@@ -314,7 +354,7 @@ export default function PatientDashboard() {
                               <Button
                                 variant="outline"
                                 onClick={() => setReagendarCitaId(reagendarCitaId === cita.id ? null : cita.id)}
-                                className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-xs h-10 px-4 gap-2 hover:bg-blue-50"
+                                className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-xs h-9.75 px-4 gap-2 hover:bg-blue-50"
                               >
                                 <CalendarClock className="w-5 h-5" />
                                 {reagendarCitaId === cita.id ? "CERRAR" : "RE-AGENDAR"}
@@ -322,7 +362,7 @@ export default function PatientDashboard() {
                               <Button
                                 variant="ghost"
                                 onClick={() => handleCancelarCita(cita.id)}
-                                className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-xs h-10 px-4 gap-2"
+                                className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-xs h-9.75 px-4 gap-2"
                               >
                                 <Trash2 className="w-5 h-5" /> CANCELAR
                               </Button>
@@ -359,7 +399,7 @@ export default function PatientDashboard() {
                 ) : (
                   <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center flex flex-col items-center">
                     <AlertCircle className="w-10 h-10 text-slate-200 mb-2" />
-                    <p className="text-slate-400 font-bold uppercase text-xs tracking-wider">No hay citas programadas para hoy o fechas futuras</p>
+                    <p className="text-slate-400 font-bold uppercase text-xs tracking-wider">No hay citas programadas para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}</p>
                   </div>
                 )}
               </div>

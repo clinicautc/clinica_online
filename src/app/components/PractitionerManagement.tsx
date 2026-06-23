@@ -138,7 +138,7 @@ export default function PractitionerManagement({ area }: PractitionerManagementP
           </div>
 
           <Button 
-            onClick={() => navigate('/administrar-practicantes')}
+            onClick={() => navigate('/administrar-personal')}
             className={area === 'nutricion' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-900 hover:bg-blue-800'}
             style={arialStyle}
           >

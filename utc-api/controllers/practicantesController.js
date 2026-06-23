@@ -4,7 +4,9 @@ const { USUARIO_COLUMNAS_SEGURAS } = require('./usuariosController');
 
 async function getAll(req, res) {
   try {
-    const result = await pool.query(`SELECT ${USUARIO_COLUMNAS_SEGURAS} FROM usuarios WHERE rol = 'practicante' ORDER BY fecha_creacion DESC`);
+    // Incluye practicantes y docentes (admin): ambos viven en "usuarios" y se
+    // gestionan desde el mismo módulo de Gestión de Personal.
+    const result = await pool.query(`SELECT ${USUARIO_COLUMNAS_SEGURAS} FROM usuarios WHERE rol IN ('practicante', 'admin') ORDER BY fecha_creacion DESC`);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -12,10 +14,27 @@ async function getAll(req, res) {
 }
 
 async function create(req, res) {
-  const { nombre, email, matricula, area, estado, fecha_autorizacion } = req.body;
+  const { tipo, nombre, email, matricula, numero_empleado, area } = req.body;
 
-  const passwordTemporal = `UTC${matricula}`;
+  // tipo === 'docente' -> rol admin, identificado por numero_empleado.
+  // Cualquier otro valor (incluido ausente, para no romper llamadas viejas)
+  // conserva el comportamiento original: practicante, identificado por matricula.
+  const esDocente = tipo === 'docente';
+  const identificador = esDocente ? numero_empleado : matricula;
+
+  // VALIDACIÓN DE IDENTIFICADOR: solo números, máximo 9 dígitos (respaldo del
+  // lado del servidor a la validación que ya existe en el formulario).
+  if (!/^\d{1,9}$/.test(identificador || '')) {
+    return res.status(400).json({
+      error: esDocente
+        ? 'El número de empleado debe contener solo números (máximo 9 dígitos).'
+        : 'La matrícula debe contener solo números (máximo 9 dígitos).'
+    });
+  }
+
+  const passwordTemporal = `UTC${identificador}`;
   const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+  const rol = esDocente ? 'admin' : 'practicante';
 
   try {
     // DETECTAR DOMINIO DEL CORREO
@@ -39,14 +58,24 @@ async function create(req, res) {
 
     const result = await pool.query(
       `INSERT INTO usuarios
-      (nombre, email, password, rol, area, matricula, status, primer_inicio)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      (nombre, email, password, rol, area, matricula, numero_empleado, status, primer_inicio)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
-      [nombre.trim(), email.trim().toLowerCase(), passwordHash, 'practicante', area, matricula, 'activo', true]
+      [
+        nombre.trim(),
+        email.trim().toLowerCase(),
+        passwordHash,
+        rol,
+        area,
+        esDocente ? null : matricula,
+        esDocente ? numero_empleado : null,
+        'activo',
+        true
+      ]
     );
 
-    const { password: _omitPassword, ...practicanteCreado } = result.rows[0];
-    res.status(201).json(practicanteCreado);
+    const { password: _omitPassword, ...creado } = result.rows[0];
+    res.status(201).json(creado);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

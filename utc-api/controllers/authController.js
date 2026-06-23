@@ -56,6 +56,18 @@ async function login(req, res) {
       return res.status(403).json({ error: 'Tu cuenta se encuentra inactiva.' });
     }
 
+    // PRIMER INICIO: credenciales correctas, pero todavía no se emite sesión real.
+    // El frontend debe redirigir obligatoriamente al cambio de contraseña.
+    if (usuario.primer_inicio) {
+      return res.json({
+        success: true,
+        requiereCambioPassword: true,
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre
+      });
+    }
+
     const { password: _omit2, ...usuarioSafe2 } = usuario;
     const tokens2 = await issueTokens(usuario);
     res.json({ ...usuarioSafe2, ...tokens2 });
@@ -378,6 +390,53 @@ async function resetPassword(req, res) {
   }
 }
 
+// CAMBIO DE CONTRASEÑA OBLIGATORIO (PRIMER INICIO)
+// Verifica la contraseña temporal (UTC+matrícula), guarda la nueva con bcrypt,
+// apaga primer_inicio y recién ahí emite la sesión real (igual que login()).
+async function cambiarPasswordInicial(req, res) {
+  const { email, passwordActual, passwordNueva } = req.body;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const usuario = result.rows[0];
+
+    if (!usuario.primer_inicio) {
+      return res.status(400).json({ error: 'Esta cuenta ya completó su primer inicio de sesión.' });
+    }
+
+    const passwordCorrecta = await bcrypt.compare(passwordActual, usuario.password);
+
+    if (!passwordCorrecta) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const nuevaHash = await bcrypt.hash(passwordNueva, 10);
+
+    const updateResult = await pool.query(
+      'UPDATE usuarios SET password = $1, primer_inicio = false WHERE id = $2 RETURNING *',
+      [nuevaHash, usuario.id]
+    );
+
+    const usuarioActualizado = updateResult.rows[0];
+    const { password: _omitPassword, ...usuarioSafe } = usuarioActualizado;
+    const tokens = await issueTokens(usuarioActualizado);
+
+    res.json({ ...usuarioSafe, ...tokens });
+
+  } catch (error) {
+    console.error('❌ Error cambiar-password-inicial:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+}
+
 module.exports = {
   login,
   validateSession,
@@ -388,5 +447,6 @@ module.exports = {
   forgotPassword,
   resendCode,
   verifyResetCode,
-  resetPassword
+  resetPassword,
+  cambiarPasswordInicial
 };

@@ -38,7 +38,6 @@ import {
   Send,
   Trash2,
   UserCheck,
-  UserMinus,
   Shield,
   Target,
   User, X, Edit2, Phone, Building, AlertTriangle,
@@ -93,6 +92,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
   // ESTADOS DE CITAS AGENDADAS
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Lista completa de citas (sin filtrar por fecha/área), usada para calcular
+  // la carga de trabajo (citas asignadas / por asignar) en la tabla de Personal.
+  const [todasCitas, setTodasCitas] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -182,6 +184,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     try {
       setIsLoadingCitas(true);
       const todas: Appointment[] = await citasAPI.getAll();
+      setTodasCitas(todas);
       const filtradas = todas.filter((apt) => {
         const cleanAptDate = apt.fecha.split('T')[0];
         const matchesArea = citasAreaFilter === 'todos' ? true : apt.tipo === citasAreaFilter;
@@ -227,40 +230,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     p.status === 'activo'
   );
 
-  /**
-   * CAMBIAR ESTADO (ACTIVAR/DESACTIVAR)
-   */
-  const handleCambiarEstado = async (id: string) => {
-    const practicante = practicantes.find(p => p.id === id);
-    if (!practicante) return;
-    
-    const nuevoEstado = practicante.status === 'activo' ? 'inactivo' : 'activo';
-    const backup = [...practicantes];
 
-    setPracticantes(prev => prev.map(p => p.id === id ? { ...p, status: nuevoEstado } : p));
-
-    try {
-      await usuariosAPI.updateStatus(id, nuevoEstado);
-      toast.success(`Estado actualizado a: ${nuevoEstado.toUpperCase()}`);
-    } catch (error) {
-      setPracticantes(backup);
-      toast.error('No se pudo actualizar el estado en la base de datos'); 
-    }
-  };
-
-  /**
-   * ELIMINAR REGISTRO PERMANENTE
-   */
-  const handleEliminarPracticante = async (id: string) => {
-    if (!window.confirm('¿Deseas eliminar permanentemente este registro de la base de datos?')) return;
-    try {
-      await usuariosAPI.remove(id);
-      toast.success('Registro eliminado correctamente');
-      cargarPracticantes();
-    } catch (error) {
-      toast.error('Error al eliminar el registro'); 
-    }
-  };
 
   /**
    * PUBLICAR NOTA (CON LÓGICA DE DESTINATARIO ESPECÍFICO)
@@ -378,10 +348,10 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
       <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
-      <div className="relative z-10 size-full p-4 sm:p-8">
+      <div className="relative z-10 size-full p-4 sm:p-6">
         {/* HEADER INSTITUCIONAL */}
         <header className="bg-white/90 backdrop-blur-sm shadow-sm mb-6 rounded-xl border border-gray-100">
-          <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 gap-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-12 h-12 bg-blue-900 rounded-lg shadow-md">
                 <span className="text-white font-bold text-sm">UTC</span>
@@ -415,7 +385,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           </div>
         </header>
 
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-[1480px] mx-auto space-y-7">
           {/* BARRA DE BÚSQUEDA Y FILTROS */}
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-5 flex flex-col md:flex-row items-center gap-5 border border-gray-100">
             <div className="flex-1 flex items-center gap-2.5 border border-gray-200 rounded-lg px-5 py-3 w-full bg-white">
@@ -443,23 +413,23 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           </div>
 
           <Tabs defaultValue="practitioners" className="space-y-6">
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-2.5 border border-gray-100 overflow-x-auto">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
               <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
-                <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <Calendar className="w-5 h-5" /> Citas Agendadas
                 </TabsTrigger>
-                <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                <TabsTrigger value="practitioners" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <GraduationCap className="w-5 h-5" /> Personal Académico
                 </TabsTrigger>
-                <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <Users className="w-5 h-5" /> Pacientes
                 </TabsTrigger>
 
 
-                <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <BarChart3 className="w-5 h-5" /> Estadísticas
                 </TabsTrigger>
-                <TabsTrigger value="admin_notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-lg px-5 py-2.5 text-base flex items-center gap-2 transition-all font-bold">
+                <TabsTrigger value="admin_notes" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <FileEdit className="w-5 h-5" /> Comunicados
                 </TabsTrigger>
               </TabsList>
@@ -481,7 +451,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                     </div>
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <Select value={citasAreaFilter} onValueChange={(v: any) => setCitasAreaFilter(v)}>
-                        <SelectTrigger className="w-[184px] bg-white border-blue-200 text-blue-900 font-bold h-12 rounded-xl shadow-sm text-base">
+                        <SelectTrigger className="w-[184px] bg-white border-blue-200 text-blue-900 font-bold h-11.75 rounded-xl shadow-sm text-base">
                           <SelectValue placeholder="Área" />
                         </SelectTrigger>
                         <SelectContent>
@@ -496,9 +466,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
                           {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                             <Button
-                              size="sm"
                               variant="outline"
-                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                              className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
                               onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
                             >
                               Hoy
@@ -510,9 +479,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           <MonthFilterPicker selectedMonth={selectedMonth} onChange={setSelectedMonth} theme="blue" />
                           {selectedMonth !== format(new Date(), 'yyyy-MM') && (
                             <Button
-                              size="sm"
                               variant="outline"
-                              className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                              className="h-11.75 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
                               onClick={() => setSelectedMonth(format(new Date(), 'yyyy-MM'))}
                             >
                               Este mes
@@ -547,7 +515,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                 <div className="flex gap-3.5 items-center">
                                   <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
                                   <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {apt.hora.substring(0, 5)} HRS</span>
-                                  <Badge variant="outline" className={`text-[10px] font-black uppercase px-2.5 py-1 ${apt.tipo === 'nutricion' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                  <Badge variant="outline" className={`text-[10px] font-black uppercase px-2.5 py-1 ${apt.tipo === 'nutricion' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
                                     {apt.tipo}
                                   </Badge>
                                   <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
@@ -568,7 +536,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               {!esCitaBloqueada(apt) && (
                                 <>
                                   <Button
-                                    className="h-10 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                    className="h-9.75 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
                                     variant="outline"
                                     onClick={() => setReagendarCitaId(reagendarCitaId === apt.id ? null : apt.id)}
                                   >
@@ -579,8 +547,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                   <Button
                                     variant={apt.practicante_id ? "outline" : "default"}
                                     className={apt.practicante_id
-                                      ? "h-10 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
-                                      : "h-10 bg-blue-900 hover:bg-blue-800 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
+                                      ? "h-9.75 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl px-5 flex items-center gap-2 shadow-sm"
+                                      : "h-9.75 bg-blue-900 hover:bg-blue-800 font-bold rounded-xl px-6 flex items-center gap-2 shadow-md"}
                                     onClick={() => handleOpenAssignModal(apt)}
                                   >
                                     <UserPlus className="w-5 h-5" />
@@ -636,7 +604,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
     {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
     <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
-      <SelectTrigger className="w-[207px] bg-white border-blue-200 text-blue-900 font-bold h-11 rounded-xl shadow-sm text-base">
+      <SelectTrigger className="w-[207px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
         <div className="flex items-center gap-2.5">
           <Filter className="w-5 h-5 text-blue-600" />
           <SelectValue placeholder="Filtrar por Rol" />
@@ -650,8 +618,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     </Select>
 
     {/* TU BOTÓN ORIGINAL */}
-    <Button onClick={() => navigate('/administrar-practicantes')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-11 px-5 text-base">
-      Registrar Nuevo Acceso
+    <Button onClick={() => navigate('/administrar-personal')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-9.75 px-5 text-base">
+      Administrar Personal
     </Button>
   </div>
 </CardHeader>
@@ -660,21 +628,27 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                   <Table>
                     <TableHeader className="bg-white sticky top-0 z-20 border-b">
                       <TableRow>
-                        <TableHead className="pl-9 py-5 text-blue-900 font-black uppercase text-xs tracking-widest">Información del Docente</TableHead>
+                        <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información del Docente</TableHead>
                         {/* NUEVA CABECERA ROL */}
-                        <TableHead className="text-center text-blue-900 font-black uppercase text-xs tracking-widest px-5">Rol</TableHead>
-                        <TableHead className="text-blue-900 font-black uppercase text-xs tracking-widest text-center">Area</TableHead>
-                        <TableHead className="text-center text-blue-900 font-black uppercase text-xs tracking-widest">Estado</TableHead>
-                        <TableHead className="text-right pr-9 text-blue-900 font-black uppercase text-xs tracking-widest">Activación/Desactivación</TableHead>
+                        <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
+                        <TableHead className="text-blue-900 font-black uppercase tracking-widest text-center">Area</TableHead>
+                        <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
+                        <TableHead className="text-right pr-4 text-blue-900 font-black uppercase tracking-widest">Citas</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {practicantesFiltrados.map((p) => (
-                        <TableRow 
-                          key={p.id} 
+                      {practicantesFiltrados.map((p) => {
+                        const citaEstaActiva = (c: Appointment) => c.estado !== 'cancelada' && c.estado !== 'completada';
+                        const citasMetric = p.rol === 'admin'
+                          ? todasCitas.filter(c => c.tipo === p.area && !c.practicante_id && citaEstaActiva(c)).length
+                          : todasCitas.filter(c => String(c.practicante_id) === String(p.id) && citaEstaActiva(c)).length;
+                        const citasLabel = p.rol === 'admin' ? 'Por Asignar' : 'Asignadas';
+                        return (
+                        <TableRow
+                          key={p.id}
                           className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
                         >
-                          <TableCell className="pl-9 py-6">
+                          <TableCell className="pl-4">
                             <div className="flex flex-col">
                               <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
                                 {p.name}
@@ -688,7 +662,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                             <div className="flex justify-center">
                               <Badge
                                 variant="outline"
-                                className={`bg-transparent px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 ${
+                                className={`bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 ${
                                   p.rol === 'admin'
                                     ? "text-purple-700 border-purple-500/40"
                                     : "text-blue-500 border-blue-400/40"
@@ -703,7 +677,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           <TableCell className="text-center">
                             <Badge
                               variant="outline"
-                              className={`px-3.5 py-1.5 rounded-md text-[11px] font-black uppercase tracking-tighter shadow-sm ${
+                              className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-tighter shadow-sm ${
                                 p.area === 'nutricion'
                                 ? "bg-orange-100 text-orange-700 border-orange-200"
                                 : "bg-blue-100 text-blue-700 border-blue-200"
@@ -714,7 +688,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <span className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest border ${
+                              <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
                                 p.status === 'activo'
                                 ? 'bg-green-50 text-green-700 border-green-200'
                                 : 'bg-red-50 text-red-700 border-red-200'
@@ -724,33 +698,19 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right pr-9">
-                            <div className="flex justify-end gap-2.5">
-                              <Button
-                                size="sm"
-                                variant={p.status === 'activo' ? "outline" : "default"}
-                                onClick={() => handleCambiarEstado(p.id)}
-                                className={`h-10 px-5 flex items-center gap-2 rounded-xl transition-all font-bold ${
-                                  p.status === 'activo'
-                                  ? "border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
-                                }`}
-                              >
-                                {p.status === 'activo' ? <UserMinus className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
-                                <span>{p.status === 'activo' ? 'Desactivar' : 'Activar'}</span>
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => handleEliminarPracticante(p.id)}
-                                className="h-10 w-10 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </Button>
+                          <TableCell className="text-right pr-4">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-lg font-black ${citasMetric > 0 ? 'text-blue-900' : 'text-slate-300'}`}>
+                                {citasMetric}
+                              </span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight whitespace-nowrap">
+                                {citasLabel}
+                              </span>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -813,7 +773,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               value={notaNueva.destino} 
                               onValueChange={(v: any) => setNotaNueva({...notaNueva, destino: v, emailDestinatario: 'ninguno'})}
                             >
-                              <SelectTrigger className="rounded-xl h-11 bg-slate-50 border-slate-200 font-bold text-blue-900">
+                              <SelectTrigger className="rounded-xl h-10.75 bg-slate-50 border-slate-200 font-bold text-blue-900">
                                 <SelectValue placeholder="Alcance" />
                               </SelectTrigger>
                               <SelectContent>
@@ -830,7 +790,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               value={notaNueva.emailDestinatario} 
                               onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}
                             >
-                              <SelectTrigger className="rounded-xl h-11 border-slate-200 bg-white">
+                              <SelectTrigger className="rounded-xl h-10.75 border-slate-200 bg-white">
                                 <SelectValue placeholder="Seleccionar Persona" />
                               </SelectTrigger>
                               <SelectContent>
@@ -861,7 +821,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                         <Button 
                           onClick={handlePublicarNota} 
                           disabled={isEnviando}
-                          className="bg-orange-600 hover:bg-orange-700 text-white font-black px-10 h-12 rounded-xl shadow-lg transition-all"
+                          className="bg-orange-600 hover:bg-orange-700 text-white font-black px-10 h-11.75 rounded-xl shadow-lg transition-all"
                         >
                           {isEnviando ? "PROCESANDO..." : "PUBLICAR AHORA"}
                         </Button>
@@ -907,7 +867,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 setSelectedPractitioner(p);
               }}
             >
-              <SelectTrigger className="rounded-xl h-14 border-blue-200 font-bold focus:ring-blue-500">
+              <SelectTrigger className="rounded-xl h-13.75 border-blue-200 font-bold focus:ring-blue-500">
                 <SelectValue placeholder="Buscar en la plantilla..." />
               </SelectTrigger>
               <SelectContent>
@@ -935,7 +895,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
               <Button
                 onClick={handleConfirmAssignment}
                 disabled={isAssigning}
-                className="w-full bg-blue-900 hover:bg-black text-white font-black h-14 rounded-2xl shadow-xl transition-all active:scale-95"
+                className="w-full bg-blue-900 hover:bg-black text-white font-black h-13.75 rounded-2xl shadow-xl transition-all active:scale-95"
               >
                 {isAssigning ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="w-5 h-5 mr-2" />}
                 CONFIRMAR ASIGNACIÓN
