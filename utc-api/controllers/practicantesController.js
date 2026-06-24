@@ -37,8 +37,26 @@ async function create(req, res) {
   const rol = esDocente ? 'admin' : 'practicante';
 
   try {
+    const emailNormalizado = email.trim().toLowerCase();
+
+    const correoExistente = await pool.query('SELECT id FROM usuarios WHERE email = $1', [emailNormalizado]);
+    if (correoExistente.rows.length > 0) {
+      return res.status(400).json({ error: 'Este correo ya está registrado.' });
+    }
+
+    const columnaIdentificador = esDocente ? 'numero_empleado' : 'matricula';
+    const identificadorExistente = await pool.query(
+      `SELECT id FROM usuarios WHERE ${columnaIdentificador} = $1`,
+      [identificador]
+    );
+    if (identificadorExistente.rows.length > 0) {
+      return res.status(400).json({
+        error: esDocente ? 'Este número de empleado ya está registrado.' : 'Esta matrícula ya está registrada.'
+      });
+    }
+
     // DETECTAR DOMINIO DEL CORREO
-    const dominio = email.trim().toLowerCase().split('@')[1];
+    const dominio = emailNormalizado.split('@')[1];
 
     const dominiosPublicos = [
       'gmail.com', 'hotmail.com', 'outlook.com', 'live.com',
@@ -63,7 +81,7 @@ async function create(req, res) {
       RETURNING *`,
       [
         nombre.trim(),
-        email.trim().toLowerCase(),
+        emailNormalizado,
         passwordHash,
         rol,
         area,

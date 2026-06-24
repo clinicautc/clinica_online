@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, usuariosAPI } from '../lib/api';
+import { capitalizeWords } from '../lib/textFormat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -157,7 +158,7 @@ const handleSaveProfile = async () => {
 
     try {
       await usuariosAPI.updateProfile(user.id, {
-        nombre: profileData.nombre.trim(),
+        nombre: capitalizeWords(profileData.nombre),
         telefono: telefonoLimpio,
         matricula: matriculaLimpia // <-- Aquí se aplica la solución
       });

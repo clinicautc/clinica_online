@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, usuariosAPI } from '../lib/api';
+import { capitalizeWords } from '../lib/textFormat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -154,7 +155,7 @@ export default function NutritionPractitionerDashboard() {
 
     try {
       await usuariosAPI.updateProfile(user.id, {
-        nombre: profileData.nombre,
+        nombre: capitalizeWords(profileData.nombre),
         telefono: profileData.telefono,
         matricula: profileData.matricula // <-- Modificación de Matrícula Integrada
       });

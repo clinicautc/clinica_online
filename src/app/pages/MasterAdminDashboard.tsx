@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { usuariosAPI, notasAPI, citasAPI } from '../lib/api';
+import { capitalizeWords } from '../lib/textFormat';
 import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -312,7 +313,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
     try {
       await usuariosAPI.updateProfile(user.id, {
-        nombre: profileData.nombre,
+        nombre: capitalizeWords(profileData.nombre),
         telefono: profileData.telefono,
         matricula: profileData.matricula
       });

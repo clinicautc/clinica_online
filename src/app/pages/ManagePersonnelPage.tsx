@@ -18,6 +18,7 @@ import { Badge } from '../components/ui/badge';
 import { ArrowLeft, Plus, Trash2, UserCheck, UserMinus, Shield, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { practicantesAPI, usuariosAPI } from '../lib/api';
+import { capitalizeWords } from '../lib/textFormat';
 
 export default function ManagePersonnelPage() {
   const navigate = useNavigate();
@@ -95,7 +96,7 @@ export default function ManagePersonnelPage() {
     try {
       await practicantesAPI.create({
         tipo: tipoAcceso,
-        nombre: nuevoD.nombre.trim(),
+        nombre: capitalizeWords(nuevoD.nombre),
         email: nuevoD.email.trim().toLowerCase(),
         matricula: esDocente ? undefined : nuevoD.matricula.trim(),
         numero_empleado: esDocente ? nuevoD.numero_empleado.trim() : undefined,

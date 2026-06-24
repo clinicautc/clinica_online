@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
+import { capitalizeWords } from '../lib/textFormat';
 import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
@@ -256,7 +257,7 @@ export default function NutritionAdminDashboard() {
 
     try {
       await usuariosAPI.updateProfile(user.id, {
-        nombre: profileData.nombre,
+        nombre: capitalizeWords(profileData.nombre),
         telefono: profileData.telefono
       });
 
