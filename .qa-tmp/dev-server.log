@@ -35,3 +35,5 @@
 [1]   Plugin: [35mvite:esbuild[39m
 [1]   File: [36mC:/Users/thega/Documents/Projects/clinica_online/src/app/components/StatisticsPanel.tsx[39m
 [1] [2m1:09:49 a.m.[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\thega\Documents\Projects\clinica_online\src\app\pages\ManagePersonnelPage.tsx, /src/styles/index.css[22m
+[0] Failed running 'index.js'. Waiting for file changes before restarting...
+[1] npm run dev:frontend exited with code 1
