@@ -22,11 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { 
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
 } from "../components/ui/dialog";
-import { 
-  LogOut, Users, FileText, Calendar, Clock, Utensils, BarChart3, 
+import {
+  LogOut, Users, FileText, Calendar, Clock, Utensils, BarChart3,
   Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
   X, User, Phone, Building, Trash2, AlertTriangle, Edit2,
-  CalendarClock, ChevronUp 
+  CalendarClock, ChevronUp, Search, Filter, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -40,8 +40,8 @@ import ViewModeToggle from '../components/ViewModeToggle';
 import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
-import PractitionerManagement from '../components/PractitionerManagement';
 import { Badge } from '../components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import AppointmentForm from '../components/AppointmentForm'; // Importado para re-agendar
 
 // Interfaz sincronizada con PostgreSQL
@@ -79,6 +79,12 @@ export default function NutritionAdminDashboard() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
+  // ESTADOS TABLA PERSONAL ACADÉMICO
+  const [personalAcademico, setPersonalAcademico] = useState<any[]>([]);
+  const [roleFilterPersonal, setRoleFilterPersonal] = useState<'todos' | 'admin' | 'practicante'>('todos');
+  const [searchPersonal, setSearchPersonal] = useState('');
+  const [todasCitas, setTodasCitas] = useState<Appointment[]>([]);
+
   // ESTADOS PARA COMUNICADOS
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
@@ -86,8 +92,12 @@ export default function NutritionAdminDashboard() {
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
-    emailDestinatario: 'ninguno'
+    audiencia: 'practicantes' as 'master' | 'admins' | 'practicantes',
+    seleccion: 'todos',
   });
+  const [usuariosComunicados, setUsuariosComunicados] = useState<{
+    master: any[]; admins: any[]; practicantes: any[];
+  }>({ master: [], admins: [], practicantes: [] });
 
   // ==========================================
   // ESTADOS PARA LA BARRA LATERAL (PERFIL)
@@ -108,6 +118,14 @@ export default function NutritionAdminDashboard() {
   const inicialesAvatar = (partesNombre[0]?.[0] || '') + (partesNombre[1]?.[0] || '');
   const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim();
 
+  const personalFiltrado = personalAcademico.filter(p => {
+    const matchesSearch = !searchPersonal ||
+      p.name.toLowerCase().includes(searchPersonal.toLowerCase()) ||
+      p.email.toLowerCase().includes(searchPersonal.toLowerCase());
+    const matchesRole = roleFilterPersonal === 'todos' ? true : p.rol === roleFilterPersonal;
+    return matchesSearch && matchesRole;
+  });
+
   /**
    * EFECTO INICIAL: Carga de Citas y Personal
    */
@@ -116,6 +134,7 @@ export default function NutritionAdminDashboard() {
       try {
         setIsLoadingCitas(true);
         const allAppointments: Appointment[] = await citasAPI.getAll();
+        setTodasCitas(allAppointments);
         const filtered = allAppointments.filter((apt) => {
           const cleanAptDate = apt.fecha.split('T')[0];
           const matchesFecha = viewMode === 'day'
@@ -145,6 +164,21 @@ export default function NutritionAdminDashboard() {
           (u.estado === 'activo' || u.status === 'activo')
         );
         setPracticantesArea(lista);
+        setPersonalAcademico(data
+          .filter((u: any) => u.rol === 'practicante' && u.area?.toLowerCase() === 'nutricion')
+          .map((p: any) => ({
+            id: p.id.toString(),
+            name: p.nombre || 'Sin Nombre',
+            email: p.email || '',
+            status: p.estado || p.status || 'activo',
+            rol: p.rol,
+          }))
+        );
+        setUsuariosComunicados({
+          master:      data.filter((u: any) => u.rol === 'master'),
+          admins:      data.filter((u: any) => u.rol === 'admin' && u.area?.toLowerCase() === 'nutricion'),
+          practicantes: lista,
+        });
       } catch (error) {
         console.error("Error al cargar practicantes para el select:", error);
       }
@@ -208,27 +242,45 @@ export default function NutritionAdminDashboard() {
     }
   };
 
+  const usuariosSegundoSelect = notaNueva.audiencia === 'master'
+    ? usuariosComunicados.master
+    : notaNueva.audiencia === 'admins'
+      ? usuariosComunicados.admins
+      : usuariosComunicados.practicantes;
+
+  const getInfoTextoAdmin = () => {
+    const selId = parseInt(notaNueva.seleccion, 10);
+    const isUser = !isNaN(selId);
+    if (notaNueva.audiencia === 'master') return 'Nota Privada: Solo el Master verá este comunicado.';
+    if (isUser) {
+      const u = usuariosSegundoSelect.find((p: any) => p.id === selId || String(p.id) === notaNueva.seleccion);
+      return `Nota Privada: Solo ${u?.nombre || u?.name || 'el usuario seleccionado'} verá este comunicado.`;
+    }
+    if (notaNueva.audiencia === 'admins') return 'Dirigida a todos los administradores de Nutrición.';
+    return 'Dirigida a todos los practicantes de Nutrición.';
+  };
+
   const handlePublicarNotaAdmin = async () => {
     if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
       toast.error("Por favor, complete todos los campos requeridos.");
       return;
     }
 
+    const selId = parseInt(notaNueva.seleccion, 10);
+    const isUser = !isNaN(selId);
+    const payload = {
+      titulo: notaNueva.titulo.trim(),
+      contenido: notaNueva.contenido.trim(),
+      destino: 'nutricion',
+      destinatario_rol: notaNueva.audiencia === 'admins' ? 'admin' : notaNueva.audiencia === 'master' ? 'todos' : 'practicante',
+      destinatario_id: isUser ? selId : null,
+    };
+
     try {
       setIsEnviando(true);
-      const payload = {
-        titulo: notaNueva.titulo.trim(),
-        contenido: notaNueva.contenido.trim(),
-        destino: 'nutricion',
-        creado_por: user?.id,
-        creado_por_nombre: `Coordinador: ${user?.nombre || user?.name || "Nutrición"}`,
-        destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
-      };
-
       await notasAPI.createUniversitaria(payload);
-
       toast.success("Comunicado emitido correctamente.");
-      setNotaNueva({ titulo: '', contenido: '', emailDestinatario: 'ninguno' });
+      setNotaNueva({ titulo: '', contenido: '', audiencia: 'practicantes', seleccion: 'todos' });
       setIsNotaModalOpen(false);
       setRefreshKey(prev => prev + 1);
     } catch (error) {
@@ -300,7 +352,7 @@ export default function NutritionAdminDashboard() {
   return (
     <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
       {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-blue-50/60"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 to-amber-100/20"></div>
       <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
 
@@ -309,8 +361,9 @@ export default function NutritionAdminDashboard() {
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
           <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-400 rounded-full flex items-center justify-center shadow-md">
+              <div className="relative w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-400 rounded-full flex items-center justify-center shadow-md">
                 <Utensils className="w-6 h-6 text-white" />
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-orange-900">Clínica UTC - Nutrición</h1>
@@ -326,6 +379,9 @@ export default function NutritionAdminDashboard() {
               <div>
                 <p className="text-sm font-bold text-orange-900">{nombreCortoDisplay}</p>
                 <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Coordinador</p>
+                <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
+                  <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+                </p>
               </div>
               <div className="h-10 w-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center overflow-hidden">
                 <User className="h-5 w-5 text-orange-600" />
@@ -490,17 +546,86 @@ export default function NutritionAdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="practitioners">
-            <Card className="border-orange-200 shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-              <CardHeader className="flex flex-row items-center justify-between border-b p-6">
+          <TabsContent value="practitioners" className="animate-in fade-in duration-500">
+            <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-7 gap-5">
                 <div>
-                  <CardTitle className="text-orange-900 font-extrabold text-xl">Plantilla de Practicantes</CardTitle>
-                  <CardDescription className="font-medium italic">Gestión de accesos para el departamento de Nutrición</CardDescription>
+                  <CardTitle className="text-orange-900 font-extrabold text-2xl">Personal Académico</CardTitle>
+                  <CardDescription className="text-gray-500 font-medium italic text-base">Registro y filtro de practicantes y docentes · Área de Nutrición</CardDescription>
                 </div>
-                <Button onClick={handleGoToManagePractitioners} className="bg-orange-600 hover:bg-orange-700 font-bold shadow-lg"><UserPlus className="w-4 h-4 mr-2" /> Dar de Alta</Button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 bg-white">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre o correo..."
+                      className="outline-none text-sm bg-transparent w-full"
+                      value={searchPersonal}
+                      onChange={(e) => setSearchPersonal(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleGoToManagePractitioners} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10.75 px-5 text-sm whitespace-nowrap">
+                    Administrar Personal
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="p-6">
-                <PractitionerManagement area="nutricion" />
+              <CardContent className="p-0 overflow-y-auto max-h-[600px]">
+                <Table>
+                  <TableHeader className="bg-white sticky top-0 z-20 border-b">
+                    <TableRow>
+                      <TableHead className="pl-4 text-orange-900 font-black uppercase tracking-widest">Información</TableHead>
+                      <TableHead className="text-center text-orange-900 font-black uppercase tracking-widest">Rol</TableHead>
+                      <TableHead className="text-center text-orange-900 font-black uppercase tracking-widest">Estado</TableHead>
+                      <TableHead className="text-right pr-4 text-orange-900 font-black uppercase tracking-widest">Citas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {personalFiltrado.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-10 text-slate-400 font-bold text-sm italic">
+                          No se encontró personal académico.
+                        </TableCell>
+                      </TableRow>
+                    ) : personalFiltrado.map((p) => {
+                      const citaEstaActiva = (c: Appointment) => c.estado !== 'cancelada' && c.estado !== 'completada';
+                      const citasMetric = todasCitas.filter(c => String(c.practicante_id) === String(p.id) && citaEstaActiva(c)).length;
+                      return (
+                        <TableRow key={p.id} className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-orange-50/50'}`}>
+                          <TableCell className="pl-4">
+                            <div className="flex flex-col">
+                              <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-orange-950'}`}>{p.name}</span>
+                              <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Badge variant="outline" className="bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 text-blue-500 border-blue-400/40">
+                                <Shield className="w-3.5 h-3.5" />
+                                Practicante
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
+                                p.status === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full ${p.status === 'activo' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                {p.status}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right pr-4">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-lg font-black ${citasMetric > 0 ? 'text-orange-900' : 'text-slate-300'}`}>{citasMetric}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight whitespace-nowrap">Asignadas</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
@@ -545,28 +670,64 @@ export default function NutritionAdminDashboard() {
                         <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Contenido</Label>
                         <Textarea className="rounded-xl min-h-[130px] border-slate-200 resize-none" placeholder="Instrucciones del coordinador..." value={notaNueva.contenido} onChange={(e) => setNotaNueva({...notaNueva, contenido: e.target.value})} />
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-orange-600 font-black text-[11px] uppercase tracking-widest ml-1">Usuario Específico (Opcional)</Label>
-                        <Select value={notaNueva.emailDestinatario} onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}>
-                          <SelectTrigger className="rounded-xl h-11.75 border-orange-300 bg-orange-50/20 font-bold">
-                            <SelectValue placeholder="Seleccionar Practicante" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ninguno" className="font-black text-orange-900">--- TODOS LOS PRACTICANTES ---</SelectItem>
-                            {practicantesArea.map((p) => (
-                              <SelectItem key={p.email} value={p.email} className="font-medium italic">
-                                {p.nombre || p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Audiencia Destino</Label>
+                          <Select
+                            value={notaNueva.audiencia}
+                            onValueChange={(v: any) => {
+                              const auto = v === 'master' && usuariosComunicados.master.length > 0
+                                ? String(usuariosComunicados.master[0].id)
+                                : 'todos';
+                              setNotaNueva({ ...notaNueva, audiencia: v, seleccion: auto });
+                            }}
+                          >
+                            <SelectTrigger className="rounded-xl h-10.75 bg-slate-50 border-slate-200 font-bold text-orange-900">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="master">Para el Jefe de Carrera</SelectItem>
+                              <SelectItem value="admins">Administradores de Nutrición</SelectItem>
+                              <SelectItem value="practicantes">Practicantes de Nutrición</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Destinatario</Label>
+                          <Select
+                            value={notaNueva.seleccion}
+                            onValueChange={(v) => setNotaNueva({ ...notaNueva, seleccion: v })}
+                          >
+                            <SelectTrigger className="rounded-xl h-10.75 border-slate-200 bg-white font-bold text-orange-900">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {notaNueva.audiencia === 'master' ? (
+                                usuariosComunicados.master.map((u: any) => (
+                                  <SelectItem key={u.id} value={String(u.id)}>
+                                    {u.nombre || u.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <>
+                                  <SelectItem value="todos">
+                                    {notaNueva.audiencia === 'admins' ? 'Todos los Administradores' : 'Todos los Practicantes'}
+                                  </SelectItem>
+                                  {usuariosSegundoSelect.map((u: any) => (
+                                    <SelectItem key={u.id} value={String(u.id)}>
+                                      {u.nombre || u.name}
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
                         <Target className="w-5 h-5 text-orange-600 mt-0.5" />
                         <p className="text-[11px] text-orange-800 font-bold leading-tight">
-                          {notaNueva.emailDestinatario === 'ninguno' 
-                            ? "PUBLICACIÓN GENERAL: Todos los practicantes de Nutrición visualizarán este aviso." 
-                            : `PUBLICACIÓN PRIVADA: Este mensaje se enviará directamente al perfil seleccionado.`}
+                          {getInfoTextoAdmin()}
                         </p>
                       </div>
                     </div>

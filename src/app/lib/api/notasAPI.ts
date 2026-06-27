@@ -34,11 +34,11 @@ export const notasAPI = {
     });
   },
 
-  responderUniversitaria(id: string | number, respuesta: string) {
+  responderUniversitaria(id: string | number, contenido: string) {
     return apiFetchJson(`/notas_universitarias/${id}/responder`, {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ respuesta })
+      body: JSON.stringify({ contenido })
     });
   }
 

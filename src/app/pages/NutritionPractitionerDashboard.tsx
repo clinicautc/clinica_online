@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { citasAPI, historialesAPI, usuariosAPI } from '../lib/api';
+import { citasAPI, historialesAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
@@ -17,9 +17,14 @@ import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { Label } from '../components/ui/label';
-import { 
-  LogOut, Users, FileText, Calendar, Clock, Utensils, Loader2, 
-  History, User, X, Edit2, Phone, Building, Trash2, AlertTriangle 
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
+import {
+  LogOut, Users, FileText, Calendar, Clock, Utensils, Loader2,
+  History, User, X, Edit2, Phone, Building, Trash2, AlertTriangle,
+  Send, FileEdit, Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { format, parseISO, isSameDay } from 'date-fns';
@@ -67,6 +72,20 @@ export default function NutritionPractitionerDashboard() {
     area: ''
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
+
+  // ESTADOS PARA COMUNICADOS
+  const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
+  const [isEnviando, setIsEnviando] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [notaNueva, setNotaNueva] = useState({
+    titulo: '',
+    contenido: '',
+    audiencia: 'admins' as 'admins' | 'practicantes',
+    seleccion: 'todos',
+  });
+  const [usuariosComunicados, setUsuariosComunicados] = useState<{
+    admins: any[]; practicantes: any[];
+  }>({ admins: [], practicantes: [] });
 
   // Inicializar datos del perfil cuando el usuario carga
   useEffect(() => {
@@ -180,6 +199,61 @@ export default function NutritionPractitionerDashboard() {
     toast.success('Sesión finalizada');
   };
 
+  // Cargar usuarios para el modal de comunicados
+  useEffect(() => {
+    if (!user?.id) return;
+    const area = user.area?.toLowerCase() || 'nutricion';
+    usuariosAPI.getAll().then((data: any[]) => {
+      setUsuariosComunicados({
+        admins:       data.filter((u: any) => u.rol === 'admin' && u.area?.toLowerCase() === area),
+        practicantes: data.filter((u: any) => u.rol === 'practicante' && u.area?.toLowerCase() === area && (u.estado === 'activo' || u.status === 'activo')),
+      });
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const usuariosSegundoSelect = notaNueva.audiencia === 'admins'
+    ? usuariosComunicados.admins
+    : usuariosComunicados.practicantes;
+
+  const getInfoTexto = () => {
+    const selId = parseInt(notaNueva.seleccion, 10);
+    const isUser = !isNaN(selId);
+    if (isUser) {
+      const u = usuariosSegundoSelect.find((p: any) => p.id === selId || String(p.id) === notaNueva.seleccion);
+      return `Nota Privada: Solo ${u?.nombre || u?.name || 'el usuario seleccionado'} verá este comunicado.`;
+    }
+    if (notaNueva.audiencia === 'admins') return 'Dirigida a todos los administradores de Nutrición.';
+    return 'Dirigida a todos los practicantes de Nutrición.';
+  };
+
+  const handlePublicarNota = async () => {
+    if (!notaNueva.titulo.trim() || !notaNueva.contenido.trim()) {
+      toast.error("Por favor, complete todos los campos requeridos.");
+      return;
+    }
+    const selId = parseInt(notaNueva.seleccion, 10);
+    const isUser = !isNaN(selId);
+    const payload = {
+      titulo: notaNueva.titulo.trim(),
+      contenido: notaNueva.contenido.trim(),
+      destino: 'nutricion',
+      destinatario_rol: notaNueva.audiencia === 'admins' ? 'admin' : 'practicante',
+      destinatario_id: isUser ? selId : null,
+    };
+    try {
+      setIsEnviando(true);
+      await notasAPI.createUniversitaria(payload);
+      toast.success("Comunicado emitido correctamente.");
+      setNotaNueva({ titulo: '', contenido: '', audiencia: 'admins', seleccion: 'todos' });
+      setIsNotaModalOpen(false);
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      toast.error("Error al conectar con el servidor.");
+    } finally {
+      setIsEnviando(false);
+    }
+  };
+
   const handleAccessForms = (appointment: Appointment) => {
     const esRecurrente = recurrenceMap[appointment.paciente_id];
     
@@ -210,10 +284,10 @@ export default function NutritionPractitionerDashboard() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
-      {/* CAPAS ESTÉTICAS UTC (marca de agua, igual que MasterAdminDashboard) */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100"></div>
-      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
-      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-orange-700 transform rotate-45 opacity-10"></div>
+      {/* CAPAS ESTÉTICAS UTC */}
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 to-amber-100/20"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-[0.06]"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-[0.06]"></div>
 
       <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
@@ -237,6 +311,9 @@ export default function NutritionPractitionerDashboard() {
               <div>
                 <p className="text-sm font-bold text-orange-900">{nombreCortoDisplay}</p>
                 <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Practicante</p>
+                <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
+                  <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+                </p>
               </div>
               <div className="h-10 w-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center overflow-hidden">
                 <User className="h-5 w-5 text-orange-600" />
@@ -371,8 +448,93 @@ export default function NutritionPractitionerDashboard() {
           </TabsContent>
 
           <TabsContent value="notes">
-  <NotesViewer readOnly={false} filterCategory="nutricion" />
-</TabsContent>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-orange-950">Comunicados Internos</h2>
+                  <p className="text-sm text-slate-500 font-medium">Avisos del área de Nutrición.</p>
+                </div>
+                <Dialog open={isNotaModalOpen} onOpenChange={setIsNotaModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white font-black h-13.75 px-10 rounded-2xl shadow-2xl transition-all hover:-translate-y-1 active:scale-95">
+                      <Send className="w-5 h-5 mr-3 text-white" /> NUEVA NOTA
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-8" style={arialStyle}>
+                    <DialogHeader>
+                      <DialogTitle className="text-orange-950 text-2xl font-black flex items-center gap-3">
+                        <FileEdit className="w-6 h-6 text-orange-500" /> EMITIR AVISO
+                      </DialogTitle>
+                      <DialogDescription className="font-bold italic text-orange-600/60">
+                        Destino: Área de Nutrición.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 py-4">
+                      <div className="space-y-2">
+                        <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Asunto</Label>
+                        <Input className="rounded-xl h-12 border-slate-200" placeholder="Título..." value={notaNueva.titulo} onChange={(e) => setNotaNueva({ ...notaNueva, titulo: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Mensaje</Label>
+                        <Textarea className="rounded-xl min-h-[120px] border-slate-200 resize-none" placeholder="Escriba aquí..." value={notaNueva.contenido} onChange={(e) => setNotaNueva({ ...notaNueva, contenido: e.target.value })} />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Audiencia Destino</Label>
+                          <Select
+                            value={notaNueva.audiencia}
+                            onValueChange={(v: any) => setNotaNueva({ ...notaNueva, audiencia: v, seleccion: 'todos' })}
+                          >
+                            <SelectTrigger className="rounded-xl h-10.75 bg-slate-50 border-slate-200 font-bold text-orange-900">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admins">Administradores de Nutrición</SelectItem>
+                              <SelectItem value="practicantes">Practicantes de Nutrición</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-orange-950 font-black text-[11px] uppercase tracking-widest ml-1">Destinatario</Label>
+                          <Select
+                            value={notaNueva.seleccion}
+                            onValueChange={(v) => setNotaNueva({ ...notaNueva, seleccion: v })}
+                          >
+                            <SelectTrigger className="rounded-xl h-10.75 border-slate-200 bg-white font-bold text-orange-900">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todos">
+                                {notaNueva.audiencia === 'admins' ? 'Todos los Administradores' : 'Todos los Practicantes'}
+                              </SelectItem>
+                              {usuariosSegundoSelect.map((u: any) => (
+                                <SelectItem key={u.id} value={String(u.id)}>
+                                  {u.nombre || u.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
+                        <Target className="w-5 h-5 text-orange-600 mt-0.5" />
+                        <p className="text-[11px] text-orange-800 font-bold leading-tight">
+                          {getInfoTexto()}
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                      <Button variant="ghost" onClick={() => setIsNotaModalOpen(false)} className="font-bold text-slate-400">Cancelar</Button>
+                      <Button onClick={handlePublicarNota} disabled={isEnviando} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-8 h-11.75 rounded-xl shadow-lg flex-1 active:scale-95">
+                        {isEnviando ? "ENVIANDO..." : "PUBLICAR AHORA"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <NotesViewer key={refreshKey} readOnly={false} filterCategory="nutricion" />
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 

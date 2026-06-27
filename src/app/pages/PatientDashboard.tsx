@@ -208,8 +208,9 @@ export default function PatientDashboard() {
           <div className="px-6 py-3">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
+                <div className="relative w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
                   <span className="text-white font-bold text-sm">UTC</span>
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
                 </div>
                 <div className="overflow-hidden">
                   <h1 className="text-2xl font-bold text-blue-900 truncate">Clínica Universitaria</h1>
@@ -225,6 +226,9 @@ export default function PatientDashboard() {
                   <div>
                     <p className="text-sm font-bold text-blue-900 leading-none mb-1">{patientName}</p>
                     <p className="text-[10px] font-black text-blue-900/60 uppercase tracking-wider">{patientRole}</p>
+                    <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
+                      <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+                    </p>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden shrink-0">
                     <User className="h-5 w-5 text-blue-600" />

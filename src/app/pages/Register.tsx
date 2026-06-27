@@ -165,7 +165,7 @@ await authAPI.verifyRegister({
                 <div className="w-6 h-6 rounded-full bg-white/20 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</div>
                 <div>
                   <strong className="text-white block mb-0.5 text-sm">Crea tu contraseña</strong>
-                  <span className="text-blue-100 text-xs leading-relaxed block">Inventa una palabra secreta de al menos 8 letras. Asegúrate de combinar mayúsculas, minúsculas, algún número y un símbolo (como @, ! o #). ¡Mira cómo se ponen en verde los requisitos a la derecha mientras escribes!</span>
+                  <span className="text-blue-100 text-xs leading-relaxed block">Inventa una palabra secreta de al menos 8 letras. Asegúrate de combinar mayúsculas, minúsculas, algún número y un símbolo (como @, ! o #), es importante escribirla igual en cada recuadro. Mira cómo se ponen en verde los requisitos debajo mientras escribes</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">

@@ -22,19 +22,31 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { notasAPI } from '../lib/api';
 
-// Interfaz sincronizada con la base de datos PostgreSQL de la Clínica UTC
+interface Reply {
+  id: number;
+  nota_id: number;
+  autor_id: number;
+  autor_nombre: string;
+  autor_area: string | null;
+  autor_rol: string;
+  contenido: string;
+  fecha_creacion: string;
+}
+
 interface Note {
   id: number;
   titulo: string;
   contenido: string;
   categoria: 'fisioterapia' | 'nutricion' | 'general' | 'todos';
+  destinatario_rol: 'todos' | 'admin' | 'practicante';
+  creado_por: number;
   creado_por_nombre: string;
-  creado_por_email: string;
-  creado_por_rol?: string; // <--- AÑADIR ESTA LÍNEA
-  destinatario_especifico: string | null;
+  creado_por_rol: string;
+  creado_por_area: string | null;
+  destinatario_id: number | null;
+  destinatario_nombre: string | null;
   fecha_creacion: string;
-  respuesta: string | null;
-  fecha_respuesta: string | null;
+  respuestas: Reply[];
 }
 
 interface NotesViewerProps {
@@ -108,15 +120,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
 
     try {
       setIsSendingReply(noteId);
-      const notaActual = notes.find(n => n.id === noteId);
-      const nombreUsuario = user?.nombre || 'Usuario UTC';
-      const nuevoComentario = `[${nombreUsuario} | Area: ${user?.area}]: ${text.trim()} (${format(new Date(), "d MMM, HH:mm")})`;
-      
-      const historialCompleto = notaActual?.respuesta 
-        ? `${notaActual.respuesta} <BR> ${nuevoComentario}` 
-        : nuevoComentario;
-
-      await notasAPI.responderUniversitaria(noteId, historialCompleto);
+      await notasAPI.responderUniversitaria(noteId, text.trim());
 
       toast.success("Comentario publicado exitosamente.");
       setReplyTexts(prev => ({ ...prev, [noteId]: '' }));
@@ -129,7 +133,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
     }
   };
 
-  const miEmail = (user?.email || '').toLowerCase();
+  const miId = user?.id;
   const miArea = (user?.area || '').toLowerCase();
 
   
@@ -141,29 +145,26 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
    */
  const hasUnreadInTab = (type: 'alumnos' | 'administrativo') => {
     return notes.some(note => {
-      // CAMBIO AQUÍ: Evaluamos el rol directo de la base de datos
-      const fromMaster = note.creado_por_rol === 'master'; 
+      const fromMaster = note.creado_por_rol === 'master';
       const matchTab = type === 'alumnos' ? !fromMaster : fromMaster;
-      
+
       if (!matchTab) return false;
 
       const destino = (note.categoria || '').toLowerCase();
-      const esParaMi = (note.destinatario_especifico || '').toLowerCase() === miEmail;
-      
+      const esParaMi = note.destinatario_id === miId;
+
       if (!(destino === miArea || destino === 'todos' || destino === 'general' || esParaMi)) return false;
 
-      const numRespuestas = note.respuesta ? note.respuesta.split('<BR>').length : 0;
+      const numRespuestas = note.respuestas.length;
       const leidas = readMessages[note.id] || 0;
       return numRespuestas > leidas;
     });
   };
 
   const filteredNotes = notes.filter(note => {
-    // CAMBIO AQUÍ: Evaluamos el rol
-    const fromMaster = note.creado_por_rol === 'master'; 
+    const fromMaster = note.creado_por_rol === 'master';
     const destinoNota = (note.categoria || '').toLowerCase();
-    // ... resto de la función sigue igual
-    const esParaMi = (note.destinatario_especifico || '').toLowerCase() === miEmail;
+    const esParaMi = note.destinatario_id === miId;
 
     if (filterCategory && destinoNota !== filterCategory && destinoNota !== 'todos' && destinoNota !== 'general') {
       return false;
@@ -175,11 +176,8 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
       } else {
         return fromMaster;
       }
-    } else if (user?.rol === 'practicante') { // Lógica estricta SOLO para PRACTICANTES
-      // Bloqueamos los mensajes del Master, pase lo que pase
-      if (fromMaster) return false; 
-      
-      // Solo ven mensajes de su área, todos, general o privados
+    } else if (user?.rol === 'practicante') {
+      // El servidor ya filtra por destinatario_rol; el frontend solo valida área/privado.
       return (destinoNota === miArea || destinoNota === 'todos' || destinoNota === 'general' || esParaMi);
     } else { // Lógica para el MASTER u otros roles
       return (destinoNota === miArea || destinoNota === 'todos' || destinoNota === 'general' || esParaMi);
@@ -257,10 +255,8 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
           <div className="grid grid-cols-1 gap-8">
             {filteredNotes.map((note) => {
               const nombreAutor = note.creado_por_nombre || 'Usuario UTC';
-              // CAMBIO AQUÍ: Evaluamos el rol
-              const esMensajeMaster = note.creado_por_rol === 'master'; 
-              const numRespuestas = note.respuesta ? note.respuesta.split('<BR>').length : 0;
-              // ... resto del renderizado sigue igual
+              const esMensajeMaster = note.creado_por_rol === 'master';
+              const numRespuestas = note.respuestas.length;
               const leido = (readMessages[note.id] || 0) >= numRespuestas;
               
               let areaBorderColor = esMensajeMaster ? 'border-l-amber-500' : 'border-l-blue-900';
@@ -292,7 +288,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {note.destinatario_especifico && <Badge className="bg-purple-50 text-purple-600 border-black border text-[8px] font-black uppercase">PRIVADO</Badge>}
+                          {note.destinatario_id && <Badge className="bg-purple-50 text-purple-600 border-black border text-[8px] font-black uppercase">PRIVADO</Badge>}
                           {getCategoryBadge(note.categoria || 'general')}
                         </div>
                       </div>
@@ -301,13 +297,13 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
                         <h4 className="text-xl font-black uppercase tracking-tight text-slate-900">{note.titulo}</h4>
                         <p className="text-base leading-relaxed whitespace-pre-wrap font-medium text-slate-700">{note.contenido}</p>
                         
-                        {note.respuesta && (
-                          <button 
+                        {numRespuestas > 0 && (
+                          <button
                             onClick={() => {
                               if (showFullViewId === note.id) setShowFullViewId(null);
                               else {
                                 setShowFullViewId(note.id);
-                                markAsRead(note.id, numRespuestas); // Marca como leído al expandir
+                                markAsRead(note.id, numRespuestas);
                               }
                             }}
                             className={`mt-4 font-black text-xs flex items-center gap-2 underline decoration-2 underline-offset-4 transition-colors ${esMensajeMaster ? 'text-amber-700 hover:text-black' : 'text-blue-700 hover:text-black'}`}
@@ -319,23 +315,27 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
                       </div>
                     </div>
 
-                    {/* HILO DE COMENTARIOS RESPONSIVO */}
-                    {showFullViewId === note.id && note.respuesta && (
+                    {/* HILO DE COMENTARIOS */}
+                    {showFullViewId === note.id && numRespuestas > 0 && (
                       <div className="px-12 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        {note.respuesta.split('<BR>').map((comentario, index) => {
-                          const esNutriComment = comentario.toLowerCase().includes('area: nutricion');
-                          const esFisicComment = comentario.toLowerCase().includes('area: fisioterapia');
-                          const textoLimpio = comentario.replace(/\| Area: (nutricion|fisioterapia)/gi, '').trim();
+                        {note.respuestas.map((reply) => {
+                          const esNutriComment = reply.autor_area === 'nutricion';
+                          const esFisicComment = reply.autor_area === 'fisioterapia';
 
                           let chatBg = 'bg-slate-50', chatBorder = 'border-black';
                           if (esNutriComment) { chatBg = 'bg-orange-50'; chatBorder = 'border-orange-500'; }
                           if (esFisicComment) { chatBg = 'bg-blue-50'; chatBorder = 'border-blue-500'; }
 
                           return (
-                            <div key={index} className="flex gap-4 items-start">
-                              <div className={`w-8 h-8 rounded-full border-2 ${chatBorder} flex items-center justify-center text-[10px] font-black uppercase`}>{textoLimpio.charAt(1)}</div>
+                            <div key={reply.id} className="flex gap-4 items-start">
+                              <div className={`w-8 h-8 rounded-full border-2 ${chatBorder} flex items-center justify-center text-[10px] font-black uppercase`}>
+                                {reply.autor_nombre.substring(0, 2)}
+                              </div>
                               <div className={`flex-1 p-4 rounded-[1.2rem] border-2 shadow-sm ${chatBorder} ${chatBg}`}>
-                                <p className="text-sm text-slate-800 font-bold leading-relaxed">{textoLimpio}</p>
+                                <p className="text-[10px] font-black uppercase text-slate-500 mb-1">
+                                  {reply.autor_nombre} · {format(parseISO(reply.fecha_creacion), "d MMM, HH:mm", { locale: es })}
+                                </p>
+                                <p className="text-sm text-slate-800 font-bold leading-relaxed">{reply.contenido}</p>
                               </div>
                             </div>
                           );

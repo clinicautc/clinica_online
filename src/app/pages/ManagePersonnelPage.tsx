@@ -52,6 +52,10 @@ export default function ManagePersonnelPage() {
         setNuevoD(prev => ({ ...prev, area: user.area as 'nutricion' | 'fisioterapia' }));
         setAreaFilter(user.area as 'nutricion' | 'fisioterapia');
       }
+      // Admin solo puede registrar practicantes — forzar tipo
+      if (user.rol === 'admin') {
+        setTipoAcceso('practicante');
+      }
     }
   }, [user]);
 
@@ -158,8 +162,11 @@ export default function ManagePersonnelPage() {
   if (authLoading) return <div className="min-h-screen flex items-center justify-center">Sincronizando seguridad...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-blue-900/10 shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-blue-50/60"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
+      <header className="relative z-10 bg-white/90 backdrop-blur-sm border-b border-blue-900/10 shadow-sm sticky top-0">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -176,7 +183,7 @@ export default function ManagePersonnelPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6 relative z-10">
         {/* SECCIÓN DE AUTORIZACIÓN */}
         <Card className="border-blue-900/10 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -208,7 +215,9 @@ export default function ManagePersonnelPage() {
                     <SelectTrigger className="bg-white border-blue-900/20"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="practicante">Practicante</SelectItem>
-                      <SelectItem value="docente">Docente</SelectItem>
+                      {user?.rol === 'master' && (
+                        <SelectItem value="docente">Docente</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

@@ -69,6 +69,21 @@ interface Appointment {
   practicante_nombre?: string | null;
 }
 
+const AUDIENCIA_MAP: Record<string, { destino: string; destinatario_rol: string }> = {
+  general:      { destino: 'todos',        destinatario_rol: 'todos' },
+  admins_nutri: { destino: 'nutricion',    destinatario_rol: 'admin' },
+  admins_fisio: { destino: 'fisioterapia', destinatario_rol: 'admin' },
+  pracs_nutri:  { destino: 'nutricion',    destinatario_rol: 'practicante' },
+  pracs_fisio:  { destino: 'fisioterapia', destinatario_rol: 'practicante' },
+};
+
+const LABEL_TODOS: Record<string, string> = {
+  admins_nutri: 'Todos los Administradores',
+  admins_fisio: 'Todos los Administradores',
+  pracs_nutri:  'Todos los Practicantes',
+  pracs_fisio:  'Todos los Practicantes',
+};
+
 export default function ManageAdminPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -82,11 +97,13 @@ const [areaFilter, setAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterap
 const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>('todos'); // <-- AGREGAR ESTO
 
   // ESTADOS PARA COMUNICADOS SEGMENTADOS
+  // audiencia: codifica área + rol en un solo valor (simplifica la UI)
+  // seleccion: 'todos'|'admin'|'practicante' para General, o ID numérico para persona específica
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
-    destino: 'todos' as 'nutricion' | 'fisioterapia' | 'todos',
-    emailDestinatario: 'ninguno'
+    audiencia: 'general' as 'general' | 'admins_nutri' | 'admins_fisio' | 'pracs_nutri' | 'pracs_fisio',
+    seleccion: 'todos',
   });
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
@@ -204,13 +221,30 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     }
   };
 
-  /**
-   * LÓGICA DE FILTRADO PARA EL DESPLEGABLE DE USUARIOS (EN VIVO)
-   */
-  const adminsDisponibles = practicantes.filter(u => {
-    if (notaNueva.destino === 'todos') return u.rol === 'admin';
-    return u.rol === 'admin' && u.area === notaNueva.destino;
+  // Usuarios que aparecen en el segundo select según la audiencia elegida
+  const usuariosSegundoSelect = practicantes.filter(u => {
+    switch (notaNueva.audiencia) {
+      case 'admins_nutri':  return u.rol === 'admin'       && u.area === 'nutricion';
+      case 'admins_fisio':  return u.rol === 'admin'       && u.area === 'fisioterapia';
+      case 'pracs_nutri':   return u.rol === 'practicante' && u.area === 'nutricion';
+      case 'pracs_fisio':   return u.rol === 'practicante' && u.area === 'fisioterapia';
+      default: return false;
+    }
   });
+
+  const getInfoTexto = () => {
+    const selId = parseInt(notaNueva.seleccion, 10);
+    if (!isNaN(selId)) {
+      const u = practicantes.find(p => p.id === String(selId));
+      return `Nota Privada: Solo ${u?.name ?? 'el usuario seleccionado'} verá esta publicación.`;
+    }
+    if (notaNueva.audiencia === 'general') {
+      if (notaNueva.seleccion === 'admin')       return 'Dirigida a todos los docentes de ambas áreas.';
+      if (notaNueva.seleccion === 'practicante') return 'Dirigida a todos los practicantes de ambas áreas.';
+      return 'Público General: Todos los usuarios del sistema verán esta publicación.';
+    }
+    return `Dirigida a ${LABEL_TODOS[notaNueva.audiencia]}.`;
+  };
 
   // LOGICA DE FILTRADO EN TIEMPO REAL
   const practicantesFiltrados = practicantes.filter(p => {
@@ -233,29 +267,32 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
 
 
-  /**
-   * PUBLICAR NOTA (CON LÓGICA DE DESTINATARIO ESPECÍFICO)
-   */
   const handlePublicarNota = async () => {
     if (!notaNueva.titulo || !notaNueva.contenido) {
       toast.error("El título y contenido son obligatorios");
       return;
     }
 
+    const selId = parseInt(notaNueva.seleccion, 10);
+    const isUser = !isNaN(selId);
+    const map = AUDIENCIA_MAP[notaNueva.audiencia];
+
+    const payload = {
+      titulo: notaNueva.titulo,
+      contenido: notaNueva.contenido,
+      destino: map.destino,
+      destinatario_rol: (notaNueva.audiencia === 'general' && !isUser)
+        ? notaNueva.seleccion          // 'todos' | 'admin' | 'practicante'
+        : map.destinatario_rol,
+      destinatario_id: isUser ? selId : null,
+    };
+
     try {
       setIsEnviando(true);
-      await notasAPI.createUniversitaria({
-        titulo: notaNueva.titulo,
-        contenido: notaNueva.contenido,
-        destino: notaNueva.destino,
-        creado_por: user?.id,
-        creado_por_nombre: user?.nombre || user?.name || "Master UTC",
-        destinatario_especifico: notaNueva.emailDestinatario === 'ninguno' ? null : notaNueva.emailDestinatario
-      });
-
-      toast.success(`Comunicado publicado exitosamente`);
+      await notasAPI.createUniversitaria(payload);
+      toast.success('Comunicado publicado exitosamente');
       setIsNotaModalOpen(false);
-      setNotaNueva({ titulo: '', contenido: '', destino: 'todos', emailDestinatario: 'ninguno' });
+      setNotaNueva({ titulo: '', contenido: '', audiencia: 'general', seleccion: 'todos' });
     } catch (error) {
       toast.error("Error al publicar en la base de datos");
     } finally {
@@ -354,8 +391,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         <header className="bg-white/90 backdrop-blur-sm shadow-sm mb-6 rounded-xl border border-gray-100">
           <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-blue-900 rounded-lg shadow-md">
+              <div className="relative flex items-center justify-center w-12 h-12 bg-blue-900 rounded-lg shadow-md">
                 <span className="text-white font-bold text-sm">UTC</span>
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
@@ -375,6 +413,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 <div>
                   <p className="text-sm font-bold text-blue-900">{nombreCortoDisplay}</p>
                   <p className="text-[10px] font-black uppercase tracking-wider text-orange-600">Gestión de Academias</p>
+                  <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
+                    <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+                  </p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
                   <User className="h-5 w-5 text-blue-600" />
@@ -769,51 +810,60 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1">Área Destino</Label>
-                            <Select 
-                              value={notaNueva.destino} 
-                              onValueChange={(v: any) => setNotaNueva({...notaNueva, destino: v, emailDestinatario: 'ninguno'})}
+                            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1"> Destino</Label>
+                            <Select
+                              value={notaNueva.audiencia}
+                              onValueChange={(v: any) => setNotaNueva({...notaNueva, audiencia: v, seleccion: 'todos'})}
                             >
                               <SelectTrigger className="rounded-xl h-10.75 bg-slate-50 border-slate-200 font-bold text-blue-900">
-                                <SelectValue placeholder="Alcance" />
+                                <SelectValue placeholder="Audiencia" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="todos">General (Todas)</SelectItem>
-                                <SelectItem value="nutricion">Nutrición</SelectItem>
-                                <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
+                                <SelectItem value="general"> Todos </SelectItem>
+                                <SelectItem value="admins_nutri">Administradores Nutrición</SelectItem>
+                                <SelectItem value="admins_fisio">Administradores Fisioterapia</SelectItem>
+                                <SelectItem value="pracs_nutri">Practicantes Nutrición</SelectItem>
+                                <SelectItem value="pracs_fisio">Practicantes Fisioterapia</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div className="space-y-2">
-                            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1 text-orange-600">Usuario Específico (Opcional)</Label>
-                            <Select 
-                              value={notaNueva.emailDestinatario} 
-                              onValueChange={(v) => setNotaNueva({...notaNueva, emailDestinatario: v})}
+                            <Label className="text-blue-950 font-black text-[11px] uppercase tracking-widest ml-1">Destinatario</Label>
+                            <Select
+                              value={notaNueva.seleccion}
+                              onValueChange={(v) => setNotaNueva({...notaNueva, seleccion: v})}
                             >
-                              <SelectTrigger className="rounded-xl h-10.75 border-slate-200 bg-white">
-                                <SelectValue placeholder="Seleccionar Persona" />
+                              <SelectTrigger className="rounded-xl h-10.75 border-slate-200 bg-white font-bold text-blue-900">
+                                <SelectValue placeholder="Seleccionar" />
                               </SelectTrigger>
                               <SelectContent>
-                                {/* CORRECCIÓN: "ninguno" en lugar de "" para cumplir con la prop value de Radix UI */}
-                                <SelectItem value="ninguno">--- Ninguno (Público) ---</SelectItem>
-                                {adminsDisponibles.map((admin) => (
-                                  <SelectItem key={admin.email} value={admin.email}>
-                                    {admin.name} ({admin.area})
-                                  </SelectItem>
-                                ))}
+                                {notaNueva.audiencia === 'general' ? (
+                                  <>
+                                    <SelectItem value="todos">Público General</SelectItem>
+                                    <SelectItem value="admin">Todos los Administradores</SelectItem>
+                                    <SelectItem value="practicante">Todos los Practicantes</SelectItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <SelectItem value="todos">{LABEL_TODOS[notaNueva.audiencia]}</SelectItem>
+                                    {usuariosSegundoSelect.map((u) => (
+                                      <SelectItem key={u.id} value={String(u.id)}>
+                                        {u.name}
+                                      </SelectItem>
+                                    ))}
+                                  </>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-                        
+
                         <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-start gap-2">
-                           <Target className="w-4 h-4 text-blue-600 mt-0.5" />
-                           <p className="text-[10px] text-blue-800 font-medium leading-tight italic">
-                             {notaNueva.emailDestinatario !== 'ninguno' 
-                               ? `Nota Privada: Solo el usuario seleccionado verá esta publicación.` 
-                               : `Nota Pública: Todos los integrantes del área de ${notaNueva.destino.toUpperCase()} verán esta publicación.`}
-                           </p>
+                          <Target className="w-4 h-4 text-blue-600 mt-0.5" />
+                          <p className="text-[10px] text-blue-800 font-medium leading-tight italic">
+                            {getInfoTexto()}
+                          </p>
                         </div>
                       </div>
 
