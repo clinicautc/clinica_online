@@ -34,10 +34,22 @@ async function login(req, res) {
 
     // PASSWORD VIEJA (texto plano) — migración automática a bcrypt
     if (usuario.password === password) {
+      // Aplicar los mismos checks que el path bcrypt antes de emitir tokens
+      if (usuario.status === 'inactivo') {
+        return res.status(403).json({ error: 'Tu cuenta se encuentra inactiva.' });
+      }
+      if (usuario.primer_inicio) {
+        return res.json({
+          success: true,
+          requiereCambioPassword: true,
+          id: usuario.id,
+          email: usuario.email,
+          nombre: usuario.nombre
+        });
+      }
+
       const nuevaHash = await bcrypt.hash(password, 10);
-
       await pool.query('UPDATE usuarios SET password = $1 WHERE id = $2', [nuevaHash, usuario.id]);
-
       console.log(` Password migrada automáticamente: ${usuario.email}`);
 
       const { password: _omit1, ...usuarioSafe1 } = usuario;
@@ -79,34 +91,9 @@ async function login(req, res) {
 }
 
 async function validateSession(req, res) {
-  try {
-    const email = req.headers.email;
-
-    if (!email) {
-      return res.status(401).json({ valid: false });
-    }
-
-    const result = await pool.query(
-      'SELECT id, nombre, email, rol, area, status AS estado FROM usuarios WHERE email = $1',
-      [email]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ valid: false });
-    }
-
-    const usuario = result.rows[0];
-
-    if (usuario.estado === 'inactivo') {
-      return res.status(403).json({ valid: false });
-    }
-
-    res.json({ valid: true, user: usuario });
-
-  } catch (error) {
-    console.error('Error validando sesión:', error.message);
-    res.status(500).json({ valid: false });
-  }
+  // Endpoint legacy que aceptaba header `email` sin verificación JWT.
+  // Ahora requiere Bearer token — delegamos a /auth/refresh o /auth/login.
+  return res.status(410).json({ valid: false, error: 'Endpoint obsoleto. Usa el flujo JWT.' });
 }
 
 async function refresh(req, res) {
@@ -132,7 +119,7 @@ async function refresh(req, res) {
     const tokenRow = tokenResult.rows[0];
 
     const userResult = await pool.query(
-      'SELECT id, nombre, email, rol, area, status FROM usuarios WHERE id = $1',
+      'SELECT id, nombre, email, rol, area, status, telefono, matricula FROM usuarios WHERE id = $1',
       [tokenRow.usuario_id]
     );
 
@@ -294,6 +281,8 @@ async function resendCode(req, res) {
       temporal = await pool.query('SELECT * FROM registro_temporal WHERE email = $1', [email.trim().toLowerCase()]);
     } else if (tipo === 'password') {
       temporal = await pool.query('SELECT * FROM password_resets WHERE email = $1', [email.trim().toLowerCase()]);
+    } else {
+      return res.status(400).json({ error: 'Tipo de reenvío inválido. Usa "registro" o "password".' });
     }
 
     if (temporal.rows.length === 0) {
@@ -368,9 +357,12 @@ async function verifyResetCode(req, res) {
 
 async function resetPassword(req, res) {
   const { email, newPassword } = req.body;
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
 
   try {
+    if (!newPassword) {
+      return res.status(400).json({ error: 'La nueva contraseña es requerida.' });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await pool.query(
       `UPDATE usuarios SET password = $1 WHERE email = $2 RETURNING *`,
       [hashedPassword, email.trim().toLowerCase()]

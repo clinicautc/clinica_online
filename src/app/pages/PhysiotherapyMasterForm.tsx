@@ -16,15 +16,14 @@ interface PageProps {
   onNext: () => void;
   appointmentId?: string;
   isSaving?: boolean;
-  setIsSaving: (value: boolean) => void;
+  setIsSaving?: (value: boolean) => void;
   historialId?: number | null; // <--- 1. AGREGA ESTA LÍNEA
 }
 
 const PhysiotherapyMasterForm: React.FC = () => {
-  const [isReadOnly, setIsReadOnly] = useState(false); //
+  const [_isReadOnly, setIsReadOnly] = useState(false);
   const navigate = useNavigate();
   const { appointmentId } = useParams();
-  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 const [historialId, setHistorialId] = useState<number | null>(null); // <--- 2. AGREGAR ESTE ESTADO
@@ -51,11 +50,17 @@ const [historialId, setHistorialId] = useState<number | null>(null); // <--- 2. 
         
 setHistorialId(dataGuardada.id)
 
-        // HIDRATACIÓN: Inyectamos los datos guardados en el estado del formulario
+        // HIDRATACIÓN: datos ya tiene la estructura {pagina_1, pagina_2, pagina_3}
+        const datosGuardados = dataGuardada.datos || {};
         setFormData((prevData: any) => ({
           ...prevData,
-          ...dataGuardada.datos,   // <--- ¡SOLO DEBES AGREGAR ".datos" AQUÍ!
-          paciente_id: dataGuardada.paciente_id 
+          ...datosGuardados,
+          paciente_id: dataGuardada.paciente_id,
+          pagina_1: {
+            ...(prevData.pagina_1 || {}),
+            ...(datosGuardados.pagina_1 || {}),
+            paciente_id: dataGuardada.paciente_id
+          }
         }));
 
 
@@ -69,7 +74,7 @@ setHistorialId(dataGuardada.id)
   };
 
   cargarHistorialExistente();
-}, [appointmentId, user]); // Se añadió 'user' a las dependencias
+}, [appointmentId]);
 
   // ... (Sigue el resto del código: updateGlobalData, handleNext, etc.)
 
@@ -84,28 +89,6 @@ setHistorialId(dataGuardada.id)
   const handleNext = () => setStep((prev) => prev + 1);
   const handleBack = () => setStep((prev) => prev - 1);
 
-  // --- LÓGICA DE GUARDADO FINAL (En el último paso) ---
- // --- LÓGICA DE GUARDADO FINAL (En el último paso) ---
-  const handleFinalSave = async () => {
-    try {
-      setIsSaving(true);
-      await historialesAPI.create({
-        paciente_id: formData.paciente_id || 0,
-        tipo: 'fisioterapia',
-        datos: formData,
-        creado_por: user?.id,
-        appointment_id: appointmentId
-      });
-
-      toast.success('¡Historial clínico de fisioterapia guardado con éxito!');
-      navigate('/physiotherapy-dashboard');
-    } catch (error) {
-      console.error("Error crítico:", error);
-      toast.error('Fallo de conexión.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
   return (
     <div className="min-h-screen bg-zinc-600">
       
@@ -1041,15 +1024,13 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
  * ADAPTACIÓN: Contenido íntegro de PhysiotherapyFormPage3.tsx con lógica de API
  * ============================================================================
  */
-const PhysiotherapyPage3Component: React.FC<PageProps> = ({ 
-  accumulatedData, 
-  onUpdate, 
-  onBack, 
-  onNext,
-  isSaving, 
+const PhysiotherapyPage3Component: React.FC<PageProps> = ({
+  accumulatedData,
+  onUpdate,
+  onBack,
+  isSaving,
   setIsSaving,
-  historialId // <--- 4a. ASEGÚRATE DE RECIBIR ESTA PROP AQUÍ
-
+  historialId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -1085,12 +1066,20 @@ const appointmentId = params.id || params.appointmentId;
   // --- LÓGICA DE GUARDADO FINAL EN BASE DE DATOS ---
   const handleFinalizarYGuardar = async () => {
     try {
-      setIsSaving(true); 
+      setIsSaving?.(true);
 
       // 1. Extraemos los valores de forma segura (usamos paciente_id de la p1)
-      const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
+      const parsedId = parseInt(accumulatedData?.pagina_1?.paciente_id, 10);
+      const pId = !isNaN(parsedId) ? parsedId : (accumulatedData?.paciente_id ?? null);
       const pNombre = accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre";
-      const aId = appointmentId ? parseInt(appointmentId) : null;
+      const parsedAId = parseInt(appointmentId ?? '', 10);
+      const aId = !isNaN(parsedAId) ? parsedAId : null;
+
+      if (!pId) {
+        toast.error("Error: no se pudo identificar al paciente. Regresa al paso 1.");
+        setIsSaving?.(false);
+        return;
+      }
 
       const payload = {
         paciente_id: pId,
@@ -1104,7 +1093,7 @@ const appointmentId = params.id || params.appointmentId;
 
       // 2. LÓGICA CONDICIONAL DINÁMICA: PUT SI YA EXISTE, POST SI ES NUEVO
       // 3. Ejecución de la petición (Aseguramos enviar el tipo)
-      await historialesAPI.guardar(historialId, { ...payload, tipo: 'fisioterapia' });
+      await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'fisioterapia' });
 
       toast.success('¡Historial guardado/actualizado con éxito!');
 
@@ -1117,7 +1106,7 @@ const appointmentId = params.id || params.appointmentId;
       console.error("Error en el guardado final:", error);
       toast.error(`Error: ${error.message || 'Revisa la conexión con la API'}`);
     } finally {
-      setIsSaving(false);
+      setIsSaving?.(false);
     }
   };
 

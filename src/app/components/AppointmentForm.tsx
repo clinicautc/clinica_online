@@ -16,7 +16,7 @@ import { format, isBefore, startOfDay, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Clock, Loader2 } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, citasAPI } from '../lib/api';
 
 interface Appointment {
   id?: number;
@@ -29,10 +29,11 @@ interface Appointment {
 
 interface AppointmentFormProps {
   patientId: string;
-  existingAppointment?: Appointment; // Novedad: Si pasas esto, el form entra en "Modo Reagendar"
+  existingAppointment?: Appointment;
+  onSuccess?: () => void;
 }
 
-export default function AppointmentForm({ patientId, existingAppointment }: AppointmentFormProps) {
+export default function AppointmentForm({ patientId, existingAppointment, onSuccess }: AppointmentFormProps) {
   const { user } = useAuth();
   const currentUser = user as any;
   const isAdmin = currentUser?.rol === 'admin';
@@ -106,7 +107,7 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
     } else {
       setHorasOcupadas([]);
     }
-  }, [date, type, isRescheduling, existingAppointment]);
+  }, [date, type, isRescheduling, existingAppointment?.id, existingAppointment?.fecha]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,10 +166,12 @@ export default function AppointmentForm({ patientId, existingAppointment }: Appo
 
       if (response.ok) {
         toast.success(isRescheduling ? '¡Cita reagendada exitosamente!' : '¡Cita agendada exitosamente!');
-        
-        // Auto-Refresh
         setTimeout(() => {
-          window.location.reload();
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            window.location.reload();
+          }
         }, 1500);
 
       } else {

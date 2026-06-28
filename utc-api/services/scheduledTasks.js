@@ -1,8 +1,8 @@
 const pool = require('../db');
 
-/**
- * LÓGICA DE DESACTIVACIÓN AUTOMÁTICA (MODO PRECISIÓN HH:mm)
- */
+const HORA_DESACTIVACION = "00:38";
+let yaEjecutoHoy = false;
+
 async function verificarYDesactivarPracticantes() {
   try {
     const ahora = new Date().toLocaleTimeString("en-GB", {
@@ -12,18 +12,22 @@ async function verificarYDesactivarPracticantes() {
       hour12: false
     });
 
-    const HORA_DESACTIVACION = "00:38";
+    // Resetear el flag después de la hora de cierre (ej. al mediodía)
+    if (ahora === "12:00") {
+      yaEjecutoHoy = false;
+    }
 
-    if (ahora === HORA_DESACTIVACION) {
+    if (ahora >= HORA_DESACTIVACION && !yaEjecutoHoy) {
+      yaEjecutoHoy = true;
       const result = await pool.query(
         "UPDATE usuarios SET status = 'inactivo' WHERE rol = 'practicante' AND status = 'activo'"
       );
 
       if (result.rowCount > 0) {
-        console.log(`🕒 [AUTO-CIERRE] Hora alcanzada (${ahora}). Se desactivaron ${result.rowCount} practicantes.`);
+        console.log(`🕒 [AUTO-CIERRE] Hora ${ahora}. Se desactivaron ${result.rowCount} practicantes.`);
         await pool.query(
           "INSERT INTO logs_sistema (tipo, descripcion, metadata) VALUES ($1, $2, $3)",
-          ['cierre_automatico', `Cierre de las 00:38 ejecutado`, JSON.stringify({ afectados: result.rowCount })]
+          ['cierre_automatico', `Cierre de las ${HORA_DESACTIVACION} ejecutado`, JSON.stringify({ afectados: result.rowCount })]
         );
       }
     }

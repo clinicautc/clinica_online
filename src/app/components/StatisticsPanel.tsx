@@ -16,7 +16,7 @@ import {
   Zap, AlertTriangle, TrendingUp, Users2, Activity,
   CalendarClock, Download
 } from 'lucide-react';
-import { parseISO, getDay } from 'date-fns';
+import { parseISO, getDay, subDays } from 'date-fns';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell
@@ -84,7 +84,6 @@ function StatCard({
   return (
     <div style={{
       background: C.surface,
-      borderTop: `3px solid ${a.top}`,
       border: `1px solid ${C.border}`,
       borderTop: `3px solid ${a.top}`,
       boxShadow: C.shadow,
@@ -370,7 +369,7 @@ async function exportToExcel(stats: ExtendedStats) {
 // ---------------------------------------------------------------------------
 export default function StatisticsPanel({ area }: StatisticsPanelProps) {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ExtendedStats>({
     totalCitas: 0,
     citasCompletadas: 0,
@@ -411,7 +410,10 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         const timeCount: Record<string, number> = {};
 
         citas.forEach((apt: any) => {
-          const dayIdx = getDay(parseISO(apt.fecha || apt.date));
+          const fechaStr = apt.fecha || apt.date;
+          if (!fechaStr) return;
+          const dayIdx = getDay(parseISO(fechaStr));
+          if (isNaN(dayIdx) || dayIdx < 0 || dayIdx > 6) return;
           if (apt.tipo === 'nutricion') dayData[dayIdx].nutricion++;
           else if (apt.tipo === 'fisioterapia') dayData[dayIdx].fisioterapia++;
 
@@ -434,7 +436,11 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
             .slice(0, 5),
           tiempoPromedioConsulta: dbStats.promedioConsulta, // Viene de tabla metricas
           tasaAbandono: 0, // Implementar log de abandono después
-          pacientesNuevosSemana: historiales.length,
+          pacientesNuevosSemana: historiales.filter((h: any) => {
+            const fecha = h.creado_en || h.fecha || h.created_at;
+            if (!fecha) return false;
+            return parseISO(fecha) >= subDays(new Date(), 7);
+          }).length,
           velocidadAsignacionDocente: 0,
         });
       } catch (error) {

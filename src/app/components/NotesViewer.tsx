@@ -6,16 +6,15 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { 
-  MessageSquare, Calendar, User, Loader2, Target, 
-  Inbox, SendHorizontal, CheckCircle2, Send, Clock, AlertCircle,
-  ChevronDown, ChevronUp, MessageCircle, ShieldAlert, Users, Shield
+import {
+  MessageSquare, Loader2,
+  Inbox, MessageCircle, ShieldAlert, Users, Shield
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -76,30 +75,31 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
    * Guarda cuántas respuestas ha visto el usuario de cada nota en localStorage.
    */
   const [readMessages, setReadMessages] = useState<{[key: number]: number}>(() => {
-    const saved = localStorage.getItem(`utc_read_notes_${user?.id}`);
+    if (!user?.id) return {};
+    const saved = localStorage.getItem(`utc_read_notes_${user.id}`);
     return saved ? JSON.parse(saved) : {};
   });
 
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
   const esAdminDeArea = user?.rol === 'admin';
 
-  const fetchNotes = async () => {
-  try {
-    setIsLoading(true);
-    const data = await notasAPI.getUniversitarias();
-    setNotes(data);
-  } catch (error) {
-    console.error("Error en sincronización de notas:", error);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  const fetchNotes = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await notasAPI.getUniversitarias();
+      setNotes(data);
+    } catch (error) {
+      console.error("Error en sincronización de notas:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchNotes();
-    const interval = setInterval(fetchNotes, 45000); 
+    const interval = setInterval(fetchNotes, 45000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchNotes]);
 
   /**
    * FUNCIÓN PARA MARCAR COMO LEÍDO

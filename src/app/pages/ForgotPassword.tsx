@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check,Mail,Lock,KeyRound,Eye,EyeOff } from 'lucide-react';
+import { Check,Mail,KeyRound,Eye,EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 
@@ -24,7 +24,7 @@ export default function ForgotPassword() {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [codeError, setCodeError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [_confirmPasswordError, setConfirmPasswordError] = useState('');
   const passwordValidation = {
   minLength: newPassword.length >= 8,
   uppercase: /[A-Z]/.test(newPassword),
@@ -125,12 +125,12 @@ const passwordsMatch =
 
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 flex items-center justify-center rounded-full
-                ${currentStep === 'password' || currentStep === 'success'
+                ${currentStep === 'password'
                   ? 'bg-blue-900 text-white'
                   : currentStep === 'code'
                   ? 'bg-blue-500 text-white'
                   : 'bg-blue-100 text-blue-900'}`}>
-                {currentStep === 'password' || currentStep === 'success' ? '✓' : '2'}
+                {currentStep === 'password' ? '✓' : '2'}
               </div>
               <span className="text-sm mt-2 text-gray-500">Código</span>
             </div>
@@ -139,12 +139,10 @@ const passwordsMatch =
 
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 flex items-center justify-center rounded-full
-                ${currentStep === 'success'
-                  ? 'bg-blue-900 text-white'
-                  : currentStep === 'password'
+                ${currentStep === 'password'
                   ? 'bg-blue-500 text-white'
                   : 'bg-blue-100 text-blue-900'}`}>
-                {currentStep === 'success' ? '✓' : '3'}
+                3
               </div>
               <span className="text-sm mt-2 text-gray-500">Nueva</span>
             </div>

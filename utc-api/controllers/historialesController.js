@@ -35,6 +35,9 @@ async function updateGenerico(req, res) {
   const { id } = req.params; // ID del registro en la tabla de historiales
   const { datos, tipo } = req.body;
 
+  if (tipo !== 'nutricion' && tipo !== 'fisioterapia') {
+    return res.status(400).json({ error: 'Tipo de historial inválido. Usa "nutricion" o "fisioterapia".' });
+  }
   const tabla = tipo === 'nutricion' ? 'historiales_nutricion' : 'historiales_fisioterapia';
 
   try {

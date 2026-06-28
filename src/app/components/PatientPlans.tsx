@@ -6,7 +6,6 @@
  * ============================================================================
  */
 
-import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Utensils, Activity } from 'lucide-react';

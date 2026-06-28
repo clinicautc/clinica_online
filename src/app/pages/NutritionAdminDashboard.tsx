@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
@@ -23,10 +23,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
 } from "../components/ui/dialog";
 import {
-  LogOut, Users, FileText, Calendar, Clock, Utensils, BarChart3,
+  LogOut, Users, Calendar, Clock, Utensils, BarChart3,
   Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
   X, User, Phone, Building, Trash2, AlertTriangle, Edit2,
-  CalendarClock, ChevronUp, Search, Filter, Shield
+  CalendarClock, ChevronUp, Search, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -37,7 +37,6 @@ import PatientList from '../components/PatientList';
 import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
 import ViewModeToggle from '../components/ViewModeToggle';
-import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import StatisticsPanel from '../components/StatisticsPanel';
 import { Badge } from '../components/ui/badge';
@@ -81,7 +80,7 @@ export default function NutritionAdminDashboard() {
 
   // ESTADOS TABLA PERSONAL ACADÉMICO
   const [personalAcademico, setPersonalAcademico] = useState<any[]>([]);
-  const [roleFilterPersonal, setRoleFilterPersonal] = useState<'todos' | 'admin' | 'practicante'>('todos');
+  const [roleFilterPersonal, _setRoleFilterPersonal] = useState<'todos' | 'admin' | 'practicante'>('todos');
   const [searchPersonal, setSearchPersonal] = useState('');
   const [todasCitas, setTodasCitas] = useState<Appointment[]>([]);
 
@@ -108,8 +107,8 @@ export default function NutritionAdminDashboard() {
   
   // Estado inicial dinámico: Unificado bajo 'nombre'
   const [profileData, setProfileData] = useState({
-    nombre: user?.nombre || 'David Alejandro Velázquez Gutiérrez',
-    telefono: user?.telefono || '+52 55 1234 5678'
+    nombre: user?.nombre || '',
+    telefono: user?.telefono || ''
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
 
@@ -184,8 +183,7 @@ export default function NutritionAdminDashboard() {
       }
     };
 
-    const savedUser = localStorage.getItem('utc_current_user');
-    if (!user && !authLoading && !savedUser) {
+    if (!user && !authLoading) {
       navigate('/login');
       return;
     }
@@ -206,12 +204,6 @@ export default function NutritionAdminDashboard() {
       });
     }
   }, [user]);
-
-  // --- FUNCIÓN DE ÉXITO AL REAGENDAR ---
-  const handleReagendarSuccess = () => {
-    setReagendarCitaId(null);
-    setRefreshKey(prev => prev + 1); // Forzamos recarga de las citas
-  };
 
   // --- FUNCIONES DE ASIGNACIÓN ---
   const handleOpenAssignModal = (appointment: Appointment) => {
@@ -524,9 +516,10 @@ export default function NutritionAdminDashboard() {
                                 Nueva Fecha y Hora para {apt.paciente_nombre}
                               </span>
                             </div>
-                            <AppointmentForm 
-  patientId={apt.paciente_id?.toString() || ''} 
+                            <AppointmentForm
+  patientId={apt.paciente_id?.toString() || ''}
   existingAppointment={apt as any}
+  onSuccess={() => { setReagendarCitaId(null); setRefreshKey(k => k + 1); }}
 />
                             <Button 
                               variant="ghost" 

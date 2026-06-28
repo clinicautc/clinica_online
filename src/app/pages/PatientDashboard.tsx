@@ -7,16 +7,16 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { 
-  LogOut, Calendar, FileText, User, Clock, Utensils, 
+  LogOut, Calendar, FileText, User, Clock, Utensils,
   Activity, AlertCircle, Trash2, CalendarClock, ChevronUp, CalendarDays,
-  X, Edit2, Phone, Building, AlertTriangle
+  X, Edit2, Phone, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import AppointmentForm from '../components/AppointmentForm';
@@ -113,44 +113,33 @@ export default function PatientDashboard() {
     fetchCitas();
   }, [patientId, selectedDate, selectedMonth, viewMode]);
 
-  const handleCancelarCita = async (id: number) => {
-    if (!window.confirm("¿Estás seguro de que deseas cancelar esta cita?")) return;
-    try {
-      await citasAPI.remove(id);
-      toast.success("Cita cancelada exitosamente");
-      fetchCitas();
-    } catch (error) {
-      toast.error("Error al cancelar");
-    }
+  const handleCancelarCita = (id: number) => {
+    toast('¿Cancelar esta cita?', {
+      action: {
+        label: 'Sí, cancelar',
+        onClick: async () => {
+          try {
+            await citasAPI.update(id, { estado: 'cancelada' });
+            toast.success("Cita cancelada exitosamente");
+            fetchCitas();
+          } catch {
+            toast.error("Error al cancelar");
+          }
+        }
+      },
+      cancel: { label: 'No', onClick: () => {} }
+    });
   };
 
   // Filtrado por área para la vista actual
-  const citasFinales = citasHistoricas.filter(cita => 
-    cita.tipo.toLowerCase().includes(areaFiltro)
+  const citasFinales = citasHistoricas.filter(cita =>
+    cita.tipo.toLowerCase() === areaFiltro
   );
 
   const handleLogout = () => {
     logout();
     navigate('/login');
     toast.success('Sesión finalizada');
-  };
-
-  /**
-   * MANEJADOR DE ÉXITO DE RE-AGENDADO
-   * Esta función es CRUCIAL para evitar duplicados visuales.
-   */
-  const handleReagendarSuccess = () => {
-    // 1. Cerramos el formulario de edición inmediatamente
-    setReagendarCitaId(null);
-    
-    // 2. Vaciamos la lista local de citas para forzar un renderizado limpio
-    // Esto garantiza que la cita vieja (del 19 de abril) desaparezca de la pantalla.
-    setCitasHistoricas([]); 
-    
-    // 3. Consultamos de nuevo al servidor (donde el UPDATE del index.js ya reemplazó el registro)
-    fetchCitas(); 
-    
-    toast.success("Cita re-agendada exitosamente. El registro anterior ha sido actualizado.");
   };
 
   // ==========================================
@@ -383,10 +372,10 @@ export default function PatientDashboard() {
                               Nueva Fecha y Hora para {areaFiltro}
                             </span>
                           </div>
-                          {/* CÓDIGO NUEVO (CORRECTO) */}
-<AppointmentForm 
-  patientId={String(user.id)} 
-  existingAppointment={cita} // <-- ¡Esta es la clave mágica! (Asegúrate de que 'cita' o 'apt' sea la variable del .map)
+                          <AppointmentForm
+  patientId={String(user?.id ?? '')}
+  existingAppointment={cita}
+  onSuccess={() => { setReagendarCitaId(null); fetchCitas(); }}
 />
                           <Button 
                             variant="ghost" 
@@ -410,7 +399,7 @@ export default function PatientDashboard() {
             </TabsContent>
 
             <TabsContent value="plans">
-              <PatientPlans patientId={patientId || ''} />
+              <PatientPlans patientId={patientId || ''} patientName={patientName} />
             </TabsContent>
           </div>
         </Tabs>

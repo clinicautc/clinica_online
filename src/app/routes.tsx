@@ -84,7 +84,6 @@ function DashboardRouter() {
   const currentRole = (user as any).rol;
   const currentArea = user.area;
 
-  console.log("🕵️ Sherlock verificando acceso:", { currentRole, currentArea });
 
   switch (currentRole) {
     case 'master':
@@ -119,7 +118,6 @@ function DashboardRouter() {
 /**
  * CONFIGURACIÓN DE RUTAS
  */
-console.log('✅ Rutas cargadas desde src/app/routes.tsx');
 export const router = createBrowserRouter([
   {
     path: '/',

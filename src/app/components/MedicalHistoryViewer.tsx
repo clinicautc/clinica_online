@@ -78,11 +78,18 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
   }, [area, isMaster, user, navigate, id]);
 
   useEffect(() => {
-    // Solo el master puede cambiar de área mediante las props/botones externos
     if (filterType && isMaster) {
       setSelectedArea(filterType);
     }
   }, [filterType, isMaster]);
+
+  // Corrige el área cuando user carga después del mount (admin/practicante)
+  useEffect(() => {
+    if (user && !isMaster) {
+      setSelectedArea(getAreaAutorizada());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   /**
    * 2. CARGA DE DATOS SINCRONIZADA (USUARIO + HISTORIALES)
@@ -109,15 +116,15 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
           const data: MedicalHistory[] = await response.json();
           setHistories(data);
 
-          // Si hay registros, el nombre del historial suele ser más preciso para la ficha
           if (data.length > 0) {
             setPatientName(data[0]?.paciente_nombre || 'Paciente Registrado');
           }
-          
+
           setDetectedArea(selectedArea);
         } else {
           setHistories([]);
-          if (!patientName) setPatientName("Sin registros previos");
+          // Usar setter funcional para no leer patientName del closure
+          setPatientName(prev => prev || "Sin registros previos");
         }
       } catch (error) {
         console.error("Error al cargar datos desde PostgreSQL:", error);

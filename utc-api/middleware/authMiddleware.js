@@ -324,9 +324,13 @@ const canModifyAppointment = async (
 
     if (user.rol === 'admin') {
 
+      if (!user.area) {
+        return res.status(403).json({ error: 'Tu cuenta de admin no tiene área asignada.' });
+      }
+
       const mismaArea =
         cita.tipo?.toLowerCase()
-          .includes(user.area);
+          .includes(user.area.toLowerCase());
 
       if (!mismaArea) {
 

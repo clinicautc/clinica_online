@@ -5,7 +5,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
@@ -178,8 +178,8 @@ const handleSaveProfile = async () => {
     try {
       await usuariosAPI.updateProfile(user.id, {
         nombre: capitalizeWords(profileData.nombre),
-        telefono: telefonoLimpio,
-        matricula: matriculaLimpia // <-- Aquí se aplica la solución
+        telefono: telefonoLimpio ?? undefined,
+        matricula: matriculaLimpia ?? undefined
       });
 
       setIsEditingProfile(false);

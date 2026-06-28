@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { usuariosAPI, notasAPI, citasAPI } from '../lib/api';
@@ -47,7 +47,6 @@ import {
 import { toast } from 'sonner';
 
 // Importación de tipos y componentes adicionales
-import { Practitioner } from '../lib/mockData';
 import PatientList from '../components/PatientList';
 import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
@@ -349,10 +348,12 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     }
 
     try {
+      const telefonoLimpio = profileData.telefono?.replace(/\D/g, '') || undefined;
+      const matriculaLimpia = profileData.matricula?.trim() || undefined;
       await usuariosAPI.updateProfile(user.id, {
         nombre: capitalizeWords(profileData.nombre),
-        telefono: profileData.telefono,
-        matricula: profileData.matricula
+        telefono: telefonoLimpio,
+        matricula: matriculaLimpia
       });
 
       setIsEditingProfile(false);
@@ -612,6 +613,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               <AppointmentForm
                                 patientId={apt.paciente_id?.toString() || ''}
                                 existingAppointment={apt as any}
+                                onSuccess={() => { setReagendarCitaId(null); cargarCitas(); }}
                               />
                               <Button
                                 variant="ghost"

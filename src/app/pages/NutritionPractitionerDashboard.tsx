@@ -6,7 +6,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
@@ -27,10 +27,9 @@ import {
   Send, FileEdit, Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { format, parseISO, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import PatientList from '../components/PatientList';
-import MedicalHistoryViewer from '../components/MedicalHistoryViewer';
 import NotesViewer from '../components/NotesViewer';
 import { toast } from 'sonner';
 
@@ -144,8 +143,7 @@ export default function NutritionPractitionerDashboard() {
       }
     };
 
-    const savedUser = localStorage.getItem('utc_current_user');
-    if (!user && !authLoading && !savedUser) {
+    if (!user && !authLoading) {
       navigate('/login');
       return;
     }

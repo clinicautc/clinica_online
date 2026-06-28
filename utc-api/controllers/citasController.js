@@ -108,7 +108,7 @@ async function update(req, res) {
 
     const original = citaActual.rows[0];
     const horaActualStr = original.hora.substring(0, 5);
-    const esReagendamiento = fecha !== original.fecha.toISOString().split('T')[0] || hora.substring(0, 5) !== horaActualStr;
+    const esReagendamiento = fecha !== new Date(original.fecha).toISOString().split('T')[0] || hora.substring(0, 5) !== horaActualStr;
 
     if (esReagendamiento) {
       if (original.estado === 'completada') {
@@ -194,7 +194,10 @@ async function asignar(req, res) {
       `UPDATE citas SET practicante_id = $1, practicante_nombre = $2, estado = 'programada', fecha_asignacion = NOW() WHERE id = $3 RETURNING *`,
       [practicante_id, practicante_nombre, id]
     );
-    res.json(result.rows.length > 0 ? result.rows[0] : res.status(404).json({ error: "No se encontró la cita." }));
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No se encontró la cita." });
+    }
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

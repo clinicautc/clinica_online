@@ -24,7 +24,8 @@ import {
 } from '../lib/api';
 
 export interface User {
-  telefono: string;
+  telefono?: string;
+  matricula?: string;
   id: string | number;
   nombre: string;
   email: string;
@@ -127,7 +128,9 @@ export function AuthProvider({
       email: data.email,
       rol: data.rol,
       area: data.area,
-      estado: data.estado || 'activo'
+      estado: data.estado || 'activo',
+      telefono: data.telefono || '',
+      matricula: data.matricula || ''
     };
 
     setClientAccessToken(data.accessToken);

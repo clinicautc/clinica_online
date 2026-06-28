@@ -100,18 +100,9 @@ async function create(req, res) {
 }
 
 async function updateStatus(req, res) {
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  try {
-    const result = await pool.query(
-      'UPDATE practicantes_autorizados SET estado = $1 WHERE id = $2 RETURNING *',
-      [estado, id]
-    );
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  // Esta ruta es legacy — la tabla practicantes_autorizados ya no existe.
+  // El flujo correcto va por usuariosController.updateStatus (PUT /usuarios/:id/status).
+  return res.status(410).json({ error: 'Endpoint obsoleto. Usa PUT /api/usuarios/:id/status.' });
 }
 
 module.exports = { getAll, create, updateStatus };

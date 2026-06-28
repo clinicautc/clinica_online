@@ -29,7 +29,6 @@
     const params = useParams();
 // Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
 const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Línea 30 aprox.)
-    const { user } = useAuth();
     const [step, setStep] = useState(1);
     
     // --- OBJETO MAESTRO DE DATOS (Persistencia Total) ---
@@ -40,7 +39,7 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     pagina_4: {}
   });
 
-    const [isReadOnly, setIsReadOnly] = useState(false);
+    const [isReadOnly, _setIsReadOnly] = useState(false);
     const [historialId, setHistorialId] = useState<number | null>(null);
 
       // AGREGA ESTE BLOQUE AQUÍ:
@@ -59,11 +58,17 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
         // 1. Guardamos el ID del historial para que el PUT funcione
         setHistorialId(filaCompleta.id);
         
-        // 2. Hidratación: MUY IMPORTANTE usar filaCompleta.datos
+        // 2. Hidratación: datos ya tiene la estructura {pagina_1, pagina_2, ...}
+        const datosGuardados = filaCompleta.datos || {};
         setFormData((prevData: any) => ({
           ...prevData,
-          ...filaCompleta.datos, 
-          paciente_id: filaCompleta.paciente_id // <-- ¡Esto evita el error de redirección!
+          ...datosGuardados,
+          paciente_id: filaCompleta.paciente_id,
+          pagina_1: {
+            ...(prevData.pagina_1 || {}),
+            ...(datosGuardados.pagina_1 || {}),
+            paciente_id: filaCompleta.paciente_id
+          }
         }));
 
         toast.success("Expediente cargado correctamente");
@@ -75,7 +80,7 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
   };
 
   cargarHistorialExistente();
-}, [appointmentId, user]); // Se agregó 'user' a las dependencias para asegurar consistencia
+}, [appointmentId]);
 
     // Función núcleo para actualizar datos sin perder los anteriores
     const updateGlobalData = (page: string, data: any) => {
@@ -1797,12 +1802,20 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
   try {
     setIsSaving(true);
 
-    const pId = parseInt(accumulatedData?.pagina_1?.paciente_id) || accumulatedData?.paciente_id;
+    const parsedId = parseInt(accumulatedData?.pagina_1?.paciente_id, 10);
+    const pId = !isNaN(parsedId) ? parsedId : (accumulatedData?.paciente_id ?? null);
     const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
-    const aId = appointmentId ? parseInt(appointmentId) : null;
+    const parsedAId = parseInt(appointmentId ?? '', 10);
+    const aId = !isNaN(parsedAId) ? parsedAId : null;
+
+    if (!pId) {
+      toast.error("Error: no se pudo identificar al paciente. Regresa al paso 1.");
+      setIsSaving(false);
+      return;
+    }
 
     const payload = {
-      paciente_id: pId, 
+      paciente_id: pId,
       paciente_nombre: pNombre,
       tipo: 'nutricion',
       datos: accumulatedData, 
@@ -1815,7 +1828,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
     // Si ya tienes un historialId guardado en el estado del componente, usamos PUT (Actualizar)
     // Si no tienes ID (es un formulario nuevo), usamos POST (Crear nuevo)
     // 'tipo' necesario para el backend
-    await historialesAPI.guardar(historialId, { ...payload, tipo: 'nutricion' });
+    await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'nutricion' });
 
     toast.success("Expediente guardado/actualizado correctamente");
 

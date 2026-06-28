@@ -12,7 +12,6 @@ import { useAuth } from '../contexts/AuthContext'; // Importado para validar el 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';

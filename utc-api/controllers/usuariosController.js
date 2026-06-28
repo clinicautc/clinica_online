@@ -71,6 +71,9 @@ async function updateStatus(req, res) {
 
   try {
     const result = await pool.query('UPDATE usuarios SET status = $1 WHERE id = $2 RETURNING *', [estado, id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
     const { password: _omitPassword, ...usuarioActualizado } = result.rows[0];
     res.json(usuarioActualizado);
   } catch (error) {
@@ -82,7 +85,10 @@ async function remove(req, res) {
   const { id } = req.params;
 
   try {
-    await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    const result = await pool.query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
     res.json({ message: "Usuario eliminado" });
   } catch (error) {
     res.status(500).json({ error: error.message });

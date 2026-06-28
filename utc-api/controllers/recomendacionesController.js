@@ -28,6 +28,10 @@ async function getByPaciente(req, res) {
     return res.status(403).json({ error: 'No puedes ver las recomendaciones de otro paciente.' });
   }
 
+  if (!area || (area !== 'nutricion' && area !== 'fisioterapia')) {
+    return res.status(400).json({ error: 'Parámetro "area" inválido. Usa "nutricion" o "fisioterapia".' });
+  }
+
   try {
     const result = await pool.query(
       'SELECT * FROM recomendaciones_nutricion WHERE paciente_id = $1 AND area = $2 ORDER BY fecha_creacion DESC',

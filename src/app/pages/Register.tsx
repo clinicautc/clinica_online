@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { useAuth } from '../contexts/AuthContext';
 import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Check,X} from 'lucide-react';
 import { toast } from 'sonner';
 import { authAPI } from '../lib/api';
@@ -31,7 +30,7 @@ export default function Register() {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isResendingCode, setIsResendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  const [_isVerified, _setIsVerified] = useState(false);
 
   const navigate = useNavigate();
 

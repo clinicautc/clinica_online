@@ -6,7 +6,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, metricasAPI } from '../lib/api';
@@ -29,18 +29,14 @@ import {
   Cell
 } from 'recharts';
 import { 
-  ArrowLeft, 
-  TrendingUp, 
-  TrendingDown, 
-  Activity, 
-  Utensils, 
-  Users, 
-  Clock, 
-  CheckCircle2, 
-  LayoutGrid, 
-  Mountain,
-  XCircle,
-  CalendarClock
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Utensils,
+  Clock,
+  LayoutGrid,
+  Mountain
 } from 'lucide-react';
 import { Appointment } from '../lib/mockData';
 import { format, parseISO, eachDayOfInterval, subDays } from 'date-fns';
@@ -118,7 +114,7 @@ export default function StatisticsPage() {
     // Conteo desde logs para re-agendados
     const reagendadas = logs.filter(l => l.tipo === 'cita_reagendada').length;
 
-    const unicos = new Set(todasLasCitas.map(c => c.paciente_id || (c as any).paciente_nombre)).size;
+    const unicos = new Set(todasLasCitas.map(c => (c as any).paciente_id || (c as any).paciente_nombre)).size;
     const promedio = activas.length / 30;
 
     setEstadisticas({
