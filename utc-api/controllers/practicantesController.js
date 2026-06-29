@@ -99,10 +99,4 @@ async function create(req, res) {
   }
 }
 
-async function updateStatus(req, res) {
-  // Esta ruta es legacy — la tabla practicantes_autorizados ya no existe.
-  // El flujo correcto va por usuariosController.updateStatus (PUT /usuarios/:id/status).
-  return res.status(410).json({ error: 'Endpoint obsoleto. Usa PUT /api/usuarios/:id/status.' });
-}
-
-module.exports = { getAll, create, updateStatus };
+module.exports = { getAll, create };

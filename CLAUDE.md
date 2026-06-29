@@ -59,11 +59,10 @@ There is no automated test suite. Verification in this repo is done by running t
 - Real Postgres table names (do not confuse with the stale Supabase-era docs — see "Stale docs" below):
   `usuarios`, `citas`, `historiales_nutricion`, `historiales_fisioterapia`, `historiales_medicos`,
   `notas_evolucion`, `notas_universitarias`, `metricas`, `correos_especiales`, `refresh_tokens`,
-  `logs_sistema`. `practicantes_autorizados` is legacy/dead — see below.
-- `practicantesController.js` has a dead `updateStatus()` that still writes to the old
-  `practicantes_autorizados` table. The actual UI path for activating/deactivating a practicante goes
-  through `usuariosAPI.updateStatus` → `usuariosController.updateStatus`, which correctly updates
-  `usuarios.status`. The dead function/route is intentionally left in place, not wired to the UI.
+  `logs_sistema`. (`practicantes_autorizados` was dropped in migration 007 — fully removed.)
+- The actual UI path for activating/deactivating a practicante goes through
+  `usuariosAPI.updateStatus` → `usuariosController.updateStatus`, which updates `usuarios.status`.
+  `practicantesController` only exposes `getAll` and `create`; there is no `updateStatus` there.
 - `primer_inicio` flow: new practicante accounts get a temp password `UTC<matricula>` (bcrypt-hashed)
   and `primer_inicio = true`. Login detects the flag and returns `{ requiereCambioPassword: true }`
   *without* issuing tokens; the frontend redirects to `/cambiar-password-inicial`, which re-verifies
