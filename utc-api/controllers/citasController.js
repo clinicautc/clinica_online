@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { asignarPracticante } = require('../services/asignacionService');
 
 // Compara solo la parte de fecha (yyyy-MM-dd), ignorando hora/zona horaria.
 function esFechaPasada(fecha) {
@@ -72,23 +73,33 @@ async function getDisponibilidad(req, res) {
 }
 
 async function create(req, res) {
-  const { paciente_id, paciente_nombre, tipo, fecha, hora, estado } = req.body;
+  const { paciente_id, paciente_nombre, tipo, fecha, hora } = req.body;
+  const area = tipo.toLowerCase();
 
   try {
     const check = await pool.query(
       "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'confirmada')",
-      [fecha, hora, tipo.toLowerCase()]
+      [fecha, hora, area]
     );
 
     if (check.rows.length > 0) {
       return res.status(409).json({ error: "Este horario ya fue ocupado en esta área. Por favor elige otro." });
     }
 
-    const result = await pool.query(
-      'INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [paciente_id, paciente_nombre, tipo, fecha, hora, estado || 'programada']
+    // Insertar la cita sin practicante todavía
+    const inserted = await pool.query(
+      `INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado)
+       VALUES ($1, $2, $3, $4, $5, 'programada') RETURNING *`,
+      [paciente_id, paciente_nombre, area, fecha, hora]
     );
-    res.status(201).json(result.rows[0]);
+    const nuevaCita = inserted.rows[0];
+
+    // Asignación automática
+    const { cita, asignado, esFallbackDocente } = await asignarPracticante(
+      nuevaCita.id, area, fecha, hora
+    );
+
+    res.status(201).json({ ...cita, asignado, esFallbackDocente });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -8,3 +8,7 @@ export { notasAPI } from './notasAPI';
 export { practicantesAPI } from './practicantesAPI';
 export { recomendacionesAPI } from './recomendacionesAPI';
 export { metricasAPI } from './metricasAPI';
+export { horariosAPI } from './horariosAPI';
+export type { DiaSemana } from './horariosAPI';
+export { asistenciaAPI } from './asistenciaAPI';
+export type { RegistroAsistencia, PracticanteAsistencia, AsistenciaMesEntry } from './asistenciaAPI';

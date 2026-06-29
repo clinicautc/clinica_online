@@ -20,6 +20,8 @@ const historialesRoutes = require('./routes/historialesRoutes');
 const notasRoutes = require('./routes/notasRoutes');
 const recomendacionesRoutes = require('./routes/recomendacionesRoutes');
 const statsRoutes = require('./routes/statsRoutes');
+const horariosRoutes = require('./routes/horariosRoutes');
+const asistenciaRoutes = require('./routes/asistenciaRoutes');
 
 const { iniciarTareasProgramadas } = require('./services/scheduledTasks');
 
@@ -46,6 +48,8 @@ app.use('/api', historialesRoutes);
 app.use('/api', notasRoutes);
 app.use('/api', recomendacionesRoutes);
 app.use('/api', statsRoutes);
+app.use('/api', horariosRoutes);
+app.use('/api', asistenciaRoutes);
 
 // --- RUTA DE SALUD (PARA MONITOREO) ---
 app.get('/api/health', async (req, res) => {

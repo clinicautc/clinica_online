@@ -9,7 +9,7 @@
  * ============================================================================
  */
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar } from './ui/calendar';
 import { Button } from './ui/button';
@@ -30,15 +30,21 @@ const THEME_CLASSES = {
 
 export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue' }: DateFilterPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [panelPosition, setPanelPosition] = useState({ top: 0, right: 0 });
+  const [panelPosition, setPanelPosition] = useState<React.CSSProperties>({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const handleToggle = () => {
     if (!isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPanelPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+      const right = window.innerWidth - rect.right;
+      const PANEL_H = 330;
+      if (window.innerHeight - rect.bottom >= PANEL_H + 8) {
+        setPanelPosition({ top: rect.bottom + 8, right });
+      } else {
+        setPanelPosition({ bottom: window.innerHeight - rect.top + 8, right });
+      }
     }
-    setIsOpen((prev) => !prev);
+    setIsOpen(prev => !prev);
   };
 
   return (
@@ -59,7 +65,7 @@ export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue
           <div className="fixed inset-0 z-50" onClick={() => setIsOpen(false)} />
           <div
             className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-2xl"
-            style={{ top: panelPosition.top, right: panelPosition.right }}
+            style={panelPosition}
           >
             <Calendar
               mode="single"

@@ -165,7 +165,18 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
       }
 
       if (response.ok) {
-        toast.success(isRescheduling ? '¡Cita reagendada exitosamente!' : '¡Cita agendada exitosamente!');
+        if (isRescheduling) {
+          toast.success('¡Cita reagendada exitosamente!');
+        } else if (result.estado === 'pendiente_reprogramacion') {
+          toast.warning('Tu cita fue registrada, pero no hay practicantes disponibles en ese horario. Te contactaremos para reprogramar.');
+        } else if (result.asignado) {
+          const quienAtiende = result.esFallbackDocente
+            ? `Docente a cargo: ${result.asignado.nombre}`
+            : `Practicante asignado: ${result.asignado.nombre}`;
+          toast.success(`¡Cita agendada! ${quienAtiende}`);
+        } else {
+          toast.success('¡Cita agendada exitosamente!');
+        }
         setTimeout(() => {
           if (onSuccess) {
             onSuccess();
@@ -184,7 +195,7 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
   };
 
   const isDateDisabled = (date: Date) => {
-    return isBefore(date, startOfDay(new Date()));
+    return isToday(date) || isBefore(date, startOfDay(new Date()));
   };
 
   const isSelectedDateToday = date ? isToday(date) : false;
