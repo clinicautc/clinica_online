@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { USUARIO_COLUMNAS_SEGURAS } = require('./usuariosController');
+const notificationService = require('../services/notificationService');
 
 async function getAll(req, res) {
   try {
@@ -93,6 +94,11 @@ async function create(req, res) {
     );
 
     const { password: _omitPassword, ...creado } = result.rows[0];
+
+    // NOTIFICACIÓN BLOQUEANTE: el practicante o docente necesita sus credenciales
+    // para poder acceder al sistema. Si el correo falla, la operación falla.
+    await notificationService.notificarCambioPasswordInicial(nombre.trim(), emailNormalizado, passwordTemporal);
+
     res.status(201).json(creado);
   } catch (error) {
     res.status(500).json({ error: error.message });

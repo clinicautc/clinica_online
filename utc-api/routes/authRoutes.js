@@ -13,6 +13,7 @@ router.post('/logout', authController.logout);
 router.post('/pre-register', authController.preRegister);
 router.post('/verify-and-register', authController.verifyAndRegister);
 router.post('/forgot-password', authController.forgotPassword);
+router.post('/codigo-primer-inicio', authController.sendCodigoPrimerInicio);
 router.post('/resend-code', authController.resendCode);
 router.post('/verify-reset-code', authController.verifyResetCode);
 router.post('/reset-password', authController.resetPassword);

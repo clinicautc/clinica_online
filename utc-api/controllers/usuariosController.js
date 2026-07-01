@@ -1,4 +1,5 @@
 const pool = require('../db');
+const notificationService = require('../services/notificationService');
 
 const USUARIO_COLUMNAS_SEGURAS = 'id, nombre, email, rol, area, status, telefono, matricula, numero_empleado, primer_inicio, fecha_creacion';
 
@@ -75,6 +76,14 @@ async function updateStatus(req, res) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
     const { password: _omitPassword, ...usuarioActualizado } = result.rows[0];
+
+    // Notificación informativa: solo al activar la cuenta
+    if (estado === 'activo') {
+      notificationService.notificarCuentaAutorizada(
+        usuarioActualizado.nombre, usuarioActualizado.email
+      );
+    }
+
     res.json(usuarioActualizado);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -85,6 +94,11 @@ async function remove(req, res) {
   const { id } = req.params;
 
   try {
+    // Limpiar registros dependientes antes de eliminar el usuario
+    await pool.query('DELETE FROM notas_universitarias WHERE creado_por = $1', [id]);
+    await pool.query('DELETE FROM asistencia_practicantes WHERE usuario_id = $1', [id]);
+    await pool.query('DELETE FROM refresh_tokens WHERE usuario_id = $1', [id]);
+
     const result = await pool.query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });

@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { reasignarCitasPorAusencia } = require('../services/asignacionService');
+const notificationService = require('../services/notificationService');
 
 async function getByFecha(req, res) {
   const { fecha, area } = req.query;
@@ -66,9 +67,27 @@ async function registrar(req, res) {
         );
         if (uRows.length === 0) continue;
         const resultados = await reasignarCitasPorAusencia(r.usuario_id, fecha, uRows[0].area);
-        // TODO: notificar pacientes (integrar con notificationService cuando esté listo)
-        totalReasignadas += resultados.filter(x => x.resultado === 'reasignada').length;
-        totalPendientes  += resultados.filter(x => x.resultado === 'pendiente_reprogramacion').length;
+
+        for (const reasignacion of resultados) {
+          if (reasignacion.resultado === 'reasignada') {
+            totalReasignadas++;
+            try {
+              const emailResult = await pool.query(
+                'SELECT email FROM usuarios WHERE id = $1', [reasignacion.pacienteId]
+              );
+              if (emailResult.rows.length > 0) {
+                notificationService.notificarReasignacion(
+                  reasignacion.pacienteNombre, emailResult.rows[0].email,
+                  fecha, reasignacion.hora, reasignacion.nuevoPracticante.nombre
+                );
+              }
+            } catch (notifErr) {
+              console.error('[asistencia] Error al consultar email para notificación:', notifErr.message);
+            }
+          } else if (reasignacion.resultado === 'pendiente_reprogramacion') {
+            totalPendientes++;
+          }
+        }
       } catch (reasignErr) {
         console.error('[asistencia] Error en reasignación:', reasignErr.message);
       }

@@ -60,7 +60,6 @@ async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirId = n
       AND $2::time <  hp.hora_fin
     WHERE u.rol     = 'practicante'
       AND u.area    = $3
-      AND u.status  = 'activo'
       ${excluirClause}
       ${asistenciaClause}
       AND NOT EXISTS (
@@ -148,11 +147,9 @@ async function _marcarPendiente(citaId) {
  *   { cita, asignado: { id, nombre } | null, esFallbackDocente: boolean }
  */
 async function asignarPracticante(citaId, area, fecha, hora) {
-  const hoy = new Date().toISOString().split('T')[0];
-  const esMismoDia = fecha === hoy;
-
-  // Paso 1: practicante
-  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia });
+  // Paso 1: practicante — solo por horario, sin importar si es hoy o futuro.
+  // La asistencia solo afecta la reasignación (reasignarCitasPorAusencia).
+  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia: false });
   let esFallbackDocente = false;
 
   // Paso 2: docente como fallback

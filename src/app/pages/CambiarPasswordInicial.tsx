@@ -59,7 +59,7 @@ export default function CambiarPasswordInicial() {
     (async () => {
       try {
         setIsSendingCode(true);
-        await authAPI.forgotPassword(state.email);
+        await authAPI.sendCodigoPrimerInicio(state.email);
       } catch {
         setCodeError('No se pudo enviar el código. Usa "Reenviar código" para intentar de nuevo.');
       } finally {
@@ -75,7 +75,7 @@ export default function CambiarPasswordInicial() {
   const handleResendCode = async () => {
     try {
       setCodeError('');
-      await authAPI.resendCode({ email: state.email, tipo: 'password' });
+      await authAPI.resendCode({ email: state.email, tipo: 'primer_inicio' });
     } catch {
       setCodeError('Error al reenviar el código.');
     }

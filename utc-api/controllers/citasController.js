@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { asignarPracticante } = require('../services/asignacionService');
+const notificationService = require('../services/notificationService');
 
 // Compara solo la parte de fecha (yyyy-MM-dd), ignorando hora/zona horaria.
 function esFechaPasada(fecha) {
@@ -98,6 +99,30 @@ async function create(req, res) {
     const { cita, asignado, esFallbackDocente } = await asignarPracticante(
       nuevaCita.id, area, fecha, hora
     );
+
+    // Notificaciones informativas — se disparan sin bloquear la respuesta.
+    // Si fallan, el error queda registrado en consola. La cita ya existe en BD.
+    const pacienteResult = await pool.query(
+      'SELECT email FROM usuarios WHERE id = $1', [paciente_id]
+    );
+    if (pacienteResult.rows.length > 0) {
+      // Incluye el practicante en el correo del paciente si ya viene asignado
+      notificationService.notificarCitaCreada(
+        paciente_nombre, pacienteResult.rows[0].email, fecha, hora, area,
+        asignado ? asignado.nombre : null
+      );
+    }
+
+    if (asignado) {
+      const practicanteResult = await pool.query(
+        'SELECT email FROM usuarios WHERE id = $1', [cita.practicante_id]
+      );
+      if (practicanteResult.rows.length > 0) {
+        notificationService.notificarAsignacionAutomatica(
+          asignado.nombre, practicanteResult.rows[0].email, paciente_nombre, fecha, hora, area
+        );
+      }
+    }
 
     res.status(201).json({ ...cita, asignado, esFallbackDocente });
   } catch (error) {

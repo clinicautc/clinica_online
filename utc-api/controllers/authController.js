@@ -1,7 +1,6 @@
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const notificationService = require('../services/notificationService');
-const { crearHtmlCodigoVerificacion, crearHtmlRecuperacionPassword } = require('../services/emailTemplates');
 const { signAccessToken, generateRefreshToken, hashToken } = require('../middleware/authMiddleware');
 
 // Emite y persiste un par de tokens para un usuario ya autenticado.
@@ -194,11 +193,7 @@ async function preRegister(req, res) {
       [name, email.trim().toLowerCase(), hashedPassword, codigo]
     );
 
-    await notificationService.enviar({
-      destino: email.trim().toLowerCase(),
-      asunto: 'Código de Verificación - Clínica UTC',
-      html: crearHtmlCodigoVerificacion(name, codigo)
-    });
+    await notificationService.notificarCodigoVerificacion(name, email.trim().toLowerCase(), codigo);
 
     res.status(200).json({ message: "Código enviado con éxito." });
   } catch (error) {
@@ -230,6 +225,8 @@ async function verifyAndRegister(req, res) {
     // Limpiamos la tabla temporal para no dejar basura
     await pool.query('DELETE FROM registro_temporal WHERE email = $1', [email.trim().toLowerCase()]);
 
+    notificationService.notificarBienvenidaPaciente(nombre, email.trim().toLowerCase());
+
     const { password: _omitPassword, ...usuarioCreado } = newUser.rows[0];
     res.status(201).json(usuarioCreado);
   } catch (error) {
@@ -257,11 +254,7 @@ async function forgotPassword(req, res) {
       [email.trim().toLowerCase(), codigo]
     );
 
-    await notificationService.enviar({
-      destino: email.trim().toLowerCase(),
-      asunto: 'Recuperación de contraseña - Clínica UTC',
-      html: crearHtmlRecuperacionPassword(userResult.rows[0].nombre, codigo)
-    });
+    await notificationService.notificarRecuperacionPassword(userResult.rows[0].nombre, email.trim().toLowerCase(), codigo);
 
     res.status(200).json({ message: 'Código enviado correctamente.' });
 
@@ -279,10 +272,10 @@ async function resendCode(req, res) {
 
     if (tipo === 'registro') {
       temporal = await pool.query('SELECT * FROM registro_temporal WHERE email = $1', [email.trim().toLowerCase()]);
-    } else if (tipo === 'password') {
+    } else if (tipo === 'password' || tipo === 'primer_inicio') {
       temporal = await pool.query('SELECT * FROM password_resets WHERE email = $1', [email.trim().toLowerCase()]);
     } else {
-      return res.status(400).json({ error: 'Tipo de reenvío inválido. Usa "registro" o "password".' });
+      return res.status(400).json({ error: 'Tipo de reenvío inválido. Usa "registro", "password" o "primer_inicio".' });
     }
 
     if (temporal.rows.length === 0) {
@@ -318,13 +311,13 @@ async function resendCode(req, res) {
       }
     }
 
-    await notificationService.reenviar({
-      destino: email.trim().toLowerCase(),
-      asunto: tipo === 'registro' ? 'Código de Verificación - Clínica UTC' : 'Recuperación de contraseña - Clínica UTC',
-      html: tipo === 'registro'
-        ? crearHtmlCodigoVerificacion(nombre, codigo)
-        : crearHtmlRecuperacionPassword(nombre, codigo)
-    });
+    if (tipo === 'registro') {
+      await notificationService.notificarReenvioCodigoVerificacion(nombre, email.trim().toLowerCase(), codigo);
+    } else if (tipo === 'primer_inicio') {
+      await notificationService.notificarReenvioCodigoPrimerInicio(nombre, email.trim().toLowerCase(), codigo);
+    } else {
+      await notificationService.notificarReenvioRecuperacionPassword(nombre, email.trim().toLowerCase(), codigo);
+    }
 
     res.status(200).json({ message: 'Código reenviado correctamente.' });
 
@@ -385,6 +378,45 @@ async function resetPassword(req, res) {
 // CAMBIO DE CONTRASEÑA OBLIGATORIO (PRIMER INICIO)
 // Verifica la contraseña temporal (UTC+matrícula), guarda la nueva con bcrypt,
 // apaga primer_inicio y recién ahí emite la sesión real (igual que login()).
+async function sendCodigoPrimerInicio(req, res) {
+  const { email } = req.body;
+
+  try {
+    const userResult = await pool.query(
+      'SELECT nombre, primer_inicio FROM usuarios WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No existe una cuenta con ese correo.' });
+    }
+
+    const { nombre, primer_inicio } = userResult.rows[0];
+
+    if (!primer_inicio) {
+      return res.status(400).json({ error: 'Esta cuenta ya completó su configuración inicial.' });
+    }
+
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await pool.query(
+      `INSERT INTO password_resets (email, codigo_verificacion, expira_en)
+       VALUES ($1, $2, NOW() + interval '15 minutes')
+       ON CONFLICT(email)
+       DO UPDATE SET codigo_verificacion = $2, expira_en = NOW() + interval '15 minutes'`,
+      [email.trim().toLowerCase(), codigo]
+    );
+
+    await notificationService.notificarCodigoPrimerInicio(nombre, email.trim().toLowerCase(), codigo);
+
+    res.status(200).json({ message: 'Código de configuración enviado.' });
+
+  } catch (error) {
+    console.error('❌ Error send-codigo-primer-inicio:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+}
+
 async function cambiarPasswordInicial(req, res) {
   const { email, passwordActual, passwordNueva } = req.body;
 
@@ -437,6 +469,7 @@ module.exports = {
   preRegister,
   verifyAndRegister,
   forgotPassword,
+  sendCodigoPrimerInicio,
   resendCode,
   verifyResetCode,
   resetPassword,
