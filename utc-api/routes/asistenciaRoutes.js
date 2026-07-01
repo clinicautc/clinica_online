@@ -7,5 +7,6 @@ router.get('/asistencia', requireAuth, requireRole(['admin', 'master']), asisten
 router.post('/asistencia', requireAuth, requireRole(['admin', 'master']), asistenciaController.registrar);
 router.get('/asistencia/mes', requireAuth, requireRole(['admin', 'master']), asistenciaController.getByMes);
 router.get('/asistencia/practicante/:usuarioId', requireAuth, requireRole(['admin', 'master']), asistenciaController.getByPracticante);
+router.delete('/asistencia', requireAuth, requireRole(['admin', 'master']), asistenciaController.resetFecha);
 
 module.exports = router;

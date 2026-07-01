@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usuariosAPI, notasAPI, citasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -429,32 +429,6 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         </header>
 
         <div className="max-w-[1480px] mx-auto space-y-7">
-          {/* BARRA DE BÚSQUEDA Y FILTROS */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-5 flex flex-col md:flex-row items-center gap-5 border border-gray-100">
-            <div className="flex-1 flex items-center gap-2.5 border border-gray-200 rounded-lg px-5 py-3 w-full bg-white">
-              <Search className="w-6 h-6 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar personal académico por nombre o correo..."
-                className="flex-1 outline-none text-base bg-transparent"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2.5 border border-gray-200 rounded-lg px-5 py-2.5 min-w-[276px] w-full md:w-auto bg-white">
-              <Filter className="w-6 h-6 text-blue-600" />
-              <select
-                className="flex-1 outline-none text-base text-blue-900 bg-transparent font-bold cursor-pointer"
-                value={areaFilter}
-                onChange={(e) => setAreaFilter(e.target.value as any)}
-              >
-                <option value="todos">Todos los Docentes</option>
-                <option value="nutricion">Área: Nutrición</option>
-                <option value="fisioterapia">Área: Fisioterapia</option>
-              </select>
-            </div>
-          </div>
-
           <Tabs defaultValue="practitioners" className="space-y-6">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
               <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
@@ -506,7 +480,13 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                       <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
                       {viewMode === 'day' ? (
                         <>
-                          <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                          <DateFilterPicker
+                            selectedDate={selectedDate}
+                            onChange={setSelectedDate}
+                            theme="blue"
+                            onPrev={() => setSelectedDate(format(subDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))}
+                            onNext={() => setSelectedDate(format(addDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))}
+                          />
                           {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                             <Button
                               variant="outline"
@@ -636,37 +616,52 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
             {/* CONTENIDO: GESTIÓN DE DOCENTES */}
             <TabsContent value="practitioners" className="animate-in fade-in duration-500">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-7 gap-5">
-  <div>
-    {/* Ajusté los textos para que coincidan exactamente con tu imagen */}
-    <CardTitle className="text-blue-900 font-extrabold text-2xl"> Personal Académico</CardTitle>
-    <CardDescription className="text-gray-500 font-medium italic text-base">Registro y boton filtro de practicantes y docentes</CardDescription>
-  </div>
-
-  {/* NUEVO CONTENEDOR: Agrupa el filtro y el botón naranja */}
-  <div className="flex items-center gap-3.5 w-full sm:w-auto">
-
-    {/* NUEVO FILTRO POR ROL USANDO TUS COMPONENTES UI */}
-    <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
-      <SelectTrigger className="w-[207px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
-        <div className="flex items-center gap-2.5">
-          <Filter className="w-5 h-5 text-blue-600" />
-          <SelectValue placeholder="Filtrar por Rol" />
-        </div>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="todos" className="font-bold">Todos</SelectItem>
-        <SelectItem value="admin">Docentes </SelectItem>
-        <SelectItem value="practicante">Practicantes</SelectItem>
-      </SelectContent>
-    </Select>
-
-    {/* TU BOTÓN ORIGINAL */}
-    <Button onClick={() => navigate('/administrar-personal')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-9.75 px-5 text-base">
-      Administrar Personal
-    </Button>
-  </div>
-</CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50/80 p-7 gap-4">
+                  <div className="shrink-0">
+                    <CardTitle className="text-blue-900 font-extrabold text-2xl">Personal Académico</CardTitle>
+                    <CardDescription className="text-gray-500 font-medium italic text-base">Registro y filtro de practicantes y docentes</CardDescription>
+                  </div>
+                  <div className="flex flex-row items-center gap-2 flex-wrap justify-end">
+                    <div className="relative min-w-[280px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        placeholder="Buscar por nombre o correo..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="pl-9 h-10.75 rounded-xl border-blue-200 text-blue-900 font-medium w-full"
+                      />
+                    </div>
+                    <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+                      <SelectTrigger className="w-[175px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                          <SelectValue placeholder="Filtrar por rol" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos" className="font-bold">Todos</SelectItem>
+                        <SelectItem value="practicante">Practicantes</SelectItem>
+                        <SelectItem value="admin">Docentes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={areaFilter} onValueChange={(v: any) => setAreaFilter(v)}>
+                      <SelectTrigger className="w-[175px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Filter className="w-4 h-4 text-blue-600 shrink-0" />
+                          <SelectValue placeholder="Filtrar por área" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos" className="font-bold">Ambas</SelectItem>
+                        <SelectItem value="nutricion">Nutrición</SelectItem>
+                        <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={() => navigate('/administrar-personal')} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10.75 px-5 text-base">
+                      Administrar Personal
+                    </Button>
+                  </div>
+                </CardHeader>
 
                 <CardContent className="p-0 overflow-y-auto max-h-[600px]">
                   <Table>

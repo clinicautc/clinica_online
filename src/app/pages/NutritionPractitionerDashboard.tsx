@@ -27,7 +27,7 @@ import {
   Send, FileEdit, Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import PatientList from '../components/PatientList';
 import NotesViewer from '../components/NotesViewer';
@@ -359,7 +359,7 @@ export default function NutritionPractitionerDashboard() {
                     <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="orange" />
                     {viewMode === 'day' ? (
                       <>
-                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" />
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" onPrev={() => setSelectedDate(format(subDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} onNext={() => setSelectedDate(format(addDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} />
                         {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                           <Button
                             variant="outline"

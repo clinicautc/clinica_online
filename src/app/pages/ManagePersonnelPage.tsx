@@ -18,10 +18,10 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   ArrowLeft, Plus, Trash2, UserCheck, UserMinus, Shield,
-  Filter, CalendarClock, ClipboardCheck, CheckCircle2, XCircle, Lock,
+  Filter, CalendarClock, ClipboardCheck, CheckCircle2, XCircle, Lock, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { practicantesAPI, usuariosAPI, asistenciaAPI, PracticanteAsistencia, AsistenciaMesEntry, DiaSemana } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
@@ -36,6 +36,8 @@ export default function ManagePersonnelPage() {
 
   const [docentes, setDocentes] = useState<any[]>([]);
   const [areaFilter, setAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+  const [rolFilter, setRolFilter]   = useState<'todos' | 'practicante' | 'docente'>('todos');
+  const [searchQuery, setSearchQuery] = useState('');
   const [tipoAcceso, setTipoAcceso] = useState<'practicante' | 'docente'>('practicante');
   const [nuevoD, setNuevoD] = useState({
     nombre: '',
@@ -59,9 +61,12 @@ export default function ManagePersonnelPage() {
 
   // Asistencia
   const hoy = format(new Date(), 'yyyy-MM-dd');
+  const mesActual = format(new Date(), 'yyyy-MM');
   const [viewModeAsistencia, setViewModeAsistencia] = useState<'day' | 'month'>('day');
   const [selectedDateAsistencia, setSelectedDateAsistencia] = useState(hoy);
-  const [selectedMonthAsistencia, setSelectedMonthAsistencia] = useState(format(new Date(), 'yyyy-MM'));
+  const [selectedMonthAsistencia, setSelectedMonthAsistencia] = useState(mesActual);
+  const [searchAsistencia, setSearchAsistencia] = useState('');
+  const [areaFilterAsistencia, setAreaFilterAsistencia] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
   const [asistencia, setAsistencia] = useState<PracticanteAsistencia[]>([]);
   const [asistenciasMes, setAsistenciasMes] = useState<AsistenciaMesEntry[]>([]);
   const [estadosAsistencia, setEstadosAsistencia] = useState<Record<number, 'presente' | 'ausente'>>({});
@@ -217,13 +222,8 @@ export default function ManagePersonnelPage() {
     setHorarioModalOpen(true);
   };
 
-  const toggleAsistencia = (id: number) => {
-    setEstadosAsistencia(prev => {
-      const actual = prev[id];
-      if (actual === 'presente') return { ...prev, [id]: 'ausente' };
-      if (actual === 'ausente') { const nuevo = { ...prev }; delete nuevo[id]; return nuevo; }
-      return { ...prev, [id]: 'presente' };
-    });
+  const marcarAsistencia = (id: number, estado: 'presente' | 'ausente') => {
+    setEstadosAsistencia(prev => ({ ...prev, [id]: estado }));
   };
 
   const handleGuardarAsistencia = async () => {
@@ -249,15 +249,26 @@ export default function ManagePersonnelPage() {
   };
 
   const docentesFiltrados = docentes.filter(d => {
-    if (user?.area) return d.area === user.area;
-    if (areaFilter === 'todos') return true;
-    return d.area === areaFilter;
+    if (user?.area && d.area !== user.area) return false;
+    if (user?.area && d.rol !== 'practicante') return false;
+    if (!user?.area && areaFilter !== 'todos' && d.area !== areaFilter) return false;
+    if (!user?.area && rolFilter === 'practicante' && d.rol !== 'practicante') return false;
+    if (!user?.area && rolFilter === 'docente' && d.rol !== 'admin') return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!d.name?.toLowerCase().includes(q) && !d.email?.toLowerCase().includes(q)) return false;
+    }
+    return true;
   });
 
   const practicantesFiltrados = asistencia.filter(p => {
-    if (user?.area) return p.area === user.area;
-    if (areaFilter === 'todos') return true;
-    return p.area === areaFilter;
+    if (user?.area && p.area !== user.area) return false;
+    if (!user?.area && areaFilterAsistencia !== 'todos' && p.area !== areaFilterAsistencia) return false;
+    if (searchAsistencia) {
+      const q = searchAsistencia.toLowerCase();
+      if (!p.nombre?.toLowerCase().includes(q)) return false;
+    }
+    return true;
   });
 
   const asistenciasMesFiltradas = asistenciasMes.filter(e => {
@@ -434,23 +445,54 @@ export default function ManagePersonnelPage() {
             SECCIÓN 2 — TABLA DE PERSONAL
         ====================================================== */}
         <Card className="border-blue-900/10 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-blue-900 font-bold">Personal Autorizado</CardTitle>
-            {!user?.area && (
-              <Select value={areaFilter} onValueChange={(v: any) => setAreaFilter(v)}>
-                <SelectTrigger className="w-[207px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
-                  <div className="flex items-center gap-2.5">
-                    <Filter className="w-5 h-5 text-blue-600" />
-                    <SelectValue placeholder="Filtrar por área" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos" className="font-bold">Todos</SelectItem>
-                  <SelectItem value="nutricion">Nutrición</SelectItem>
-                  <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+          <CardHeader className="flex flex-col gap-3">
+            <div className="flex flex-row items-center justify-between">
+              <CardTitle className="text-blue-900 font-bold">Personal Autorizado</CardTitle>
+            </div>
+            <div className="flex flex-row items-center gap-2 flex-wrap">
+              {/* Búsqueda por nombre o correo */}
+              <div className="relative flex-1 min-w-[320px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por nombre o correo..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9 h-10.75 rounded-xl border-blue-200 text-blue-900 font-medium w-full"
+                />
+              </div>
+              {/* Filtro por rol — solo master */}
+              {!user?.area && (
+                <Select value={rolFilter} onValueChange={(v: any) => setRolFilter(v)}>
+                  <SelectTrigger className="w-[175px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                      <SelectValue placeholder="Filtrar por rol" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos" className="font-bold">Todos</SelectItem>
+                    <SelectItem value="practicante">Practicantes</SelectItem>
+                    <SelectItem value="docente">Docentes</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {/* Filtro por área — solo master */}
+              {!user?.area && (
+                <Select value={areaFilter} onValueChange={(v: any) => setAreaFilter(v)}>
+                  <SelectTrigger className="w-[175px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Filter className="w-4 h-4 text-blue-600 shrink-0" />
+                      <SelectValue placeholder="Filtrar por área" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos" className="font-bold">Ambas</SelectItem>
+                    <SelectItem value="nutricion">Nutrición</SelectItem>
+                    <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto max-h-[600px]">
             <Table>
@@ -597,24 +639,84 @@ export default function ManagePersonnelPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <ViewModeToggle mode={viewModeAsistencia} onChange={setViewModeAsistencia} theme="blue" />
                 {viewModeAsistencia === 'day'
-                  ? <DateFilterPicker selectedDate={selectedDateAsistencia} onChange={setSelectedDateAsistencia} theme="blue" />
-                  : <MonthFilterPicker selectedMonth={selectedMonthAsistencia} onChange={setSelectedMonthAsistencia} theme="blue" />
+                  ? <DateFilterPicker
+                      selectedDate={selectedDateAsistencia}
+                      onChange={setSelectedDateAsistencia}
+                      theme="blue"
+                      onPrev={() => setSelectedDateAsistencia(format(subDays(new Date(selectedDateAsistencia + 'T00:00:00'), 1), 'yyyy-MM-dd'))}
+                      onNext={() => setSelectedDateAsistencia(format(addDays(new Date(selectedDateAsistencia + 'T00:00:00'), 1), 'yyyy-MM-dd'))}
+                      disableNext={selectedDateAsistencia >= hoy}
+                    />
+                  : <MonthFilterPicker
+                      selectedMonth={selectedMonthAsistencia}
+                      onChange={setSelectedMonthAsistencia}
+                      theme="blue"
+                      disableNext={selectedMonthAsistencia >= mesActual}
+                    />
                 }
-                {viewModeAsistencia === 'day' && esHoySeleccionado && (
-                  <Button
-                    onClick={handleGuardarAsistencia}
-                    disabled={guardandoAsistencia || Object.keys(estadosAsistencia).length === 0}
-                    className="bg-blue-900 hover:bg-blue-800 font-bold rounded-xl shadow-md gap-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    {guardandoAsistencia ? 'Guardando...' : 'Registrar'}
-                  </Button>
-                )}
+                {viewModeAsistencia === 'day' && esHoySeleccionado && (() => {
+                  const presentes     = practicantesFiltrados.filter(p => estadosAsistencia[p.id] === 'presente').length;
+                  const ausentes      = practicantesFiltrados.filter(p => estadosAsistencia[p.id] === 'ausente').length;
+                  const sinRegistrar  = practicantesFiltrados.filter(p => !estadosAsistencia[p.id]).length;
+                  const todosMarcados = sinRegistrar === 0;
+                  const nadaMarcado   = presentes + ausentes === 0;
+                  return (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+                          Asistencia: {presentes}
+                        </span>
+                        <span className="text-xs font-black bg-red-100 text-red-700 px-2.5 py-1 rounded-full">
+                          Ausencias: {ausentes}
+                        </span>
+                        <span className="text-xs font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full">
+                          Sin registrar: {sinRegistrar}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={handleGuardarAsistencia}
+                        disabled={guardandoAsistencia || todosMarcados || nadaMarcado}
+                        className="bg-blue-900 hover:bg-blue-800 font-bold rounded-xl shadow-md gap-2 disabled:bg-slate-300 disabled:text-slate-400 disabled:shadow-none"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        {guardandoAsistencia ? 'Guardando...' : 'Registrar'}
+                      </Button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </CardHeader>
 
           <CardContent>
+            {/* Filtros de asistencia */}
+            <div className="flex flex-row items-center gap-2 flex-wrap mb-4">
+              <div className="relative flex-1 min-w-[260px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar practicante..."
+                  value={searchAsistencia}
+                  onChange={e => setSearchAsistencia(e.target.value)}
+                  className="pl-9 h-10.75 rounded-xl border-blue-200 text-blue-900 font-medium w-full"
+                />
+              </div>
+              {!user?.area && (
+                <Select value={areaFilterAsistencia} onValueChange={(v: any) => setAreaFilterAsistencia(v)}>
+                  <SelectTrigger className="w-[175px] bg-white border-blue-200 text-blue-900 font-bold h-10.75 rounded-xl shadow-sm text-base">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Filter className="w-4 h-4 text-blue-600 shrink-0" />
+                      <SelectValue placeholder="Filtrar por área" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos" className="font-bold">Ambas</SelectItem>
+                    <SelectItem value="nutricion">Nutrición</SelectItem>
+                    <SelectItem value="fisioterapia">Fisioterapia</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             {/* ── VISTA DÍA ── */}
             {viewModeAsistencia === 'day' && (
               <>
@@ -630,15 +732,14 @@ export default function ManagePersonnelPage() {
                       return (
                         <div
                           key={p.id}
-                          onClick={() => !locked && toggleAsistencia(p.id)}
-                          className={`flex items-center justify-between px-4 py-3.5 transition-all select-none ${
+                          className={`flex items-center justify-between px-4 py-3.5 transition-all ${
                             locked
-                              ? 'bg-slate-50/60 cursor-default'
+                              ? 'bg-slate-50/60'
                               : estado === 'presente'
-                              ? 'bg-green-50/60 cursor-pointer hover:bg-green-50'
+                              ? 'bg-green-50/60'
                               : estado === 'ausente'
-                              ? 'bg-red-50/60 cursor-pointer hover:bg-red-50'
-                              : 'bg-white cursor-pointer hover:bg-slate-50/80'
+                              ? 'bg-red-50/60'
+                              : 'bg-white'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -657,17 +758,51 @@ export default function ManagePersonnelPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {locked && <Lock className="w-3.5 h-3.5 text-slate-300" />}
-                            <span className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1.5 rounded-full ${
-                              estado === 'presente' ? 'bg-green-200 text-green-800' :
-                              estado === 'ausente'  ? 'bg-red-200 text-red-700'    : 'bg-slate-100 text-slate-400'
-                            }`}>
-                              {estado === 'presente' ? (
-                                <><CheckCircle2 className="w-3.5 h-3.5" /> Presente</>
-                              ) : estado === 'ausente' ? (
-                                <><XCircle className="w-3.5 h-3.5" /> Ausente</>
-                              ) : 'Sin marcar'}
-                            </span>
+                            {locked ? (
+                              <>
+                                <Lock className="w-3.5 h-3.5 text-slate-300" />
+                                <span className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1.5 rounded-full ${
+                                  estado === 'presente' ? 'bg-green-200 text-green-800' :
+                                  estado === 'ausente'  ? 'bg-red-200 text-red-700'    : 'bg-slate-100 text-slate-400'
+                                }`}>
+                                  {estado === 'presente' ? (
+                                    <><CheckCircle2 className="w-3.5 h-3.5" /> Presente</>
+                                  ) : estado === 'ausente' ? (
+                                    <><XCircle className="w-3.5 h-3.5" /> Ausente</>
+                                  ) : 'Sin registrar'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {!estado && (
+                                  <span className="text-xs text-slate-400 font-medium mr-1">Sin registrar</span>
+                                )}
+                                <button
+                                  onClick={() => marcarAsistencia(p.id, 'presente')}
+                                  className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1.5 rounded-full transition-all ${
+                                    estado === 'presente'
+                                      ? 'bg-green-500 text-white shadow-sm'
+                                      : !estado
+                                      ? 'bg-slate-200 text-slate-500 hover:bg-green-200 hover:text-green-700'
+                                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  }`}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Presente
+                                </button>
+                                <button
+                                  onClick={() => marcarAsistencia(p.id, 'ausente')}
+                                  className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1.5 rounded-full transition-all ${
+                                    estado === 'ausente'
+                                      ? 'bg-red-500 text-white shadow-sm'
+                                      : !estado
+                                      ? 'bg-slate-200 text-slate-500 hover:bg-red-200 hover:text-red-700'
+                                      : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  }`}
+                                >
+                                  <XCircle className="w-3.5 h-3.5" /> Ausente
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
@@ -676,7 +811,7 @@ export default function ManagePersonnelPage() {
                 )}
                 {esHoySeleccionado && (
                   <p className="text-[10px] text-slate-400 mt-3 italic">
-                    Clic en una fila para alternar: Sin marcar → Presente → Ausente. Las filas con <Lock className="w-3 h-3 inline mb-0.5" /> ya fueron registradas.
+                    Selecciona Presente o Ausente para cada practicante. Las filas con <Lock className="w-3 h-3 inline mb-0.5" /> ya fueron registradas.
                   </p>
                 )}
               </>

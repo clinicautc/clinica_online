@@ -23,7 +23,7 @@ import {
   Send, FileEdit, Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
@@ -357,7 +357,7 @@ const handleSaveProfile = async () => {
                     <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="blue" />
                     {viewMode === 'day' ? (
                       <>
-                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" />
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="blue" onPrev={() => setSelectedDate(format(subDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} onNext={() => setSelectedDate(format(addDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} />
                         {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                           <Button
                             variant="outline"

@@ -13,7 +13,7 @@ import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar } from './ui/calendar';
 import { Button } from './ui/button';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -21,17 +21,20 @@ interface DateFilterPickerProps {
   selectedDate: string; // formato 'yyyy-MM-dd'
   onChange: (date: string) => void;
   theme?: 'blue' | 'orange';
+  onPrev?: () => void;
+  onNext?: () => void;
+  disableNext?: boolean;
 }
 
 const THEME_CLASSES = {
-  blue: 'border-blue-200 text-blue-900 hover:bg-blue-50',
-  orange: 'border-orange-200 text-orange-900 hover:bg-orange-50',
+  blue:   { border: 'border-blue-200 text-blue-900', hover: 'hover:bg-blue-50' },
+  orange: { border: 'border-orange-200 text-orange-900', hover: 'hover:bg-orange-50' },
 };
 
-export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue' }: DateFilterPickerProps) {
+export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue', onPrev, onNext, disableNext = false }: DateFilterPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<React.CSSProperties>({ top: 0, right: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   const handleToggle = () => {
     if (!isOpen && triggerRef.current) {
@@ -47,18 +50,41 @@ export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue
     setIsOpen(prev => !prev);
   };
 
+  const tc = THEME_CLASSES[theme];
+  const withArrows = onPrev !== undefined && onNext !== undefined;
+
   return (
-    <div className="relative">
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="outline"
-        onClick={handleToggle}
-        className={`h-11.75 px-5 rounded-xl font-bold flex items-center gap-3 text-base ${THEME_CLASSES[theme]}`}
-      >
-        <CalendarDays className="w-7 h-7" />
-        {format(new Date(selectedDate + 'T00:00:00'), "dd 'de' MMMM, yyyy", { locale: es })}
-      </Button>
+    <div className="relative" ref={triggerRef}>
+      {withArrows ? (
+        // Con flechas: todo dentro del mismo recuadro
+        <div className={`h-11.75 pl-1.5 pr-1.5 rounded-xl font-bold flex items-center gap-1.5 border bg-white text-base ${tc.border}`}>
+          <Button type="button" variant="ghost" size="icon" className="h-8.75 w-8.75" onClick={onPrev}>
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <button
+            type="button"
+            onClick={handleToggle}
+            className={`px-2 flex items-center gap-2 rounded-lg py-1 transition-colors ${tc.hover}`}
+          >
+            <CalendarDays className="w-5 h-5" />
+            <span>{format(new Date(selectedDate + 'T00:00:00'), "dd 'de' MMMM, yyyy", { locale: es })}</span>
+          </button>
+          <Button type="button" variant="ghost" size="icon" className={`h-8.75 w-8.75 ${disableNext ? 'opacity-30 cursor-not-allowed' : ''}`} onClick={disableNext ? undefined : onNext} disabled={disableNext}>
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+      ) : (
+        // Sin flechas: botón simple original
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleToggle}
+          className={`h-11.75 px-5 rounded-xl font-bold flex items-center gap-3 text-base ${tc.border} ${tc.hover}`}
+        >
+          <CalendarDays className="w-7 h-7" />
+          {format(new Date(selectedDate + 'T00:00:00'), "dd 'de' MMMM, yyyy", { locale: es })}
+        </Button>
+      )}
 
       {isOpen && createPortal(
         <>
@@ -77,6 +103,7 @@ export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue
                   setIsOpen(false);
                 }
               }}
+              disabled={disableNext ? { after: new Date() } : undefined}
               className="rounded-md"
             />
           </div>

@@ -72,13 +72,24 @@ async function registrar(req, res) {
           if (reasignacion.resultado === 'reasignada') {
             totalReasignadas++;
             try {
-              const emailResult = await pool.query(
+              // Notificar al paciente que su cita fue reasignada
+              const emailPaciente = await pool.query(
                 'SELECT email FROM usuarios WHERE id = $1', [reasignacion.pacienteId]
               );
-              if (emailResult.rows.length > 0) {
+              if (emailPaciente.rows.length > 0) {
                 notificationService.notificarReasignacion(
-                  reasignacion.pacienteNombre, emailResult.rows[0].email,
+                  reasignacion.pacienteNombre, emailPaciente.rows[0].email,
                   fecha, reasignacion.hora, reasignacion.nuevoPracticante.nombre
+                );
+              }
+              // Notificar al nuevo practicante que le fue asignada la cita
+              const emailPracticante = await pool.query(
+                'SELECT email FROM usuarios WHERE id = $1', [reasignacion.nuevoPracticante.id]
+              );
+              if (emailPracticante.rows.length > 0) {
+                notificationService.notificarAsignacionAutomatica(
+                  reasignacion.nuevoPracticante.nombre, emailPracticante.rows[0].email,
+                  reasignacion.pacienteNombre, fecha, reasignacion.hora, area
                 );
               }
             } catch (notifErr) {
@@ -150,4 +161,27 @@ async function getByMes(req, res) {
   }
 }
 
-module.exports = { getByFecha, registrar, getByPracticante, getByMes };
+async function resetFecha(req, res) {
+  const { fecha } = req.query;
+  if (!fecha) return res.status(400).json({ error: 'fecha requerida (YYYY-MM-DD)' });
+
+  try {
+    // Borrar registros de asistencia del día
+    const { rowCount } = await pool.query(
+      'DELETE FROM asistencia_practicantes WHERE fecha = $1',
+      [fecha]
+    );
+
+    // Revertir status de los practicantes afectados a 'inactivo'
+    // (estado neutral antes de pasar lista)
+    await pool.query(
+      "UPDATE usuarios SET status = 'inactivo' WHERE rol = 'practicante'"
+    );
+
+    res.json({ message: `Asistencia del ${fecha} eliminada.`, registrosBorrados: rowCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { getByFecha, registrar, getByPracticante, getByMes, resetFecha };

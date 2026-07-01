@@ -33,6 +33,8 @@ function _formatearFecha(fecha) {
 function _formatearHora(hora) { return String(hora).substring(0, 5); }
 function _formatearArea(area) { return area === 'nutricion' ? 'Nutrición' : 'Fisioterapia'; }
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 function crearHtmlCitaCreada(nombre, fecha, hora, area, practicanteNombre) {
   const fechaFormateada   = _formatearFecha(fecha);
   const horaFormateada    = _formatearHora(hora);
@@ -112,7 +114,15 @@ function crearHtmlCitaCreada(nombre, fecha, hora, area, practicanteNombre) {
               </table>
 
               <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">${pieTexto}</p>
-              <p style="color:#6b7280;font-size:14px;line-height:1.7;">Si necesitas cancelar o reagendar tu cita, accede al sistema con suficiente anticipación.</p>
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;">Si necesitas cancelar o reagendar tu cita, accede a tu portal con 24 horas de anticipación a tu horario de cita.</p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Accede aquí</a>
+                  </td>
+                </tr>
+              </table>
 
             </td>
           </tr>
@@ -200,6 +210,14 @@ function crearHtmlAsignacionAutomatica(practicanteNombre, pacienteNombre, fecha,
 
               <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Puedes consultar todos los detalles de tu agenda desde tu panel de practicante.</p>
 
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Accede aquí</a>
+                  </td>
+                </tr>
+              </table>
+
             </td>
           </tr>
 
@@ -261,7 +279,7 @@ function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNomb
                       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td style="padding-bottom:12px;">
-                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Nuevo practicante</p>
+                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Nuevo profesional de la salud</p>
                             <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#1e3a8a;">${nuevoPracticanteNombre}</p>
                           </td>
                         </tr>
@@ -284,7 +302,15 @@ function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNomb
               </table>
 
               <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Tu cita se llevará a cabo en el mismo horario. No es necesario que realices ninguna acción adicional.</p>
-              <p style="color:#6b7280;font-size:14px;line-height:1.7;">Si tienes alguna duda, comunícate con la clínica.</p>
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;">Si tienes alguna duda, comunícate con la clínica o accede a tu portal.</p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Accede aquí</a>
+                  </td>
+                </tr>
+              </table>
 
             </td>
           </tr>

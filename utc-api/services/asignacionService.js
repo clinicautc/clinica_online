@@ -17,7 +17,7 @@ const pool = require('../db');
  *
  * Excluye practicantes con conflicto de horario exacto (misma fecha + hora).
  */
-async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirId = null }) {
+async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusentes = false, excluirId = null }) {
   const params = [fecha, hora, area];
 
   let excluirClause = '';
@@ -28,12 +28,23 @@ async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirId = n
 
   let asistenciaClause = '';
   if (esMismoDia) {
+    // Reasignación: exige que el practicante esté marcado presente
     asistenciaClause = `
       AND EXISTS (
         SELECT 1 FROM asistencia_practicantes ap
         WHERE ap.usuario_id = u.id
           AND ap.fecha = $1
           AND ap.estado = 'presente'
+      )
+    `;
+  } else if (excluirAusentes) {
+    // Creación de cita para hoy: descarta ausentes pero acepta sin registro todavía
+    asistenciaClause = `
+      AND NOT EXISTS (
+        SELECT 1 FROM asistencia_practicantes ap
+        WHERE ap.usuario_id = u.id
+          AND ap.fecha = $1
+          AND ap.estado = 'ausente'
       )
     `;
   }
@@ -147,9 +158,13 @@ async function _marcarPendiente(citaId) {
  *   { cita, asignado: { id, nombre } | null, esFallbackDocente: boolean }
  */
 async function asignarPracticante(citaId, area, fecha, hora) {
-  // Paso 1: practicante — solo por horario, sin importar si es hoy o futuro.
-  // La asistencia solo afecta la reasignación (reasignarCitasPorAusencia).
-  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia: false });
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  const esHoy = fecha === hoy;
+
+  // Paso 1: practicante por horario.
+  // Si la cita es para hoy, excluye a los marcados como ausentes (pero acepta sin registro aún).
+  // Para fechas futuras, no hay restricción de asistencia.
+  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia: false, excluirAusentes: esHoy });
   let esFallbackDocente = false;
 
   // Paso 2: docente como fallback
@@ -184,14 +199,14 @@ async function asignarPracticante(citaId, area, fecha, hora) {
  *   [{ citaId, pacienteId, pacienteNombre, hora, nuevoPracticante, esFallbackDocente, resultado }]
  */
 async function reasignarCitasPorAusencia(practicanteAusenteId, fecha, area) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
   if (fecha !== hoy) return [];
 
   const { rows: citasAfectadas } = await pool.query(
     `SELECT id, hora, paciente_id, paciente_nombre
      FROM citas
      WHERE practicante_id = $1
-       AND fecha          = $2
+       AND fecha::date    = $2::date
        AND estado         IN ('programada', 'confirmada')
      ORDER BY hora ASC`,
     [practicanteAusenteId, fecha]
@@ -202,12 +217,14 @@ async function reasignarCitasPorAusencia(practicanteAusenteId, fecha, area) {
   const resultados = [];
 
   for (const cita of citasAfectadas) {
-    // Buscar practicante presente (excluye al ausente)
+    // Buscar practicante disponible: excluye al ausente y a quienes están marcados ausentes,
+    // pero acepta sin registro (no exige presente explícito)
     let candidato = await _buscarPracticante({
       area,
       fecha,
       hora: cita.hora,
-      esMismoDia: true,
+      esMismoDia: false,
+      excluirAusentes: true,
       excluirId: practicanteAusenteId,
     });
     let esFallbackDocente = false;

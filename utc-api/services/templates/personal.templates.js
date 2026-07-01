@@ -5,6 +5,8 @@
  * ==========================================================
  */
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 const STYLES = `
 <style type="text/css">
   body, table, td { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
@@ -87,6 +89,16 @@ function crearHtmlCambioPasswordInicial(nombre, passwordTemporal) {
                   <strong>Importante:</strong> Esta contraseña es temporal y de uso único. Si no eres tú quien recibió este correo, comunícate de inmediato con el administrador de tu área.
                 </p>
               </div>
+              <p style="color:#4b5563;font-size:16px;line-height:1.8;margin-bottom:30px;">
+                PUEDES INICIAR SESIÓN EN EL SISTEMA UTC HACIENDO CLIC EN EL BOTÓN DE ABAJO.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/login" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Iniciar sesión</a>
+                  </td>
+                </tr>
+              </table>
 
             </td>
           </tr>

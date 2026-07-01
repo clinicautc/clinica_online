@@ -29,7 +29,7 @@ import {
   CalendarClock, ChevronUp, Search, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
@@ -80,7 +80,6 @@ export default function NutritionAdminDashboard() {
 
   // ESTADOS TABLA PERSONAL ACADÉMICO
   const [personalAcademico, setPersonalAcademico] = useState<any[]>([]);
-  const [roleFilterPersonal, _setRoleFilterPersonal] = useState<'todos' | 'admin' | 'practicante'>('todos');
   const [searchPersonal, setSearchPersonal] = useState('');
   const [todasCitas, setTodasCitas] = useState<Appointment[]>([]);
 
@@ -118,11 +117,9 @@ export default function NutritionAdminDashboard() {
   const nombreCortoDisplay = `${partesNombre[0] || ''} ${partesNombre[1] || ''}`.trim();
 
   const personalFiltrado = personalAcademico.filter(p => {
-    const matchesSearch = !searchPersonal ||
-      p.name.toLowerCase().includes(searchPersonal.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchPersonal.toLowerCase());
-    const matchesRole = roleFilterPersonal === 'todos' ? true : p.rol === roleFilterPersonal;
-    return matchesSearch && matchesRole;
+    if (!searchPersonal) return true;
+    const q = searchPersonal.toLowerCase();
+    return p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
   });
 
   /**
@@ -420,7 +417,7 @@ export default function NutritionAdminDashboard() {
                     <ViewModeToggle mode={viewMode} onChange={setViewMode} theme="orange" />
                     {viewMode === 'day' ? (
                       <>
-                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" />
+                        <DateFilterPicker selectedDate={selectedDate} onChange={setSelectedDate} theme="orange" onPrev={() => setSelectedDate(format(subDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} onNext={() => setSelectedDate(format(addDays(new Date(selectedDate + 'T00:00:00'), 1), 'yyyy-MM-dd'))} />
                         {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
                           <Button
                             variant="outline"
@@ -541,23 +538,22 @@ export default function NutritionAdminDashboard() {
 
           <TabsContent value="practitioners" className="animate-in fade-in duration-500">
             <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b bg-gray-50/80 p-7 gap-5">
-                <div>
+              <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50/80 p-7 gap-4">
+                <div className="shrink-0">
                   <CardTitle className="text-orange-900 font-extrabold text-2xl">Personal Académico</CardTitle>
                   <CardDescription className="text-gray-500 font-medium italic text-base">Registro y filtro de practicantes y docentes · Área de Nutrición</CardDescription>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 bg-white">
-                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                    <input
-                      type="text"
+                <div className="flex flex-row items-center gap-2 flex-wrap justify-end">
+                  <div className="relative min-w-[280px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
                       placeholder="Buscar por nombre o correo..."
-                      className="outline-none text-sm bg-transparent w-full"
                       value={searchPersonal}
-                      onChange={(e) => setSearchPersonal(e.target.value)}
+                      onChange={e => setSearchPersonal(e.target.value)}
+                      className="pl-9 h-10.75 rounded-xl border-orange-200 text-orange-900 font-medium w-full"
                     />
                   </div>
-                  <Button onClick={handleGoToManagePractitioners} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10.75 px-5 text-sm whitespace-nowrap">
+                  <Button onClick={handleGoToManagePractitioners} className="bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-lg transition-transform hover:scale-105 rounded-xl h-10.75 px-5 text-base whitespace-nowrap">
                     Administrar Personal
                   </Button>
                 </div>
