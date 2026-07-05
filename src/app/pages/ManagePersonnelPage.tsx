@@ -41,6 +41,7 @@ export default function ManagePersonnelPage() {
   const [tipoAcceso, setTipoAcceso] = useState<'practicante' | 'docente'>('practicante');
   const [nuevoD, setNuevoD] = useState({
     nombre: '',
+    apellido: '',
     email: '',
     matricula: '',
     numero_empleado: '',
@@ -161,8 +162,8 @@ export default function ManagePersonnelPage() {
     e.preventDefault();
     const esDocente = tipoAcceso === 'docente';
     const identificador = esDocente ? nuevoD.numero_empleado : nuevoD.matricula;
-    if (!nuevoD.nombre || !nuevoD.email || !identificador || !nuevoD.area) {
-      toast.error('Faltan datos: Nombre, Email, Área e Identificador son obligatorios');
+    if (!nuevoD.nombre || !nuevoD.apellido || !nuevoD.email || !identificador || !nuevoD.area) {
+      toast.error('Faltan datos: Nombre, Apellido, Email, Área e Identificador son obligatorios');
       return;
     }
     if (user?.area && nuevoD.area !== user.area) {
@@ -179,7 +180,7 @@ export default function ManagePersonnelPage() {
     try {
       const creado = await practicantesAPI.create({
         tipo: tipoAcceso,
-        nombre: capitalizeWords(nuevoD.nombre),
+        nombre: capitalizeWords(`${nuevoD.nombre.trim()} ${nuevoD.apellido.trim()}`),
         email: nuevoD.email.trim().toLowerCase(),
         matricula: esDocente ? undefined : nuevoD.matricula.trim(),
         numero_empleado: esDocente ? nuevoD.numero_empleado.trim() : undefined,
@@ -187,7 +188,7 @@ export default function ManagePersonnelPage() {
       });
       toast.success(`${esDocente ? 'Docente' : 'Practicante'} autorizado.\nContraseña temporal: UTC${identificador}`);
       if (!esDocente && creado?.id) setPendienteHorarioId(creado.id);
-      setNuevoD({ nombre: '', email: '', matricula: '', numero_empleado: '', area: (user?.area || '') as any });
+      setNuevoD({ nombre: '', apellido: '', email: '', matricula: '', numero_empleado: '', area: (user?.area || '') as any });
       setMostrandoFormulario(false);
       cargarDocentes();
     } catch (error: any) {
@@ -355,13 +356,24 @@ export default function ManagePersonnelPage() {
                     </Select>
                   </div>
 
-                  {/* Nombre */}
+                  {/* Nombre(s) */}
                   <div className="space-y-2">
-                    <Label className="text-blue-900 font-bold">Nombre Completo</Label>
+                    <Label className="text-blue-900 font-bold">Nombre(s)</Label>
                     <Input
                       value={nuevoD.nombre}
                       onChange={e => setNuevoD({ ...nuevoD, nombre: e.target.value })}
-                      placeholder={tipoAcceso === 'docente' ? 'Nombre completo del docente' : 'Nombre completo del alumno'}
+                      placeholder="Nombre(s)"
+                      required className="bg-white border-blue-900/20"
+                    />
+                  </div>
+
+                  {/* Apellido(s) */}
+                  <div className="space-y-2">
+                    <Label className="text-blue-900 font-bold">Apellido(s)</Label>
+                    <Input
+                      value={nuevoD.apellido}
+                      onChange={e => setNuevoD({ ...nuevoD, apellido: e.target.value })}
+                      placeholder="Apellido(s)"
                       required className="bg-white border-blue-900/20"
                     />
                   </div>
@@ -432,7 +444,7 @@ export default function ManagePersonnelPage() {
                   <Button type="submit" className="bg-blue-900 hover:bg-blue-800 px-8 font-bold shadow-md">
                     Confirmar Autorización
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => { setMostrandoFormulario(false); setHorarioNuevo([]); }} className="text-slate-500 font-bold">
+                  <Button type="button" variant="ghost" onClick={() => { setMostrandoFormulario(false); setHorarioNuevo([]); setNuevoD(prev => ({ ...prev, nombre: '', apellido: '' })); }} className="text-slate-500 font-bold">
                     Cancelar
                   </Button>
                 </div>
@@ -895,7 +907,7 @@ export default function ManagePersonnelPage() {
             </DialogTitle>
             <DialogDescription className="text-slate-600 font-medium mt-1">
               ¿Seguro que deseas dar de alta a{' '}
-              <span className="font-black text-blue-900">{nuevoD.nombre}</span>{' '}
+              <span className="font-black text-blue-900">{nuevoD.nombre} {nuevoD.apellido}</span>{' '}
               como{' '}
               <span className="capitalize font-bold">{tipoAcceso}</span>{' '}
               en el área de{' '}

@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { usuariosAPI, notasAPI, citasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
-import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
+import { esCitaBloqueada, getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -541,7 +541,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                   <Badge variant="outline" className={`text-[10px] font-black uppercase px-2.5 py-1 ${apt.tipo === 'nutricion' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
                                     {apt.tipo}
                                   </Badge>
-                                  <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{apt.estado}</span>
+                                  <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{getEstadoLabel(apt.estado)}</span>
                                 </div>
                               </div>
                             </div>

@@ -236,9 +236,10 @@ function crearHtmlAsignacionAutomatica(practicanteNombre, pacienteNombre, fecha,
 </html>`;
 }
 
-function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNombre) {
+function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNombre, area) {
   const fechaFormateada = _formatearFecha(fecha);
   const horaFormateada  = _formatearHora(hora);
+  const areaFormateada  = _formatearArea(area);
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="es">
@@ -277,6 +278,12 @@ function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNomb
                   <td>
                     <div class="info-box" style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:12px;padding:25px;margin-bottom:20px;">
                       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Área</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#1e3a8a;">${areaFormateada}</p>
+                          </td>
+                        </tr>
                         <tr>
                           <td style="padding-bottom:12px;">
                             <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Nuevo profesional de la salud</p>

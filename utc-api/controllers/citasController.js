@@ -78,6 +78,17 @@ async function create(req, res) {
   const area = tipo.toLowerCase();
 
   try {
+    const conflictoPaciente = await pool.query(
+      "SELECT tipo FROM citas WHERE paciente_id = $1 AND fecha = $2 AND hora = $3 AND estado IN ('programada', 'confirmada')",
+      [paciente_id, fecha, hora]
+    );
+
+    if (conflictoPaciente.rows.length > 0) {
+      const areaExistente = conflictoPaciente.rows[0].tipo;
+      const areaFormateada = areaExistente === 'nutricion' ? 'Nutrición' : 'Fisioterapia';
+      return res.status(409).json({ error: `Ya tienes una cita de ${areaFormateada} a esa hora. Selecciona un horario distinto.` });
+    }
+
     const check = await pool.query(
       "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'confirmada')",
       [fecha, hora, area]

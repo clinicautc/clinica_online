@@ -146,9 +146,9 @@ async function notificarAsignacionAutomatica(practicanteNombre, practicanteEmail
   }
 }
 
-async function notificarReasignacion(pacienteNombre, pacienteEmail, fecha, hora, nuevoPracticanteNombre) {
+async function notificarReasignacion(pacienteNombre, pacienteEmail, fecha, hora, nuevoPracticanteNombre, area) {
   try {
-    const html = crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNombre);
+    const html = crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNombre, area);
     await enviarCorreo(pacienteEmail, 'Actualización sobre tu cita - Clínica UTC', html);
   } catch (error) {
     console.error('[notificaciones] Error al notificar reasignación:', error.message);

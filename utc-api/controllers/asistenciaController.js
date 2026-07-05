@@ -79,7 +79,7 @@ async function registrar(req, res) {
               if (emailPaciente.rows.length > 0) {
                 notificationService.notificarReasignacion(
                   reasignacion.pacienteNombre, emailPaciente.rows[0].email,
-                  fecha, reasignacion.hora, reasignacion.nuevoPracticante.nombre
+                  fecha, reasignacion.hora, reasignacion.nuevoPracticante.nombre, area
                 );
               }
               // Notificar al nuevo practicante que le fue asignada la cita

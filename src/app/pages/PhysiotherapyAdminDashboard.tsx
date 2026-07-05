@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
-import { esCitaBloqueada, getEstadoBadgeClasses } from '../lib/citasHelpers';
+import { esCitaBloqueada, getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -479,7 +479,7 @@ export default function PhysiotherapyAdminDashboard() {
                                   <Clock className="w-3.5 h-3.5"/> {apt.hora.substring(0,5)} HRS
                                 </span>
                                 <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>
-                                  {apt.estado}
+                                  {getEstadoLabel(apt.estado)}
                                 </span>
                               </div>
                             </div>
