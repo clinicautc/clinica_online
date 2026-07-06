@@ -318,7 +318,7 @@ const handleSaveProfile = async () => {
         </header>
       </div>
 
-      <main className="max-w-[1480px] mx-auto px-4 py-9 sm:px-6 lg:px-6 relative z-10">
+      <main className="w-full px-4 py-9 sm:px-6 lg:px-6 relative z-10">
         <div className="mb-7">
           <h2 className="text-3xl font-bold text-blue-900 mb-2">Panel de Trabajo</h2>
           <p className="text-blue-900/70 text-base">Gestiona pacientes, citas y consulta historiales de fisioterapia</p>

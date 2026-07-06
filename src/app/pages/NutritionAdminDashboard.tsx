@@ -381,7 +381,7 @@ export default function NutritionAdminDashboard() {
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="max-w-[1480px] mx-auto px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
+      <main className="w-full px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-orange-200 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">

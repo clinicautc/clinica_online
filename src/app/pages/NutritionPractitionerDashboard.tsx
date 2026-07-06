@@ -289,6 +289,7 @@ export default function NutritionPractitionerDashboard() {
 
       <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
+          
           <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-500 rounded-full flex items-center justify-center relative shadow-md">
@@ -321,7 +322,7 @@ export default function NutritionPractitionerDashboard() {
         </header>
       </div>
 
-      <main className="max-w-[1480px] mx-auto px-4 py-9 sm:px-6 lg:px-6 relative z-10">
+      <main className="w-full px-4 py-9 sm:px-6 lg:px-6 relative z-10">
         <div className="mb-7">
           <h2 className="text-3xl font-bold text-orange-900 mb-2">Panel de Nutrición</h2>
           <p className="text-orange-900/70 text-base">Gestión de consultas y expedientes clínicos en tiempo real.</p>

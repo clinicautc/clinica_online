@@ -386,7 +386,7 @@ export default function PhysiotherapyAdminDashboard() {
         </header>
       </div>
 
-      <main className="max-w-[1480px] mx-auto px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
+      <main className="w-full px-4 pb-9 sm:px-6 lg:px-6 relative z-0">
         <Tabs defaultValue="today_appointments" className="space-y-6">
           <TabsList className="bg-white/80 backdrop-blur-sm border border-blue-900/10 p-1.5 h-auto flex-wrap gap-1.5 shadow-sm rounded-xl">
             <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white font-bold px-6 py-1.5 text-base">
