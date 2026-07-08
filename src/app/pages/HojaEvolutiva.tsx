@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Save, Loader2 } from 'lucide-react'; 
+import { Save, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner'; // 👈 ¡AGREGA ESTA LÍNEA!
-import { notasAPI } from '../lib/api';
+import { toast } from 'sonner';
+import { notasAPI, historialesAPI } from '../lib/api';
+import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
 
 type FormDataState = Record<string, string | boolean>;
 
-const HojaEvolutiva: React.FC = () => {
+const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
   // 1. CAMBIO CLAVE: Copiamos la lógica infalible del NutritionMasterForm
   const params = useParams();
   const appointmentId = params.id || params.appointmentId; 
@@ -19,6 +20,8 @@ const HojaEvolutiva: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [notaId, setNotaId] = useState<number | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [yaGuardado, setYaGuardado] = useState(false);
 
   useEffect(() => {
     // 2. Usar appointmentId en la validación (¡PROTEGIDO CONTRA TEXTO "null" y "undefined"!)
@@ -30,6 +33,12 @@ const HojaEvolutiva: React.FC = () => {
     }
 
     if (!user) return;
+
+    // En modo workspace el borrador se restaura vía restoreDraft(); saltamos la carga de BD.
+    if (props.formKey) {
+      setIsLoading(false);
+      return;
+    }
 
     const loadData = async () => {
       try {
@@ -62,53 +71,77 @@ const HojaEvolutiva: React.FC = () => {
     loadData();
   }, [appointmentId, user]);
 
-  // --- FUNCIÓN PARA SALIR CON CONFIRMACIÓN ---
+  // --- FUNCIÓN PARA SALIR CON CONFIRMACIÓN (modo standalone) ---
   const handleVolver = () => {
     const confirmar = window.confirm("¿Deseas salir sin guardar los cambios?");
-    if (confirmar) {
-      navigate(-1); // Si dice que sí, lo regresa al MedicalHistoryViewer
-    }
-    // Si dice que no, no hace nada y se queda en la pantalla actual
+    if (confirmar) navigate(-1);
   };
-  
+
 // --- 2. GUARDAR DATOS EN LA BASE DE DATOS ---
- const handleSave = async () => {
+ const doSave = async () => {
     setIsSaving(true);
     try {
       const aId = appointmentId ? parseInt(appointmentId as string, 10) : null;
 
-      const payload = {
-        paciente_id: null, 
-        practicante_id: user?.id,
-        appointment_id: aId, 
-        nombre_completo: formData.paciente_nombre || 'Sin nombre',
-        numero_expediente: formData.paciente_expediente || 'S/N',
-        edad: null, 
-        fecha_elaboracion: new Date().toISOString(),
-        cuadro_evolucion: formData, 
-        area: user?.area || 'nutricion'
-      };
-
-      if (notaId) {
-        await notasAPI.updateEvolucion(notaId, payload);
+      if (props.formKey === 'seguimiento_nutricion') {
+        // Nutrición subsecuente: debe guardarse en historiales_nutricion
+        // para que getDocumentosExistentes lo encuentre y permita finalizar la consulta.
+        await historialesAPI.guardar(null, {
+          paciente_id: props.pacienteId ?? null,
+          paciente_nombre: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
+          tipo: 'nutricion',
+          datos: formData,
+          creado_por: user?.id,
+          creado_por_nombre: user?.nombre,
+          appointment_id: aId,
+        });
       } else {
-        await notasAPI.createEvolucion(payload);
+        // Fisioterapia subsecuente (nota_evolutiva) y modo standalone
+        const payload = {
+          paciente_id: props.pacienteId ?? null,
+          practicante_id: user?.id,
+          appointment_id: aId,
+          nombre_completo: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
+          numero_expediente: (formData.paciente_expediente as string) || 'S/N',
+          edad: null,
+          fecha_elaboracion: new Date().toISOString(),
+          cuadro_evolucion: formData,
+          area: user?.area || 'fisioterapia'
+        };
+        if (notaId) {
+          await notasAPI.updateEvolucion(notaId, payload);
+        } else {
+          await notasAPI.createEvolucion(payload);
+        }
       }
 
-      toast.success(notaId ? "¡Hoja Evolutiva actualizada!" : "¡Hoja Evolutiva creada correctamente!");
+      toast.success("¡Expediente guardado correctamente!");
+      setYaGuardado(true);
 
-      // 👈 REDIRECCIÓN TEMPORIZADA (COMO EN NUTRITION MASTER FORM)
-      setTimeout(() => {
-        navigate(-1);
-      }, 1000);
+      if (props.onSaveSuccess) {
+        props.onSaveSuccess(props.formKey ?? '');
+      } else {
+        setTimeout(() => { navigate(-1); }, 1000);
+      }
 
    } catch (error: any) {
       console.error("Error al guardar:", error);
       toast.error(`Error al guardar: ${error.message}`);
+      props.onSaveFailure?.(props.formKey ?? '', error.message);
     } finally {
       setIsSaving(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    triggerSave: doSave,
+    canSave: !!(props.pacienteNombre?.trim() || (formData.paciente_nombre as string)?.trim()),
+    restoreDraft: (draft) => setFormData((draft as FormDataState) ?? {}),
+  }));
+
+  useEffect(() => {
+    props.onStateChange?.(props.formKey ?? '', formData);
+  }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- MANEJADORES DE EVENTOS CON TIPADO ESTricto ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -160,22 +193,50 @@ const HojaEvolutiva: React.FC = () => {
       {/* BOTONERA FLOTANTE DE ACCIÓN (¡AHORA SÍ FUERA DEL STYLE!) */}
       {/* ========================================================= */}
       <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 50, display: 'flex', gap: '10px' }}>
-        <button 
-          onClick={handleVolver} 
-          style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-        >
-          Volver
-        </button>
-        
-        <button 
-          onClick={handleSave} 
-          disabled={isSaving}
-          style={{ padding: '12px 25px', borderRadius: '50px', backgroundColor: 'var(--azul-utc)', color: 'white', border: 'none', fontWeight: 'bold', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
+        {!props.formKey && (
+          <button
+            onClick={handleVolver}
+            style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+          >
+            Volver
+          </button>
+        )}
+
+        <button
+          onClick={() => !yaGuardado && setShowConfirm(true)}
+          disabled={isSaving || yaGuardado}
+          style={{ padding: '12px 25px', borderRadius: '50px', backgroundColor: yaGuardado ? '#27AE60' : 'var(--azul-utc)', color: 'white', border: 'none', fontWeight: 'bold', cursor: (isSaving || yaGuardado) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', opacity: yaGuardado ? 0.8 : 1 }}
         >
           {isSaving ? <Loader2 className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}
-          {isSaving ? 'Guardando...' : 'Guardar Hoja'}
+          {yaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar Hoja'}
         </button>
       </div>
+
+      {showConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a', fontSize: '18px' }}>¿Guardar expediente?</h3>
+            <p style={{ color: '#555', marginBottom: '24px', fontSize: '14px', lineHeight: '1.5' }}>
+              Al confirmar, el expediente quedará guardado para esta consulta. Podrás revisarlo o editarlo antes de dar por finalizada la sesión.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowConfirm(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', background: 'white', fontWeight: '500' }}>Cancelar</button>
+              <button
+                onClick={() => {
+                  setShowConfirm(false);
+                  if (props.formKey) {
+                    setYaGuardado(true);
+                    props.onBack?.();
+                  } else {
+                    doSave();
+                  }
+                }}
+                style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              >Sí, guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LOADER PRINCIPAL */}
      {isLoading && (
@@ -194,21 +255,8 @@ const HojaEvolutiva: React.FC = () => {
          /* ==========================================================
              ESTILOS GENERALES Y PÁGINA 1
              ========================================================== */
-          * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
-          :root {
-              --azul-utc: #26549A;
-              --azul-claro: #E8EFF7;
-              --texto-label: #26549A;
-              --borde-grueso: 2px solid #26549A;
-              --borde-fino: 1px solid #26549A;
-          }
-
-
-          /* ==========================================================
-             ESTILOS GENERALES Y PÁGINA 1
-             ========================================================== */
-          * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
-          :root {
+          .hoja-evolutiva-wrapper * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
+          .hoja-evolutiva-wrapper {
               --azul-utc: #26549A;
               --azul-claro: #E8EFF7;
               --texto-label: #26549A;
@@ -263,9 +311,9 @@ const HojaEvolutiva: React.FC = () => {
           .page tr td:last-child, .page tr th:last-child { border-right: none; }
           .th-fecha { color: var(--azul-utc); font-size: 11px; font-weight: bold; text-align: center; padding: 4px; }
           .td-label { color: var(--azul-utc); font-size: 8px; font-weight: bold; text-align: left; padding: 3px 6px; line-height: 1.2; }
-          input[type="text"], input[type="number"], textarea { width: 100%; height: 100%; min-height: 16px; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 10px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; box-sizing: border-box; display: block; }
-          textarea { text-align: left; min-height: 35px; padding: 4px; }
-          input:focus, textarea:focus { background-color: var(--azul-claro) !important; }
+          .hoja-evolutiva-wrapper input[type="text"], .hoja-evolutiva-wrapper input[type="number"], .hoja-evolutiva-wrapper textarea { width: 100%; height: 100%; min-height: 16px; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 10px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; box-sizing: border-box; display: block; }
+          .hoja-evolutiva-wrapper textarea { text-align: left; min-height: 35px; padding: 4px; }
+          .hoja-evolutiva-wrapper input:focus, .hoja-evolutiva-wrapper textarea:focus { background-color: var(--azul-claro) !important; }
           .page-content { flex-grow: 1; }
           .footer { margin-top: auto; display: flex; justify-content: space-between; font-size: 7px; color: var(--azul-utc); font-weight: bold; padding-top: 5px; }
 
@@ -1400,6 +1448,6 @@ const HojaEvolutiva: React.FC = () => {
 
     </div>
     );
-};
+});
 
 export default HojaEvolutiva;

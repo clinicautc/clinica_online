@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react'; //
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import { apiFetch, historialesAPI } from '../lib/api';
+import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
 
 // IMPORTACIÓN DE IMÁGENES
 import caritasImg from './Caritas.png';
@@ -17,29 +18,37 @@ interface PageProps {
   appointmentId?: string;
   isSaving?: boolean;
   setIsSaving?: (value: boolean) => void;
-  historialId?: number | null; // <--- 1. AGREGA ESTA LÍNEA
+  historialId?: number | null;
+  onGuardarDirecto?: () => void;
+  isYaGuardado?: boolean;
 }
 
-const PhysiotherapyMasterForm: React.FC = () => {
+const PhysiotherapyMasterForm = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
   const [_isReadOnly, setIsReadOnly] = useState(false);
   const navigate = useNavigate();
-  const { appointmentId } = useParams();
+  const params = useParams();
+  // Acepta tanto /forms/fisioterapia/:appointmentId como /consulta/:id (workspace)
+  const appointmentId = params.id || params.appointmentId;
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
-const [historialId, setHistorialId] = useState<number | null>(null); // <--- 2. AGREGAR ESTE ESTADO
+  const [historialId, setHistorialId] = useState<number | null>(null);
+  const [yaGuardado, setYaGuardado] = useState(false);
 
 
-  const [formData, setFormData] = useState<any>({
-    pagina_1: {},
+  const [formData, setFormData] = useState<any>(() => ({
+    pagina_1: { paciente_id: props.pacienteId ?? undefined },
     pagina_2: { markers: [] },
     pagina_3: { markers: [] }
-  });
+  }));
 
   // Lógica de carga automática desde PostgreSQL
   // Lógica de carga automática desde PostgreSQL
   useEffect(() => {
   const cargarHistorialExistente = async () => {
-    if (!appointmentId) return; 
+    if (!appointmentId) return;
+    // En modo workspace el borrador se restaura vía restoreDraft; saltamos la carga de BD.
+    if (props.formKey) return;
 
     try {
       const response = await apiFetch(`/historiales-fisioterapia/detalle/${appointmentId}`);
@@ -89,14 +98,81 @@ setHistorialId(dataGuardada.id)
   const handleNext = () => setStep((prev) => prev + 1);
   const handleBack = () => setStep((prev) => prev - 1);
 
+  // Función de guardado expuesta al workspace mediante useImperativeHandle.
+  const handleFinalizarYGuardar = async () => {
+    try {
+      setIsSaving(true);
+      const pId = props.pacienteId ?? null;
+      const pNombre = props.pacienteNombre ?? 'Paciente sin nombre';
+      const parsedAId = parseInt(appointmentId ?? '', 10);
+      const aId = !isNaN(parsedAId) ? parsedAId : null;
+
+      if (!pId) {
+        toast.error('Error: no se pudo identificar al paciente.');
+        setIsSaving(false);
+        return;
+      }
+
+      const payload = {
+        paciente_id: pId,
+        paciente_nombre: pNombre,
+        tipo: 'fisioterapia',
+        datos: formData,
+        creado_por: user?.id || 1,
+        creado_por_nombre: user?.nombre || 'Practicante Fisioterapia',
+        appointment_id: aId,
+      };
+
+      await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'fisioterapia' });
+      toast.success('¡Historial guardado correctamente!');
+
+      if (props.onSaveSuccess) {
+        props.onSaveSuccess(props.formKey ?? '');
+      } else {
+        setTimeout(() => navigate(`/historial/${pId}/fisioterapia`, { replace: true }), 1500);
+      }
+    } catch (error: any) {
+      console.error('Error en el guardado final:', error);
+      toast.error(`Error: ${error.message || 'Revisa la conexión con la API'}`);
+      props.onSaveFailure?.(props.formKey ?? '', error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Regresa al hub sin guardar en BD; el guardado real ocurre en "Finalizar Consulta".
+  const handleGuardarSinFinalizar = () => {
+    setYaGuardado(true);
+    props.onBack?.();
+  };
+
+  useImperativeHandle(ref, () => ({
+    triggerSave: handleFinalizarYGuardar,
+    canSave: !!(formData?.pagina_1?.nombre_completo?.trim()),
+    restoreDraft: (draft) => {
+      const d = (draft as any) ?? { pagina_1: {}, pagina_2: { markers: [] }, pagina_3: { markers: [] } };
+      setFormData({
+        ...d,
+        pagina_1: {
+          ...d.pagina_1,
+          ...(props.pacienteId != null ? { paciente_id: props.pacienteId } : {}),
+        },
+      });
+    },
+  }));
+
+  useEffect(() => {
+    props.onStateChange?.(props.formKey ?? '', formData);
+  }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="min-h-screen bg-zinc-600">
       
       {step === 1 && (
-        <PhysiotherapyPage1Component 
+        <PhysiotherapyPage1Component
           accumulatedData={formData}
           onUpdate={updateGlobalData}
-          onBack={() => navigate(-1)} 
+          onBack={props.onBack ?? (() => { if (!props.formKey) navigate(-1); })}
           onNext={handleNext}
           appointmentId={appointmentId}
         />
@@ -112,20 +188,22 @@ setHistorialId(dataGuardada.id)
       )}
 
       {step === 3 && (
-        <PhysiotherapyPage3Component 
+        <PhysiotherapyPage3Component
           accumulatedData={formData}
           onUpdate={updateGlobalData}
           onBack={handleBack}
-          onNext={() => {}} // <--- AQUÍ: Ya no llamamos al handleFinalSave viejo
+          onNext={() => {}}
           isSaving={isSaving}
           setIsSaving={setIsSaving}
-          historialId={historialId} 
+          historialId={historialId}
+          onGuardarDirecto={props.formKey ? handleGuardarSinFinalizar : undefined}
+          isYaGuardado={yaGuardado}
         />
       )}
 
     </div>
   );
-};
+});
 
 
 /**
@@ -299,7 +377,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 8px;}
         .page-num { font-size: 14px; font-weight: bold; color: #2A4B8C; }
         
-        .btn-salir-fixed { position: fixed; top: 16px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
+        .btn-salir-fixed { position: fixed; top: 64px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
         .btn-siguiente-fixed { position: fixed; bottom: 32px; right: 32px; padding: 12px 32px; border-radius: 9999px; font-weight: bold; z-index: 50; border: none; transition: all 0.2s; background-color: #16a34a; color: white; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
         .btn-siguiente-fixed:hover { transform: scale(1.05); background-color: #15803d; }
 
@@ -1031,8 +1109,11 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
   isSaving,
   setIsSaving,
   historialId,
+  onGuardarDirecto,
+  isYaGuardado,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showConfirm, setShowConfirm] = React.useState(false);
   const { user } = useAuth();
   const params = useParams();
 // Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
@@ -1296,9 +1377,45 @@ const appointmentId = params.id || params.appointmentId;
 
       <div className="hc-body-p3">
         <button className="btn-anterior-p3" onClick={onBack}>Anterior</button>
-        <button className="btn-finalizar-p3" onClick={handleFinalizarYGuardar} disabled={isSaving}>
-          {isSaving ? 'Guardando...' : 'Finalizar y Guardar'}
+        <button
+          className="btn-finalizar-p3"
+          onClick={() => !isYaGuardado && setShowConfirm(true)}
+          disabled={isSaving || isYaGuardado}
+        >
+          {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
         </button>
+
+        {showConfirm && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+              <h3 style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a', fontSize: '18px' }}>¿Guardar expediente?</h3>
+              <p style={{ color: '#555', marginBottom: '24px', fontSize: '14px', lineHeight: '1.5' }}>
+                Al confirmar, el expediente quedará guardado para esta consulta. Podrás revisarlo o editarlo antes de dar por finalizada la sesión.
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', background: 'white', fontWeight: '500' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConfirm(false);
+                    if (onGuardarDirecto) {
+                      onGuardarDirecto();
+                    } else {
+                      handleFinalizarYGuardar();
+                    }
+                  }}
+                  style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Sí, guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="page-p3">
           <div className="flex gap-3 w-full">
@@ -1420,4 +1537,4 @@ const appointmentId = params.id || params.appointmentId;
     </>
   );
 };
-export default PhysiotherapyMasterForm ;
+export default PhysiotherapyMasterForm;

@@ -26,7 +26,7 @@ import {
   LogOut, Users, Calendar, Clock, Utensils, BarChart3,
   Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
   X, User, Phone, Building, Trash2, AlertTriangle, Edit2,
-  CalendarClock, ChevronUp, Search, Shield
+  CalendarClock, ChevronUp, Search, Shield, UserX, RotateCcw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, subDays } from 'date-fns';
@@ -52,6 +52,7 @@ interface Appointment {
   fecha: string;
   hora: string;
   estado: string;
+  numero_consulta?: number | null;
   practicante_id?: number | null;
   practicante_nombre?: string | null;
 }
@@ -87,6 +88,10 @@ export default function NutritionAdminDashboard() {
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
+  const [revertirCita, setRevertirCita] = useState<Appointment | null>(null);
+  const [motivoRevertir, setMotivoRevertir] = useState('');
+  const [recuperandoCitaId, setRecuperandoCitaId] = useState<number | null>(null);
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
@@ -126,28 +131,26 @@ export default function NutritionAdminDashboard() {
    * EFECTO INICIAL: Carga de Citas y Personal
    */
   useEffect(() => {
-    const fetchTodayAppointments = async () => {
+    const fetchTodayAppointments = async (silent = false) => {
       try {
-        setIsLoadingCitas(true);
+        if (!silent) setIsLoadingCitas(true);
         const allAppointments: Appointment[] = await citasAPI.getAll();
         setTodasCitas(allAppointments);
         const filtered = allAppointments.filter((apt) => {
+          if (apt.tipo !== 'nutricion') return false;
+          if (estadoFilter !== 'todos') return apt.estado === estadoFilter;
           const cleanAptDate = apt.fecha.split('T')[0];
           const matchesFecha = viewMode === 'day'
             ? cleanAptDate === selectedDate
             : cleanAptDate.startsWith(selectedMonth);
-          return (
-            matchesFecha &&
-            apt.tipo === 'nutricion'
-          );
+          return matchesFecha;
         });
-        // ORDEN DESCENDENTE: más reciente primero (fecha y, dentro del mismo día, hora)
-        filtered.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
+        filtered.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
         setTodayAppointments(filtered);
       } catch (error) {
         console.error("❌ Error Admin Nutrición -> PostgreSQL:", error);
       } finally {
-        setIsLoadingCitas(false);
+        if (!silent) setIsLoadingCitas(false);
       }
     };
 
@@ -188,9 +191,10 @@ export default function NutritionAdminDashboard() {
     fetchTodayAppointments();
     cargarPracticantesEnVivo();
 
-    const interval = setInterval(cargarPracticantesEnVivo, 30000);
-    return () => clearInterval(interval);
-  }, [user, authLoading, navigate, refreshKey, selectedDate, selectedMonth, viewMode]);
+    const interval = setInterval(cargarPracticantesEnVivo, 30_000);
+    const citasInterval = setInterval(() => fetchTodayAppointments(true), 30_000);
+    return () => { clearInterval(interval); clearInterval(citasInterval); };
+  }, [user, authLoading, navigate, refreshKey, estadoFilter, selectedDate, selectedMonth, viewMode]);
 
   // Sincronizar datos del perfil si el objeto 'user' se actualiza desde el contexto
   useEffect(() => {
@@ -330,6 +334,43 @@ export default function NutritionAdminDashboard() {
     navigate('/administrar-personal');
   };
 
+  const handleNoAsistioAdmin = async (apt: Appointment) => {
+    if (!window.confirm(`¿Confirmas que ${apt.paciente_nombre} no se presentó?`)) return;
+    try {
+      await citasAPI.noAsistio(apt.id);
+      toast.success('Cita marcada como no asistió');
+      setRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error');
+    }
+  };
+
+  const handleConfirmarRevertir = async () => {
+    if (!revertirCita || !motivoRevertir.trim()) return;
+    try {
+      await citasAPI.revertir(revertirCita.id, motivoRevertir);
+      toast.success('Cita revertida a programada');
+      setRevertirCita(null);
+      setMotivoRevertir('');
+      setRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al revertir');
+    }
+  };
+
+  const handleRecuperar = async (apt: Appointment) => {
+    setRecuperandoCitaId(apt.id);
+    try {
+      await citasAPI.recuperar(apt.id);
+      toast.success(`Cita de ${apt.paciente_nombre} habilitada para retomar`);
+      setRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al recuperar la cita');
+    } finally {
+      setRecuperandoCitaId(null);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-orange-50">
@@ -408,7 +449,9 @@ export default function NutritionAdminDashboard() {
                   <div>
                     <CardTitle className="text-orange-900 font-extrabold text-xl">Citas Programadas</CardTitle>
                     <CardDescription className="font-medium italic text-orange-800/60 text-base">
-                      {viewMode === 'day'
+                      {estadoFilter !== 'todos'
+                        ? `Mostrando todas las citas: ${getEstadoLabel(estadoFilter).toLowerCase()}`
+                        : viewMode === 'day'
                         ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                         : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
                     </CardDescription>
@@ -444,6 +487,26 @@ export default function NutritionAdminDashboard() {
                     )}
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-1.5 pt-3">
+                  {[
+                    { value: 'todos',       label: 'Todos',       active: 'bg-slate-700 text-white',   inactive: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
+                    { value: 'programada',  label: 'Programadas', active: 'bg-amber-500 text-white',   inactive: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
+                    { value: 'en_atencion', label: 'En Atención', active: 'bg-purple-600 text-white',  inactive: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
+                    { value: 'completada',  label: 'Completadas', active: 'bg-green-600 text-white',   inactive: 'bg-green-100 text-green-800 hover:bg-green-200' },
+                    { value: 'no_asistio',  label: 'No Asistió',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                    { value: 'incompleta',  label: 'Incompletas', active: 'bg-red-600 text-white',     inactive: 'bg-red-100 text-red-800 hover:bg-red-200' },
+                    { value: 'recuperada',  label: 'Recuperadas', active: 'bg-sky-500 text-white',     inactive: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
+                    { value: 'cancelada',   label: 'Canceladas',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                  ].map(btn => (
+                    <button
+                      key={btn.value}
+                      onClick={() => setEstadoFilter(btn.value)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${estadoFilter === btn.value ? btn.active : btn.inactive}`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-3">
@@ -463,6 +526,11 @@ export default function NutritionAdminDashboard() {
                                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3.5 h-3.5"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}</span>
                                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {apt.hora.substring(0,5)} HRS</span>
                                 <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{getEstadoLabel(apt.estado)}</span>
+                                {apt.estado === 'completada' && apt.numero_consulta && (
+                                  <span className="text-xs px-2 py-1 rounded-full font-black bg-slate-100 text-slate-600">
+                                    Consulta #{apt.numero_consulta}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -477,6 +545,37 @@ export default function NutritionAdminDashboard() {
                               </div>
                             )}
 
+                            {apt.estado === 'en_atencion' && (
+                              <div className="flex items-center gap-3">
+                                <Button
+                                  variant="outline"
+                                  className="h-9.75 border-gray-300 text-gray-600 hover:bg-gray-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  onClick={() => handleNoAsistioAdmin(apt)}
+                                >
+                                  <UserX className="w-4.5 h-4.5" /> No asistió
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="h-9.75 border-orange-200 text-orange-700 hover:bg-orange-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  onClick={() => setRevertirCita(apt)}
+                                >
+                                  <RotateCcw className="w-4.5 h-4.5" /> Revertir
+                                </Button>
+                              </div>
+                            )}
+                            {apt.estado === 'incompleta' && (
+                              <Button
+                                variant="outline"
+                                className="h-9.75 border-amber-300 text-amber-700 hover:bg-amber-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                disabled={recuperandoCitaId === apt.id}
+                                onClick={() => handleRecuperar(apt)}
+                              >
+                                {recuperandoCitaId === apt.id
+                                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Recuperando...</>
+                                  : <><AlertTriangle className="w-4.5 h-4.5" /> Recuperar</>
+                                }
+                              </Button>
+                            )}
                             {!esCitaBloqueada(apt) && (
                               <>
                                 {/* BOTÓN RE-AGENDAR */}
@@ -800,6 +899,39 @@ export default function NutritionAdminDashboard() {
                 CONFIRMAR ASIGNACIÓN
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: REVERTIR CITA A PROGRAMADA */}
+      <Dialog open={!!revertirCita} onOpenChange={(open) => { if (!open) { setRevertirCita(null); setMotivoRevertir(''); } }}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-orange-900 font-black">Revertir cita a Programada</DialogTitle>
+            <DialogDescription>
+              Indica el motivo por el que se revierte la consulta de <strong>{revertirCita?.paciente_nombre}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <Label htmlFor="motivo-revertir-nutri" className="font-bold text-sm">Motivo</Label>
+            <Textarea
+              id="motivo-revertir-nutri"
+              placeholder="Ej: Error al iniciar la consulta, problema técnico..."
+              value={motivoRevertir}
+              onChange={(e) => setMotivoRevertir(e.target.value)}
+              className="mt-1.5"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => { setRevertirCita(null); setMotivoRevertir(''); }}>Cancelar</Button>
+            <Button
+              disabled={!motivoRevertir.trim()}
+              onClick={handleConfirmarRevertir}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-bold"
+            >
+              Confirmar revertir
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

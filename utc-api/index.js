@@ -37,7 +37,7 @@ const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://l
   .filter(Boolean);
 
 app.use(cors({ origin: corsOrigins }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // --- RUTAS ---
 app.use('/api/auth', authRoutes);

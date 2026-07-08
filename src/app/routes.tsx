@@ -34,7 +34,8 @@ import MedicalHistoryViewer from './components/MedicalHistoryViewer';
 
 // --Nueva pagina de Notas Evolutivas
 // --- NUEVA IMPORTACIÓN: HOJA EVOLUTIVA ---
-import HojaEvolutiva from './pages/HojaEvolutiva'; // (Ajusta la carpeta si lo guardaste en /components)
+import HojaEvolutiva from './pages/HojaEvolutiva';
+import ConsultaWorkspace from './pages/ConsultaWorkspace';
 
 /**
  * COMPONENTE: ProtectedRoute
@@ -213,20 +214,33 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     )
   },
-  {
-    path: '*',
-    element: <Navigate to="/login" replace />
-  },
-
   /**
    * RUTA: HOJA EVOLUTIVA
    */
   {
-    path: '/hoja-evolutiva/:appointmentId', 
+    path: '/hoja-evolutiva/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <HojaEvolutiva />
       </ProtectedRoute>
     )
+  },
+
+  /**
+   * RUTA: WORKSPACE DE CONSULTA (popup window)
+   * Usa :id para que los formularios internos resuelvan params.id correctamente.
+   */
+  {
+    path: '/consulta/:id',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante']}>
+        <ConsultaWorkspace />
+      </ProtectedRoute>
+    )
+  },
+
+  {
+    path: '*',
+    element: <Navigate to="/login" replace />
   }
 ]);

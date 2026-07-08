@@ -111,7 +111,15 @@ async function getNutricionByPaciente(req, res) {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      'SELECT * FROM historiales_nutricion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      `SELECT h.*,
+        NULLIF((SELECT COUNT(*) FROM citas c
+         WHERE c.paciente_id = h.paciente_id
+           AND c.tipo = 'nutricion'
+           AND c.id <= h.appointment_id
+           AND c.estado = 'completada'), 0) AS numero_consulta
+       FROM historiales_nutricion h
+       WHERE h.paciente_id = $1
+       ORDER BY h.fecha_creacion DESC`,
       [id]
     );
     res.json(result.rows);
@@ -124,7 +132,15 @@ async function getFisioterapiaByPaciente(req, res) {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      'SELECT * FROM historiales_fisioterapia WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      `SELECT h.*,
+        NULLIF((SELECT COUNT(*) FROM citas c
+         WHERE c.paciente_id = h.paciente_id
+           AND c.tipo = 'fisioterapia'
+           AND c.id <= h.appointment_id
+           AND c.estado = 'completada'), 0) AS numero_consulta
+       FROM historiales_fisioterapia h
+       WHERE h.paciente_id = $1
+       ORDER BY h.fecha_creacion DESC`,
       [id]
     );
     res.json(result.rows);
@@ -158,16 +174,26 @@ async function create(req, res) {
       }
     }
 
+    // Prevenir duplicados: si ya existe un historial para esta cita, actualizar en lugar de insertar.
+    if (appointment_id) {
+      const existingResult = await pool.query(
+        `SELECT id FROM ${tablaDestino} WHERE appointment_id = $1 LIMIT 1`,
+        [appointment_id]
+      );
+      if (existingResult.rows.length > 0) {
+        const updateResult = await pool.query(
+          `UPDATE ${tablaDestino} SET datos = $1, paciente_id = $2, paciente_nombre = $3 WHERE id = $4 RETURNING *`,
+          [JSON.stringify(datos), paciente_id, paciente_nombre, existingResult.rows[0].id]
+        );
+        return res.json(updateResult.rows[0]);
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO ${tablaDestino} (paciente_id, paciente_nombre, tipo, datos, creado_por, creado_por_nombre, appointment_id, duracion_carga, timestamp_inicio)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [paciente_id, paciente_nombre, tipoLimpio, JSON.stringify(datos), creado_por, creado_por_nombre, appointment_id, duracion_carga || 0, timestamp_inicio || null]
     );
-
-    // ACTUALIZAR ESTADO DE LA CITA PARA QUE DESAPAREZCA DEL DASHBOARD
-    if (appointment_id) {
-      await pool.query("UPDATE citas SET estado = 'completada' WHERE id = $1", [appointment_id]);
-    }
 
     // Registro de métrica para el dashboard de control del Master/Admin
     await pool.query(

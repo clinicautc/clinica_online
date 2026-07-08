@@ -56,6 +56,8 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
   );
 
   const [isSaving, setIsSaving] = useState(false);
+  const [diasCompletos, setDiasCompletos] = useState<string[]>([]);
+  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
 
   useEffect(() => {
     if (isAdmin && currentUser?.area && !isRescheduling) {
@@ -68,16 +70,25 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
 
   const generateAvailableSlots = () => {
     const slots = [];
-    for (let hour = 0; hour <= 16; hour++) {
-      const hh = hour.toString().padStart(2, '0');
-      slots.push(`${hh}:00`);
-      slots.push(`${hh}:30`);
+    for (let hour = 0; hour <= 17; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
     }
-    slots.push("17:00");
     return slots;
   };
 
   const availableTimeSlots = generateAvailableSlots();
+
+  // Carga los días completamente ocupados del mes visible
+  useEffect(() => {
+    if (!type) {
+      setDiasCompletos([]);
+      return;
+    }
+    const mes = format(visibleMonth, 'yyyy-MM');
+    citasAPI.getDiasCompletos(mes, type)
+      .then(setDiasCompletos)
+      .catch(() => setDiasCompletos([]));
+  }, [type, visibleMonth]);
 
   // EFECTO PRINCIPAL: CONSULTA LA BASE DE DATOS CADA VEZ QUE CAMBIA FECHA O ÁREA
   useEffect(() => {
@@ -194,8 +205,11 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
     } 
   };
 
-  const isDateDisabled = (date: Date) => {
-    return isToday(date) || isBefore(date, startOfDay(new Date()));
+  const isDateDisabled = (d: Date): boolean => {
+    if (isToday(d) || isBefore(d, startOfDay(new Date()))) return true;
+    if (d.getDay() === 0 || d.getDay() === 6) return true;
+    if (diasCompletos.includes(format(d, 'yyyy-MM-dd'))) return true;
+    return false;
   };
 
   const isSelectedDateToday = date ? isToday(date) : false;
@@ -240,20 +254,14 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
             </Label>
             <div className="border border-blue-900/20 rounded-lg p-4 bg-white flex justify-center">
               <Calendar
-  mode="single"
-  selected={date}
-  onSelect={(newDate) => { setDate(newDate); setTime(''); }}
-  // 👇 MODIFICA ESTA LÍNEA 👇
-  disabled={(date) => {
-    const esFinDeSemana = date.getDay() === 0 || date.getDay() === 6;
-    const esDiaDeshabilitado = typeof isDateDisabled === 'function' ? isDateDisabled(date) : isDateDisabled;
-    
-    return esFinDeSemana || esDiaDeshabilitado || isSaving;
-  }}
-  // 👆 ==================== 👆
-  locale={es}
-  className="rounded-md"
-/>
+                mode="single"
+                selected={date}
+                onSelect={(newDate) => { setDate(newDate); setTime(''); }}
+                disabled={(d) => isDateDisabled(d) || isSaving}
+                onMonthChange={setVisibleMonth}
+                locale={es}
+                className="rounded-md"
+              />
             </div>
             {isSelectedDateToday && (
               <p className="text-xs text-red-500 font-bold text-center mt-2">
@@ -263,39 +271,47 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
           </div>
 
           {date && type && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-              <Label className="text-blue-900 font-semibold flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Horario Disponible (00:00 - 17:00)
-              </Label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md shadow-inner bg-slate-50">
-                {availableTimeSlots.map((slot) => {
-                  const isBlockedByTime = isSelectedDateToday;
-                  const isOccupied = horasOcupadas.includes(slot) || isBlockedByTime;
-                  const isSelected = time === slot;
-                  
-                  return (
-                    <Button
-                      key={slot}
-                      type="button"
-                      variant={isSelected ? "default" : "outline"}
-                      className={`
-                        text-xs transition-all duration-200
-                        ${isOccupied 
-                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60 border-dashed border-gray-300 hover:bg-gray-200' 
-                          : isSelected
-                          ? 'bg-blue-900 text-white shadow-md scale-105'
-                          : 'border-blue-900/20 text-blue-900 hover:bg-blue-50'
-                        }
-                      `}
-                      onClick={() => !isOccupied && setTime(slot)}
-                      disabled={isOccupied || isSaving}
-                    >
-                      {slot}
-                    </Button>
-                  );
-                })}
+            diasCompletos.includes(format(date, 'yyyy-MM-dd')) ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-center animate-in fade-in duration-300">
+                <p className="text-sm text-amber-700 font-medium">
+                  Todos los horarios de este día están ocupados. Por favor selecciona otra fecha.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <Label className="text-blue-900 font-semibold flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> Horario Disponible (00:00 - 17:00)
+                </Label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md shadow-inner bg-slate-50">
+                  {availableTimeSlots.map((slot) => {
+                    const isBlockedByTime = isSelectedDateToday;
+                    const isOccupied = horasOcupadas.includes(slot) || isBlockedByTime;
+                    const isSelected = time === slot;
+
+                    return (
+                      <Button
+                        key={slot}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        className={`
+                          text-xs transition-all duration-200
+                          ${isOccupied
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60 border-dashed border-gray-300 hover:bg-gray-200'
+                            : isSelected
+                            ? 'bg-blue-900 text-white shadow-md scale-105'
+                            : 'border-blue-900/20 text-blue-900 hover:bg-blue-50'
+                          }
+                        `}
+                        onClick={() => !isOccupied && setTime(slot)}
+                        disabled={isOccupied || isSaving}
+                      >
+                        {slot}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )
           )}
 
           <Button 

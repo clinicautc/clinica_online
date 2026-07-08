@@ -418,7 +418,8 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
           else if (apt.tipo === 'fisioterapia') dayData[dayIdx].fisioterapia++;
 
           if (filteredCitas.includes(apt)) {
-            timeCount[apt.hora || apt.time] = (timeCount[apt.hora || apt.time] || 0) + 1;
+            const horaKey = (apt.hora || apt.time || '').substring(0, 5);
+            timeCount[horaKey] = (timeCount[horaKey] || 0) + 1;
           }
         });
 

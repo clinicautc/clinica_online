@@ -146,7 +146,7 @@ export default function PatientList() {
                         <p className="font-black text-blue-950 uppercase">{patient.nombre}</p>
                         <p className="text-xs text-slate-500 flex items-center gap-2"><Mail className="w-3 h-3" /> {patient.email}</p>
                         <Button size="sm" className="w-full bg-blue-900 hover:bg-blue-800 font-bold gap-2 text-xs" onClick={() => handleViewHistory(patient.id)}>
-                          <BookOpen className="w-3 h-3" /> Historiales
+                          <BookOpen className="w-3 h-3" /> Expediente
                         </Button>
                       </div>
                   ))}
@@ -179,7 +179,7 @@ export default function PatientList() {
                             </TableCell>
                             <TableCell className="text-right">
                               <Button variant="outline" size="sm" className="border-blue-900 text-blue-900 hover:bg-blue-900 hover:text-white font-bold gap-2" onClick={() => handleViewHistory(patient.id)}>
-                                <BookOpen className="w-4 h-4" /> Historiales
+                                <BookOpen className="w-4 h-4" /> Expediente
                               </Button>
                             </TableCell>
                             {/* COLUMNA ACCIONES: Solo Master */}
