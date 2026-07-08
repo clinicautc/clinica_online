@@ -186,82 +186,87 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
   
   return (
-    <div className={`min-h-screen ${theme.bgGradient}`} style={arialStyle}>
-      {/* Header */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 bg-gradient-to-br ${theme.header} rounded-full flex items-center justify-center shadow-md`}>
-                {detectedArea === 'fisioterapia' ? (
-                  <Activity className="w-6 h-6 text-white" />
-                ) : (
-                  <Utensils className="w-6 h-6 text-white" />
-                )}
-              </div>
-              
-              {isMaster && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ver Historiales de:</span>
-                  <select 
-                    value={selectedArea} 
-                    onChange={(e) => setSelectedArea(e.target.value as 'nutricion' | 'fisioterapia')} 
-                    className="h-10 rounded-xl border-slate-200 px-3 bg-white font-bold text-xs text-slate-600 outline-none shadow-sm border"
-                  >
-                    <option value="nutricion">NUTRICIÓN</option>
-                    <option value="fisioterapia">FISIOTERAPIA</option>
-                  </select>
-                </div>
+    <div className="size-full min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
+      {/* CAPAS ESTÉTICAS UTC */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-blue-50/60"></div>
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] bg-orange-500 transform rotate-45 opacity-10"></div>
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10"></div>
+
+      <div className="relative z-10 size-full p-4 sm:p-6">
+      {/* HEADER INSTITUCIONAL */}
+      <header className="bg-white/90 backdrop-blur-sm shadow-sm mb-6 rounded-xl border border-gray-100">
+        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative flex items-center justify-center w-12 h-12 bg-blue-900 rounded-lg shadow-md">
+              {detectedArea === 'fisioterapia' ? (
+                <Activity className="w-6 h-6 text-white" />
+              ) : (
+                <Utensils className="w-6 h-6 text-white" />
               )}
-
-              <div>
-                <h1 className={`text-xl font-bold ${theme.color}`}>
-                  Expediente Médico - {detectedArea.toUpperCase()}
-                </h1>
-                <p className="text-sm text-gray-600 font-medium">
-                  Paciente: <span className="font-bold">{patientName || (loading ? 'Consultando...' : 'Sin Nombre')}</span>
-                </p>
-              </div>
             </div>
-            
-<Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="border-gray-200">
-  <ArrowLeft className="w-4 h-4 mr-2" />Volver 
-</Button>
 
+            {isMaster && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ver Historiales de:</span>
+                <select
+                  value={selectedArea}
+                  onChange={(e) => setSelectedArea(e.target.value as 'nutricion' | 'fisioterapia')}
+                  className="h-10 rounded-xl border-slate-200 px-3 bg-white font-bold text-xs text-slate-600 outline-none shadow-sm border"
+                >
+                  <option value="nutricion">NUTRICIÓN</option>
+                  <option value="fisioterapia">FISIOTERAPIA</option>
+                </select>
               </div>
+            )}
+
+            <div>
+              <h1 className="text-2xl font-bold">
+                <span className="text-blue-900">Expediente</span>{' '}
+                <span className="text-orange-600">{detectedArea.toUpperCase()}</span>
+              </h1>
+              <p className="text-sm text-gray-500 font-medium tracking-wide">
+                Paciente: <span className="font-bold text-blue-900">{patientName || (loading ? 'Consultando...' : 'Sin Nombre')}</span>
+              </p>
+            </div>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl">
+            <ArrowLeft className="w-4 h-4 mr-2" />Volver
+          </Button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div className="w-full space-y-7">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <Loader2 className={`w-12 h-12 animate-spin ${theme.colorAlt}`} />
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
             <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Consultando PostgreSQL...</p>
           </div>
         ) : (
           <Tabs defaultValue="historiales" className="space-y-6">
-            <TabsList className="bg-white/80 border shadow-sm p-1 h-auto gap-1 rounded-xl">
-              <TabsTrigger value="historiales" className={`${theme.tabActive} font-bold`}><FileText className="w-4 h-4 mr-2" />Historial Médico</TabsTrigger>
-              <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Evolución</TabsTrigger>
-              <TabsTrigger value="recomendaciones" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Recomendaciones</TabsTrigger>
-             
-            </TabsList>
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
+              <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
+                <TabsTrigger value="historiales" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><FileText className="w-5 h-5" />Historial Médico</TabsTrigger>
+                <TabsTrigger value="evolucion" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><TrendingUp className="w-5 h-5" />Evolución</TabsTrigger>
+                <TabsTrigger value="recomendaciones" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><TrendingUp className="w-5 h-5" />Recomendaciones</TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="historiales">
-              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8">
+              <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
+                <CardHeader className="bg-gray-50/80 border-b p-7">
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
-                      <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}><ClipboardList /> Historiales Registrados</CardTitle>
+                      <CardTitle className="text-blue-900 font-extrabold text-2xl flex items-center gap-3"><ClipboardList /> Historiales Registrados</CardTitle>
                       <CardDescription className="font-bold italic text-slate-500">Lista completa de evaluaciones de {detectedArea}</CardDescription>
                     </div>
                     <div className="relative w-full md:w-96">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                      <Input placeholder="Buscar por fecha o profesional..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-14 rounded-2xl" />
+                      <Input placeholder="Buscar por fecha o profesional..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-12 rounded-xl border-blue-200" />
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-7">
                   {filteredHistories.length === 0 ? (
                     <div className="text-center py-12">
                       <BookOpen className="w-16 h-16 mx-auto text-slate-200 mb-4" />
@@ -309,11 +314,11 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
             </TabsContent>
 
             <TabsContent value="evolucion">
-              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8">
-                  <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
+              <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
+                <CardHeader className="bg-gray-50/80 border-b p-7">
+                  <CardTitle className="text-blue-900 font-extrabold text-2xl">Evolución</CardTitle>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-7">
                   {filteredHistories.length === 0 ? (
                     <div className="text-center py-12">
                       <TrendingUp className="w-16 h-16 mx-auto text-slate-200 mb-4" />
@@ -369,17 +374,17 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
             </TabsContent>
 
                     <TabsContent value="recomendaciones">
-              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8">
-                  <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
-                    <MessageSquare className="w-6 h-6" /> 
+              <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
+                <CardHeader className="bg-gray-50/80 border-b p-7">
+                  <CardTitle className="text-blue-900 font-extrabold text-2xl flex items-center gap-3">
+                    <MessageSquare className="w-6 h-6" />
                     Recomendaciones de {detectedArea === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
                   </CardTitle>
                   <CardDescription className="font-bold italic text-slate-500">
                     Planes y sugerencias asignadas a {patientName}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-7">
                   {/* Aquí inyectas tu componente pasándole las variables dinámicas */}
                   <NutritionRecommendations 
                     pacienteId={id || ''} 
@@ -392,7 +397,16 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
           </Tabs>
         )}
-      </main>
+      </div>
+
+      <footer className="py-16 text-center">
+        <div className="inline-block px-7 py-2.5 border-y border-gray-100">
+          <p className="text-xs text-gray-400 font-black uppercase tracking-[0.6em] opacity-40">
+            Sistema de Gestión de Academias UTC • 2026
+          </p>
+        </div>
+      </footer>
+      </div>
     </div>
   );
 }
