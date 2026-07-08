@@ -28,6 +28,7 @@ import { es } from 'date-fns/locale';
 import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
 import ViewModeToggle from '../components/ViewModeToggle';
+import { getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth();
@@ -101,6 +102,7 @@ export default function PatientDashboard() {
           : cleanFecha.startsWith(selectedMonth);
       });
 
+      filtradasPorFecha.sort((a: any, b: any) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
       setCitasHistoricas(filtradasPorFecha);
     } catch (error) {
       console.error("Error al cargar citas:", error);
@@ -184,6 +186,18 @@ export default function PatientDashboard() {
   const inicialesAvatar = profileData.nombre
     ? profileData.nombre.split(' ').map(n => n[0]).join('').substring(0, 2)
     : 'U';
+
+  const citaEsAccionable = (cita: any): boolean => {
+    if (cita.estado !== 'programada') return false;
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const fechaCita = cita.fecha.split('T')[0];
+    if (fechaCita < hoyMX) return false;
+    if (fechaCita > hoyMX) return true;
+    const horaActual = new Date().toLocaleTimeString('en-GB', {
+      timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    return cita.hora.substring(0, 5) > horaActual;
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-white" style={arialStyle}>
@@ -331,7 +345,7 @@ export default function PatientDashboard() {
                                   {format(parseISO(cita.fecha), "eeee dd 'de' MMMM", { locale: es })}
                                 </p>
                               </div>
-                              <p className="text-2xl font-black text-blue-900">{cita.hora}</p>
+                              <p className="text-2xl font-black text-blue-900">{cita.hora.substring(0, 5)}</p>
                             </div>
                           </div>
 
@@ -343,28 +357,34 @@ export default function PatientDashboard() {
                               </p>
                             </div>
 
-                            <div className="flex gap-2.5 w-full sm:w-auto">
-                              <Button
-                                variant="outline"
-                                onClick={() => setReagendarCitaId(reagendarCitaId === cita.id ? null : cita.id)}
-                                className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-xs h-9.75 px-4 gap-2 hover:bg-blue-50"
-                              >
-                                <CalendarClock className="w-5 h-5" />
-                                {reagendarCitaId === cita.id ? "CERRAR" : "RE-AGENDAR"}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                onClick={() => handleCancelarCita(cita.id)}
-                                className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-xs h-9.75 px-4 gap-2"
-                              >
-                                <Trash2 className="w-5 h-5" /> CANCELAR
-                              </Button>
-                            </div>
+                            {citaEsAccionable(cita) ? (
+                              <div className="flex gap-2.5 w-full sm:w-auto">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setReagendarCitaId(reagendarCitaId === cita.id ? null : cita.id)}
+                                  className="flex-1 sm:flex-none border-blue-900/10 text-blue-900 font-bold text-xs h-9.75 px-4 gap-2 hover:bg-blue-50"
+                                >
+                                  <CalendarClock className="w-5 h-5" />
+                                  {reagendarCitaId === cita.id ? "CERRAR" : "RE-AGENDAR"}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => handleCancelarCita(cita.id)}
+                                  className="flex-1 sm:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 font-bold text-xs h-9.75 px-4 gap-2"
+                                >
+                                  <Trash2 className="w-5 h-5" /> CANCELAR
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className={`text-xs px-3.5 py-1.5 rounded-full font-black border ${getEstadoBadgeClasses(cita.estado)}`}>
+                                {getEstadoLabel(cita.estado)}
+                              </span>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
 
-                      {reagendarCitaId === cita.id && (
+                      {citaEsAccionable(cita) && reagendarCitaId === cita.id && (
                         <div className="bg-white border border-blue-900/10 rounded-xl p-5 shadow-inner animate-in slide-in-from-top-2 duration-300">
                           <div className="flex items-center gap-2 mb-5 text-blue-900">
                             <CalendarClock className="w-5 h-5" />

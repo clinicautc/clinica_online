@@ -42,7 +42,8 @@ import {
   Shield,
   Target,
   User, X, Edit2, Phone, Building, AlertTriangle,
-  Calendar, Clock, UserPlus, CalendarClock, ChevronUp, Loader2, Utensils, Activity
+  Calendar, Clock, UserPlus, CalendarClock, ChevronUp, Loader2, Utensils, Activity,
+  UserX, RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -64,6 +65,7 @@ interface Appointment {
   fecha: string;
   hora: string;
   estado: string;
+  numero_consulta?: number | null;
   practicante_id?: number | null;
   practicante_nombre?: string | null;
 }
@@ -117,7 +119,11 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
   const [citasAreaFilter, setCitasAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
+  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
   const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
+  const [revertirCita, setRevertirCita] = useState<Appointment | null>(null);
+  const [motivoRevertir, setMotivoRevertir] = useState('');
+  const [recuperandoCitaId, setRecuperandoCitaId] = useState<number | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedPractitioner, setSelectedPractitioner] = useState<any>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -152,7 +158,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   // EFECTO DE CARGA DE CITAS AGENDADAS (filtra por área, día/mes y fecha elegida)
   useEffect(() => {
     cargarCitas();
-  }, [citasAreaFilter, selectedDate, selectedMonth, viewMode]);
+    const interval = setInterval(() => cargarCitas(true), 30_000);
+    return () => clearInterval(interval);
+  }, [citasAreaFilter, estadoFilter, selectedDate, selectedMonth, viewMode]);
 
   // Inicializar datos del perfil cuando el usuario carga
   useEffect(() => {
@@ -197,26 +205,26 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   /**
    * CARGA DE CITAS AGENDADAS (AMBAS ÁREAS, FILTRABLE POR EL SELECTOR DE ÁREA Y FECHA)
    */
-  const cargarCitas = async () => {
+  const cargarCitas = async (silent = false) => {
     try {
-      setIsLoadingCitas(true);
+      if (!silent) setIsLoadingCitas(true);
       const todas: Appointment[] = await citasAPI.getAll();
       setTodasCitas(todas);
       const filtradas = todas.filter((apt) => {
-        const cleanAptDate = apt.fecha.split('T')[0];
         const matchesArea = citasAreaFilter === 'todos' ? true : apt.tipo === citasAreaFilter;
+        if (estadoFilter !== 'todos') return apt.estado === estadoFilter && matchesArea;
+        const cleanAptDate = apt.fecha.split('T')[0];
         const matchesFecha = viewMode === 'day'
           ? cleanAptDate === selectedDate
           : cleanAptDate.startsWith(selectedMonth);
         return matchesFecha && matchesArea;
       });
-      // ORDEN DESCENDENTE: más reciente primero (fecha y, dentro del mismo día, hora)
-      filtradas.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
+      filtradas.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
       setAppointments(filtradas);
     } catch (error) {
       console.error("Error Master -> Citas:", error);
     } finally {
-      setIsLoadingCitas(false);
+      if (!silent) setIsLoadingCitas(false);
     }
   };
 
@@ -375,6 +383,43 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     toast.success('Sesión finalizada');
   };
 
+  const handleNoAsistioAdmin = async (apt: Appointment) => {
+    if (!window.confirm(`¿Confirmas que ${apt.paciente_nombre} no se presentó?`)) return;
+    try {
+      await citasAPI.noAsistio(apt.id);
+      toast.success('Cita marcada como no asistió');
+      cargarCitas();
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error');
+    }
+  };
+
+  const handleConfirmarRevertir = async () => {
+    if (!revertirCita || !motivoRevertir.trim()) return;
+    try {
+      await citasAPI.revertir(revertirCita.id, motivoRevertir);
+      toast.success('Cita revertida a programada');
+      setRevertirCita(null);
+      setMotivoRevertir('');
+      cargarCitas();
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al revertir');
+    }
+  };
+
+  const handleRecuperar = async (apt: Appointment) => {
+    setRecuperandoCitaId(apt.id);
+    try {
+      await citasAPI.recuperar(apt.id);
+      toast.success(`Cita de ${apt.paciente_nombre} habilitada para retomar`);
+      cargarCitas();
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al recuperar la cita');
+    } finally {
+      setRecuperandoCitaId(null);
+    }
+  };
+
   // Generar iniciales para el Avatar
   const partesNombre = profileData.nombre.trim().split(' ');
   const inicialesAvatar = (partesNombre[0]?.[0] || '') + (partesNombre[1]?.[0] || '');
@@ -460,7 +505,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                     <div>
                       <CardTitle className="text-blue-900 font-extrabold text-xl">Citas Programadas</CardTitle>
                       <CardDescription className="text-gray-500 font-medium italic text-base">
-                        {viewMode === 'day'
+                        {estadoFilter !== 'todos'
+                          ? `Mostrando todas las citas: ${getEstadoLabel(estadoFilter).toLowerCase()}`
+                          : viewMode === 'day'
                           ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                           : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
                         {citasAreaFilter !== 'todos' && ` · Área: ${citasAreaFilter}`}
@@ -513,6 +560,26 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                       )}
                     </div>
                   </div>
+                  <div className="flex flex-wrap gap-1.5 pt-3">
+                    {[
+                      { value: 'todos',       label: 'Todos',       active: 'bg-slate-700 text-white',   inactive: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
+                      { value: 'programada',  label: 'Programadas', active: 'bg-amber-500 text-white',   inactive: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
+                      { value: 'en_atencion', label: 'En Atención', active: 'bg-purple-600 text-white',  inactive: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
+                      { value: 'completada',  label: 'Completadas', active: 'bg-green-600 text-white',   inactive: 'bg-green-100 text-green-800 hover:bg-green-200' },
+                      { value: 'no_asistio',  label: 'No Asistió',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                      { value: 'incompleta',  label: 'Incompletas', active: 'bg-red-600 text-white',     inactive: 'bg-red-100 text-red-800 hover:bg-red-200' },
+                      { value: 'recuperada',  label: 'Recuperadas', active: 'bg-sky-500 text-white',     inactive: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
+                      { value: 'cancelada',   label: 'Canceladas',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                    ].map(btn => (
+                      <button
+                        key={btn.value}
+                        onClick={() => setEstadoFilter(btn.value)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${estadoFilter === btn.value ? btn.active : btn.inactive}`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
                 </CardHeader>
                 <CardContent className="p-7">
                   <div className="space-y-3.5">
@@ -542,6 +609,11 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                     {apt.tipo}
                                   </Badge>
                                   <span className={`text-xs px-2.5 py-1 rounded-full font-black border ${getEstadoBadgeClasses(apt.estado)}`}>{getEstadoLabel(apt.estado)}</span>
+                                  {apt.estado === 'completada' && apt.numero_consulta && (
+                                    <span className="text-xs px-2 py-1 rounded-full font-black bg-slate-100 text-slate-600">
+                                      Consulta #{apt.numero_consulta}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -556,6 +628,37 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                 </div>
                               )}
 
+                              {apt.estado === 'en_atencion' && (
+                                <div className="flex items-center gap-3">
+                                  <Button
+                                    variant="outline"
+                                    className="h-9.75 border-gray-300 text-gray-600 hover:bg-gray-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                    onClick={() => handleNoAsistioAdmin(apt)}
+                                  >
+                                    <UserX className="w-4.5 h-4.5" /> No asistió
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="h-9.75 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                    onClick={() => setRevertirCita(apt)}
+                                  >
+                                    <RotateCcw className="w-4.5 h-4.5" /> Revertir
+                                  </Button>
+                                </div>
+                              )}
+                              {apt.estado === 'incompleta' && (
+                                <Button
+                                  variant="outline"
+                                  className="h-9.75 border-amber-300 text-amber-700 hover:bg-amber-50 font-bold rounded-xl px-4 flex items-center gap-2 shadow-sm"
+                                  disabled={recuperandoCitaId === apt.id}
+                                  onClick={() => handleRecuperar(apt)}
+                                >
+                                  {recuperandoCitaId === apt.id
+                                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Recuperando...</>
+                                    : <><AlertTriangle className="w-4.5 h-4.5" /> Recuperar</>
+                                  }
+                                </Button>
+                              )}
                               {!esCitaBloqueada(apt) && (
                                 <>
                                   <Button
@@ -949,6 +1052,39 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 CONFIRMAR ASIGNACIÓN
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: REVERTIR CITA A PROGRAMADA */}
+      <Dialog open={!!revertirCita} onOpenChange={(open) => { if (!open) { setRevertirCita(null); setMotivoRevertir(''); } }}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-blue-900 font-black">Revertir cita a Programada</DialogTitle>
+            <DialogDescription>
+              Indica el motivo por el que se revierte la consulta de <strong>{revertirCita?.paciente_nombre}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <Label htmlFor="motivo-revertir-master" className="font-bold text-sm">Motivo</Label>
+            <Textarea
+              id="motivo-revertir-master"
+              placeholder="Ej: Error al iniciar la consulta, problema técnico..."
+              value={motivoRevertir}
+              onChange={(e) => setMotivoRevertir(e.target.value)}
+              className="mt-1.5"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => { setRevertirCita(null); setMotivoRevertir(''); }}>Cancelar</Button>
+            <Button
+              disabled={!motivoRevertir.trim()}
+              onClick={handleConfirmarRevertir}
+              className="bg-blue-900 hover:bg-blue-800 text-white font-bold"
+            >
+              Confirmar revertir
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

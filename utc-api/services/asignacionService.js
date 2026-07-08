@@ -57,7 +57,7 @@ async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusent
         SELECT COUNT(*) FROM citas c2
         WHERE c2.practicante_id = u.id
           AND c2.fecha = $1
-          AND c2.estado IN ('programada', 'confirmada')
+          AND c2.estado IN ('programada', 'en_atencion')
       ) AS citas_hoy,
       (
         SELECT MAX(c3.fecha_asignacion) FROM citas c3
@@ -78,7 +78,7 @@ async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusent
         WHERE cc.practicante_id = u.id
           AND cc.fecha  = $1
           AND cc.hora   = $2
-          AND cc.estado IN ('programada', 'confirmada')
+          AND cc.estado IN ('programada', 'en_atencion')
       )
     ORDER BY citas_hoy ASC, ultima_asignacion ASC NULLS FIRST
     LIMIT 1
@@ -105,7 +105,7 @@ async function _buscarDocente({ area, fecha, hora }) {
          WHERE cc.practicante_id = u.id
            AND cc.fecha  = $2
            AND cc.hora   = $3
-           AND cc.estado IN ('programada', 'confirmada')
+           AND cc.estado IN ('programada', 'en_atencion')
        )
      LIMIT 1`,
     [area, fecha, hora]
@@ -207,7 +207,7 @@ async function reasignarCitasPorAusencia(practicanteAusenteId, fecha, area) {
      FROM citas
      WHERE practicante_id = $1
        AND fecha::date    = $2::date
-       AND estado         IN ('programada', 'confirmada')
+       AND estado         IN ('programada', 'en_atencion')
      ORDER BY hora ASC`,
     [practicanteAusenteId, fecha]
   );

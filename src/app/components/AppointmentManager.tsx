@@ -41,11 +41,10 @@ export default function AppointmentManager() {
   const fetchAppointments = async () => {
     try {
       const data = await citasAPI.getAll();
-      // Orden cronológico descendente
       const sorted = data.sort((a: AppointmentDB, b: AppointmentDB) => {
         const dateA = new Date(`${a.fecha.substring(0, 10)}T${a.hora.substring(0, 5)}`);
         const dateB = new Date(`${b.fecha.substring(0, 10)}T${b.hora.substring(0, 5)}`);
-        return dateB.getTime() - dateA.getTime();
+        return dateA.getTime() - dateB.getTime();
       });
       setAppointments(sorted);
     } catch (error) {
@@ -89,11 +88,13 @@ export default function AppointmentManager() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'programada': return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Programada</Badge>;
-      case 'asignada': return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Asignada</Badge>;
-      case 'completada': return <Badge className="bg-green-100 text-green-800 border-green-200">Completada</Badge>;
-      case 'cancelada': return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelada</Badge>;
-      default: return <Badge>{status}</Badge>;
+      case 'programada':               return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Programada</Badge>;
+      case 'en_atencion':              return <Badge className="bg-purple-100 text-purple-800 border-purple-200">En atención</Badge>;
+      case 'completada':               return <Badge className="bg-green-100 text-green-800 border-green-200">Completada</Badge>;
+      case 'no_asistio':               return <Badge className="bg-gray-100 text-gray-600 border-gray-200">No asistió</Badge>;
+      case 'cancelada':                return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelada</Badge>;
+      case 'pendiente_reprogramacion': return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Sin practicante</Badge>;
+      default:                         return <Badge>{status}</Badge>;
     }
   };
 

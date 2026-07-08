@@ -106,8 +106,8 @@ export default function StatisticsPage() {
       format(parseISO(cita.date || (cita as any).fecha), 'yyyy-MM-dd') === hoyStr
     );
 
-    const fisio = activas.filter(c => c.type === 'fisioterapia').length;
-    const nutri = activas.filter(c => c.type === 'nutricion').length;
+    const fisio = activas.filter(c => ((c as any).tipo || c.type) === 'fisioterapia').length;
+    const nutri = activas.filter(c => ((c as any).tipo || c.type) === 'nutricion').length;
     const completadas = activas.filter(c => c.status === 'completada').length;
     const canceladas = todasLasCitas.filter(c => c.status === 'cancelada').length;
     
@@ -170,8 +170,8 @@ export default function StatisticsPage() {
 
   const obtenerRendimientoPorArea = () => {
     const citasCompletadas = citas.filter(c => c.status === 'completada');
-    const fisioC = citasCompletadas.filter(c => c.type === 'fisioterapia').length;
-    const nutriC = citasCompletadas.filter(c => c.type === 'nutricion').length;
+    const fisioC = citasCompletadas.filter(c => ((c as any).tipo || c.type) === 'fisioterapia').length;
+    const nutriC = citasCompletadas.filter(c => ((c as any).tipo || c.type) === 'nutricion').length;
     const total = fisioC + nutriC;
 
     return [

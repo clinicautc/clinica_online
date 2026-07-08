@@ -4,11 +4,12 @@
    * PROPÓSITO: Formulario Multi-pasos con persistencia de datos local.
    * ============================================================================
    */
-  import React, { useState, useEffect } from 'react';
-  import { useNavigate, useParams } from 'react-router'; 
+  import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+  import { useNavigate, useParams } from 'react-router';
   import { useAuth } from '../contexts/AuthContext';
   import { toast } from 'sonner';
   import { apiFetch, historialesAPI } from '../lib/api';
+  import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
   // IMPORTACIÓN DE LA IMAGEN
   import bristolImg from './bristol.jpg';
 
@@ -19,34 +20,40 @@
     onBack: () => void;
     onNext: () => void;
     isReadOnly: boolean;
-    historialId?: number | null; // <--- 1. AGREGA ESTA LÍNEA
-
+    historialId?: number | null;
+    onGuardarDirecto?: () => void;
+    isYaGuardado?: boolean;
   }
 
-  const NutritionMasterForm: React.FC = () => {
+  const NutritionMasterForm = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
     // --- CONTROL DE PASOS ---
     const navigate = useNavigate();
     const params = useParams();
 // Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
-const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Línea 30 aprox.)
+const appointmentId = params.id || params.appointmentId;
+    const { user } = useAuth();
     const [step, setStep] = useState(1);
     
     // --- OBJETO MAESTRO DE DATOS (Persistencia Total) ---
-    const [formData, setFormData] = useState<any>({
-    pagina_1: {},
-    pagina_2: {},
-    pagina_3: {},
-    pagina_4: {}
-  });
+    const [formData, setFormData] = useState<any>(() => ({
+      pagina_1: { paciente_id: props.pacienteId ?? undefined },
+      pagina_2: {},
+      pagina_3: {},
+      pagina_4: {}
+    }));
 
     const [isReadOnly, _setIsReadOnly] = useState(false);
     const [historialId, setHistorialId] = useState<number | null>(null);
+    const [_isSaving, setIsSaving] = useState(false);
+    const [yaGuardado, setYaGuardado] = useState(false);
 
       // AGREGA ESTE BLOQUE AQUÍ:
     // Lógica de carga automática desde PostgreSQL para Nutrición
   useEffect(() => {
   const cargarHistorialExistente = async () => {
-    if (!appointmentId) return; 
+    if (!appointmentId) return;
+    // En modo workspace el borrador se restaura vía restoreDraft; saltamos la carga de BD.
+    if (props.formKey) return;
 
     try {
       const response = await apiFetch(`/historiales-nutricion/detalle/${appointmentId}`);
@@ -98,6 +105,75 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
     const handleNext = () => setStep(2);
     const handleBack = () => setStep(1);
 
+    // Función de guardado expuesta al workspace mediante useImperativeHandle.
+    // Cuando se usa desde la ruta clásica (/forms/nutricion/:id) esta función no se llama;
+    // en ese caso el guardado lo ejecuta NutritionPage4Component directamente.
+    const handleFinalizar = async () => {
+      try {
+        setIsSaving(true);
+        const pId = props.pacienteId ?? null;
+        const pNombre = props.pacienteNombre ?? 'Paciente sin nombre';
+        const parsedAId = parseInt(appointmentId ?? '', 10);
+        const aId = !isNaN(parsedAId) ? parsedAId : null;
+
+        if (!pId) {
+          toast.error('Error: no se pudo identificar al paciente.');
+          setIsSaving(false);
+          return;
+        }
+
+        const payload = {
+          paciente_id: pId,
+          paciente_nombre: pNombre,
+          tipo: 'nutricion',
+          datos: formData,
+          creado_por: user?.id || 1,
+          creado_por_nombre: user?.nombre || 'Practicante Nutrición',
+          appointment_id: aId,
+        };
+
+        await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'nutricion' });
+        toast.success('Expediente guardado correctamente');
+
+        if (props.onSaveSuccess) {
+          props.onSaveSuccess(props.formKey ?? '');
+        } else {
+          setTimeout(() => navigate(`/historial/${pId}/nutricion`, { replace: true }), 1000);
+        }
+      } catch (error: any) {
+        console.error('Error crítico:', error);
+        toast.error('Error al guardar en la base de datos.');
+        props.onSaveFailure?.(props.formKey ?? '', error.message);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    // Regresa al hub sin guardar en BD; el guardado real ocurre en "Finalizar Consulta".
+    const handleGuardarSinFinalizar = () => {
+      setYaGuardado(true);
+      props.onBack?.();
+    };
+
+    useImperativeHandle(ref, () => ({
+      triggerSave: handleFinalizar,
+      canSave: !!(formData?.pagina_1?.nombre?.trim()),
+      restoreDraft: (draft) => {
+        const d = (draft as any) ?? { pagina_1: {}, pagina_2: {}, pagina_3: {}, pagina_4: {} };
+        setFormData({
+          ...d,
+          pagina_1: {
+            ...d.pagina_1,
+            ...(props.pacienteId != null ? { paciente_id: props.pacienteId } : {}),
+          },
+        });
+      },
+    }));
+
+    useEffect(() => {
+      props.onStateChange?.(props.formKey ?? '', formData);
+    }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
       <div className="bg-zinc-600 min-h-screen flex justify-center p-5 font-sans print:bg-white print:p-0 relative">
         
@@ -123,21 +199,23 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
         )}
 
         {step === 4 && (
-          <NutritionPage4Component 
-            accumulatedData={formData} 
-            onUpdate={updateGlobalData} 
-            onBack={() => setStep(3)} 
-            onNext={() => {}} 
+          <NutritionPage4Component
+            accumulatedData={formData}
+            onUpdate={updateGlobalData}
+            onBack={() => setStep(3)}
+            onNext={() => {}}
             isReadOnly={isReadOnly}
             historialId={historialId}
+            onGuardarDirecto={props.formKey ? handleGuardarSinFinalizar : undefined}
+            isYaGuardado={yaGuardado}
           />
         )}
 {/* --- PÁGINA 1 --- */}
         <div className={step === 1 ? "block" : "hidden"}>
          
           {/* BOTONES DE NAVEGACIÓN FIJOS */}
-         <button onClick={() => navigate(-1)}
-         className="fixed top-4 right-4 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
+         <button onClick={props.onBack ?? (() => navigate(-1))}
+         className={`fixed ${props.formKey ? 'top-16' : 'top-4'} right-4 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
@@ -606,7 +684,7 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
         </div>
       </div>
     );
-  };
+  });
 
   /* --- COMPONENTES AUXILIARES --- */
 
@@ -1781,10 +1859,11 @@ const appointmentId = params.id || params.appointmentId; // <--- VA AQUÍ (Líne
    * ============================================================================
    */
 
-function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly, historialId }: PageProps) {   
+function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly, historialId, onGuardarDirecto, isYaGuardado }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
-    
-    const { user } = useAuth(); // Obtenemos el usuario autenticado
+  const [showConfirm, setShowConfirm] = useState(false);
+
+    const { user } = useAuth();
     const navigate = useNavigate();
     const { appointmentId } = useParams()
 
@@ -2114,9 +2193,46 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
           ← Pagina 3 
         </button>
 
-        <button className="no-print" style={styles.btnFinalizar} onClick={handleFinalizar} disabled={isSaving}> 
-          {isSaving ? 'Guardando...' : 'Finalizar'} 
+        <button
+          className="no-print"
+          style={styles.btnFinalizar}
+          onClick={() => !isYaGuardado && setShowConfirm(true)}
+          disabled={isSaving || isYaGuardado}
+        >
+          {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
         </button>
+
+        {showConfirm && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+              <h3 style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a', fontSize: '18px' }}>¿Guardar expediente?</h3>
+              <p style={{ color: '#555', marginBottom: '24px', fontSize: '14px', lineHeight: '1.5' }}>
+                Al confirmar, el expediente quedará guardado para esta consulta. Podrás revisarlo o editarlo antes de dar por finalizada la sesión.
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', background: 'white', fontWeight: '500' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConfirm(false);
+                    if (onGuardarDirecto) {
+                      onGuardarDirecto();
+                    } else {
+                      handleFinalizar();
+                    }
+                  }}
+                  style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Sí, guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={styles.container} className="printable-page">
           {/* SECCIÓN SUPERIOR */}
