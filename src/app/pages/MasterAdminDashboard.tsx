@@ -473,7 +473,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           </div>
         </header>
 
-        <div className="max-w-[1480px] mx-auto space-y-7">
+        <div className="w-full space-y-7">
           <Tabs defaultValue="practitioners" className="space-y-6">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
               <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">

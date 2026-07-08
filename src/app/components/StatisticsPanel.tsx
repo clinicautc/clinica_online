@@ -8,7 +8,10 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { citasAPI, historialesAPI, metricasAPI } from '../lib/api';
+import { citasAPI, historialesAPI, metricasAPI, usuariosAPI } from '../lib/api';
+
+
+
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
@@ -40,6 +43,13 @@ interface ExtendedStats {
 interface StatisticsPanelProps {
   area?: 'nutricion' | 'fisioterapia' | 'todos' | 'general';
 }
+
+type FilterArea = 'general' | 'nutricion' | 'fisioterapia';
+
+const normalizeAreaFilter = (value?: StatisticsPanelProps['area']): FilterArea => {
+  if (value === 'nutricion' || value === 'fisioterapia') return value;
+  return 'general';
+};
 
 // ---------------------------------------------------------------------------
 // Paleta de tokens visuales
@@ -247,121 +257,215 @@ function SectionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Exportar a Excel (Versión Profesional con ExcelJS)
+// Exportar a Excel (Versión Avanzada con Auditoría)
 // ---------------------------------------------------------------------------
-async function exportToExcel(stats: ExtendedStats) {
+async function exportToExcel(
+  stats: ExtendedStats,
+  rawData: { citas: any[]; usuarios: any[] },
+  filtroArea: string,
+  esMaster: boolean
+) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Clínica UTC';
   workbook.created = new Date();
 
-  // Función de ayuda para darle estilo profesional a las cabeceras
-  const styleHeader = (worksheet: ExcelJS.Worksheet) => {
-    worksheet.getRow(1).eachCell((cell) => {
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1E3A8A' } // Azul institucional UTC
-      };
-      cell.font = {
-        color: { argb: 'FFFFFFFF' },
-        bold: true,
-        size: 12
-      };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-      };
-    });
-    worksheet.getRow(1).height = 25;
+  const colors = {
+    blueUTC: 'FF1E3A8A',
+    orangeUTC: 'FFEA580C',
+    emerald: 'FF10B981',
+    darkSlate: 'FF334155',
+    zebraGray: 'FFF8FAFC',
+    borderGray: 'FFCBD5E1',
   };
 
-  // ==========================================
-  // HOJA 1: KPIs Generales
-  // ==========================================
-  const ws1 = workbook.addWorksheet('KPIs Generales', { views: [{ showGridLines: false }] });
-  
+  const thinBorder = {
+    top: { style: 'thin' as const, color: { argb: colors.borderGray } },
+    left: { style: 'thin' as const, color: { argb: colors.borderGray } },
+    bottom: { style: 'thin' as const, color: { argb: colors.borderGray } },
+    right: { style: 'thin' as const, color: { argb: colors.borderGray } },
+  };
+
+  const applyHeaderStyle = (cell: any, bgColor: string) => {
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  };
+
+  const capitalize = (value?: string) => {
+    if (!value) return '';
+    return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  };
+
+  const normalizedFiltroArea = filtroArea === 'general' || filtroArea === 'todos' ? 'general' : filtroArea;
+  const textoFiltro = normalizedFiltroArea === 'general' ? 'TODAS LAS ÁREAS' : normalizedFiltroArea.toUpperCase();
+  const scopeLabel = esMaster ? 'AUDITORÍA MASTER' : 'AUDITORÍA OPERATIVA';
+
+  const ws1 = workbook.addWorksheet('Resumen de KPIs', { views: [{ showGridLines: false }] });
   ws1.columns = [
-    { header: 'Métrica Operativa', key: 'metrica', width: 40 },
-    { header: 'Valor', key: 'valor', width: 20 }
+    { width: 3 },
+    { width: 35 },
+    { width: 18 },
+    { width: 5 },
+    { width: 18 },
+    { width: 15 },
+    { width: 15 },
   ];
 
-  ws1.addRows([
-    { metrica: 'Total Citas', valor: stats.totalCitas },
-    { metrica: 'Citas Completadas', valor: stats.citasCompletadas },
-    { metrica: 'Citas Canceladas', valor: stats.citasCanceladas },
-    { metrica: 'Citas Programadas', valor: stats.citasProgramadas },
-    { metrica: 'Citas Re-agendadas', valor: stats.reagendadas },
-    { metrica: 'Promedio de Consulta (minutos)', valor: stats.tiempoPromedioConsulta },
-    { metrica: 'Tasa de Abandono (%)', valor: stats.tasaAbandono },
-    { metrica: 'Nuevos Expedientes (7 días)', valor: stats.pacientesNuevosSemana },
-    { metrica: 'Velocidad Asignación Docente (minutos)', valor: stats.velocidadAsignacionDocente }
-  ]);
+  ws1.mergeCells('B2:G3');
+  const banner = ws1.getCell('B2');
+  banner.value = `${scopeLabel} - ${textoFiltro}`;
+  banner.font = { name: 'Arial', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+  banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.blueUTC } };
+  banner.alignment = { vertical: 'middle', horizontal: 'center' };
 
-  styleHeader(ws1);
+  ws1.mergeCells('B6:C6');
+  ws1.getCell('B6').value = 'MÉTRICAS CLAVE';
+  applyHeaderStyle(ws1.getCell('B6'), colors.darkSlate);
 
-  // Dar estilo a las celdas de datos (filas alternas y alineación)
-  ws1.eachRow((row, rowNumber) => {
-    if (rowNumber > 1) {
-      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
-      row.getCell(2).font = { bold: true, color: { argb: 'FF0F172A' } };
-      
-      // Filas cebra (Gris muy claro)
-      if (rowNumber % 2 === 0) {
-        row.eachCell((cell) => {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-        });
-      }
+  const kpiData = [
+    ['Total Citas', stats.totalCitas],
+    ['Citas Completadas', stats.citasCompletadas],
+    ['Citas Canceladas', stats.citasCanceladas],
+    ['Citas Programadas', stats.citasProgramadas],
+    ['Promedio de Consulta (min)', stats.tiempoPromedioConsulta],
+    ['Nuevos Expedientes (7 días)', stats.pacientesNuevosSemana],
+  ];
+
+  kpiData.forEach((row, index) => {
+    const labelCell = ws1.getCell(`B${7 + index}`);
+    const valueCell = ws1.getCell(`C${7 + index}`);
+    labelCell.value = row[0];
+    valueCell.value = row[1];
+    labelCell.border = thinBorder;
+    valueCell.border = thinBorder;
+    valueCell.alignment = { horizontal: 'center' };
+    if (index % 2 === 0) {
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
+      valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
     }
   });
 
-  // ==========================================
-  // HOJA 2: Flujo Semanal (Ideal para hacer gráficas)
-  // ==========================================
-  const ws2 = workbook.addWorksheet('Flujo Semanal');
+  const ws2 = workbook.addWorksheet('Bitácora de Citas', { views: [{ showGridLines: true }] });
   ws2.columns = [
-    { header: 'Día de la Semana', key: 'dia', width: 25 },
-    { header: 'Nutrición', key: 'nut', width: 20 },
-    { header: 'Fisioterapia', key: 'fisio', width: 20 }
+    { width: 8 },
+    { width: 15 },
+    { width: 12 },
+    { width: 35 },
+    { width: 15 },
+    { width: 30 },
+    { width: 15 },
   ];
+  ws2.getRow(1).values = ['ID', 'Fecha', 'Hora', 'Paciente', 'Área', 'Practicante', 'Estado'];
+  ws2.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.orangeUTC));
 
-  stats.datosGrafica.forEach(d => {
-    ws2.addRow({ dia: d.name, nut: d.nutricion, fisio: d.fisioterapia });
+  rawData.citas.forEach((cita, index) => {
+    const row = ws2.addRow({
+      id: cita.id,
+      fecha: cita.fecha?.split('T')[0] || 'N/A',
+      hora: cita.hora?.substring(0, 5) || 'N/A',
+      paciente: capitalize(cita.paciente_nombre),
+      area: cita.tipo?.toUpperCase() || 'N/A',
+      practicante: capitalize(cita.practicante_nombre) || 'Sin asignar',
+      estado: cita.estado?.toUpperCase() || 'N/A',
+    });
+
+    row.eachCell((cell: any) => {
+      cell.border = thinBorder;
+      cell.font = { size: 10 };
+      if (index % 2 === 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
+      }
+      if (cell.value === 'COMPLETADA') {
+        cell.font = { ...cell.font, color: { argb: 'FF16A34A' }, bold: true };
+      }
+      if (cell.value === 'CANCELADA') {
+        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+      }
+    });
   });
 
-  styleHeader(ws2);
-  ws2.eachRow((row, rowNumber) => {
-    if (rowNumber > 1) row.alignment = { horizontal: 'center' };
-  });
-
-  // ==========================================
-  // HOJA 3: Horarios de Mayor Demanda
-  // ==========================================
-  const ws3 = workbook.addWorksheet('Horarios Demanda');
+  const ws3 = workbook.addWorksheet('Rendimiento Alumnos', { views: [{ showGridLines: true }] });
   ws3.columns = [
-    { header: 'Posición', key: 'pos', width: 15 },
-    { header: 'Horario', key: 'hora', width: 20 },
-    { header: 'Total Consultas', key: 'cant', width: 25 }
+    { width: 35 },
+    { width: 15 },
+    { width: 15 },
+    { width: 15 },
+    { width: 15 },
+    { width: 22 },
+    { width: 20 },
+    { width: 15 },
   ];
+  ws3.getRow(1).values = ['Nombre del Alumno', 'Matrícula', 'Área', 'Estado Cuenta', 'Total Asignadas', 'Completadas (Presente)', 'Canceladas (Falta)', '% Efectividad'];
+  ws3.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.emerald));
 
-  stats.horariosMasVisitados.forEach((h, i) => {
-    ws3.addRow({ pos: `#${i + 1}`, hora: h.horario, cant: h.cantidad });
+  const practicantes = rawData.usuarios.filter((usuario: any) => usuario.rol === 'practicante');
+  practicantes.forEach((prac, index) => {
+    const susCitas = rawData.citas.filter((cita: any) => String(cita.practicante_id) === String(prac.id));
+    const completadas = susCitas.filter((cita: any) => cita.estado === 'completada').length;
+    const canceladas = susCitas.filter((cita: any) => cita.estado === 'cancelada').length;
+    const total = susCitas.length;
+    const efectividad = total > 0 ? `${((completadas / total) * 100).toFixed(1)}%` : 'N/A';
+
+    const row = ws3.addRow({
+      nombre: capitalize(prac.nombre),
+      matricula: prac.matricula || 'N/A',
+      area: prac.area?.toUpperCase() || 'N/A',
+      estado: prac.estado?.toUpperCase() || prac.status?.toUpperCase() || 'ACTIVO',
+      total,
+      completadas,
+      canceladas,
+      efectividad,
+    });
+
+    row.eachCell((cell: any) => {
+      cell.border = thinBorder;
+      cell.font = { size: 10 };
+      if (index % 2 === 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
+      }
+      if (cell.value === 'INACTIVO') {
+        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+      }
+    });
   });
 
-  styleHeader(ws3);
-  ws3.eachRow((row, rowNumber) => {
-    if (rowNumber > 1) row.alignment = { horizontal: 'center' };
+  const ws4 = workbook.addWorksheet('Auditoría Personal', { views: [{ showGridLines: true }] });
+  ws4.columns = [
+    { width: 10 },
+    { width: 35 },
+    { width: 30 },
+    { width: 15 },
+    { width: 15 },
+    { width: 15 },
+    { width: 20 },
+  ];
+  ws4.getRow(1).values = ['ID Sistema', 'Nombre', 'Correo Registrado', 'Rol', 'Área', 'Estado', 'Registrado Por'];
+  ws4.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.blueUTC));
+
+  rawData.usuarios.forEach((usuario, index) => {
+    const row = ws4.addRow({
+      id: usuario.id,
+      nombre: capitalize(usuario.nombre),
+      email: usuario.email?.toLowerCase() || 'N/A',
+      rol: usuario.rol?.toUpperCase() || 'N/A',
+      area: usuario.area?.toUpperCase() || 'N/A',
+      estado: usuario.estado?.toUpperCase() || usuario.status?.toUpperCase() || 'ACTIVO',
+      creador: usuario.creado_por_nombre ? capitalize(usuario.creado_por_nombre) : 'Admin Sistema',
+    });
+
+    row.eachCell((cell: any) => {
+      cell.border = thinBorder;
+      cell.font = { size: 10 };
+      if (index % 2 === 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
+      }
+    });
   });
 
-  // ==========================================
-  // GENERAR Y DESCARGAR ARCHIVO
-  // ==========================================
+  const fileName = `Auditoria_${textoFiltro.replace(/\s+/g, '_')}_UTC_${new Date().getTime()}.xlsx`;
   const buffer = await workbook.xlsx.writeBuffer();
   const dataBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(dataBlob, `Reporte_Clinico_UTC_${new Date().getTime()}.xlsx`);
+  saveAs(dataBlob, fileName);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +474,10 @@ async function exportToExcel(stats: ExtendedStats) {
 export default function StatisticsPanel({ area }: StatisticsPanelProps) {
   const { user } = useAuth();
   const [_loading, setLoading] = useState(true);
+  const [filtroArea, setFiltroArea] = useState<FilterArea>(() => normalizeAreaFilter(area));
+  const [rawData, setRawData] = useState<{ citas: any[], usuarios: any[] }>({ citas: [], usuarios: [] });
+
+
   const [stats, setStats] = useState<ExtendedStats>({
     totalCitas: 0,
     citasCompletadas: 0,
@@ -385,6 +493,13 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
   });
 
   const esMaster = user?.rol === 'master';
+  const isGeneralView = filtroArea === 'general';
+  const isNutritionView = isGeneralView || filtroArea === 'nutricion';
+  const isFisioterapiaView = isGeneralView || filtroArea === 'fisioterapia';
+
+  useEffect(() => {
+    setFiltroArea(normalizeAreaFilter(area));
+  }, [area]);
 
   useEffect(() => {
     const fetchAllMetrics = async () => {
@@ -392,17 +507,25 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         setLoading(true);
 
         // 1. Obtención de datos base y analíticos (Consumiendo la nueva tabla metricas)
-        const [citas, historiales, dbStats] = await Promise.all([
+        // 1. Obtención de datos base y analíticos + USUARIOS
+        const [citas, historiales, dbStats, usuarios] = await Promise.all([
           citasAPI.getAll(),
           historialesAPI.getAll(),
-          metricasAPI.getDashboardStats() // NUEVO: Trae datos de la tabla 'metricas'
+          metricasAPI.getDashboardStats(),
+          usuariosAPI.getAll().catch(() => []) // Prevenimos fallos si la API de usuarios falla
         ]);
 
-        // --- LÓGICA DE FILTRADO EXISTENTE ---
-        let filteredCitas = citas;
-        if (area && area !== 'todos' && area !== 'general') {
-          filteredCitas = citas.filter((apt: any) => apt.tipo === area);
-        }
+        // --- LÓGICA DE FILTRADO SEGURO POR ÁREA ---
+        const filterData = (item: any) => {
+          if (filtroArea === 'general') return true;
+          return item.area?.toLowerCase() === filtroArea || item.tipo?.toLowerCase() === filtroArea;
+        };
+
+        const filteredCitas = citas.filter(filterData);
+        const filteredUsuarios = usuarios.filter(filterData);
+        
+        // Guardamos los datos puros para exportarlos luego al Excel
+        setRawData({ citas: filteredCitas, usuarios: filteredUsuarios });
 
         // --- CÁLCULO DE MÉTRICAS CLÁSICAS PARA GRÁFICAS ---
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
@@ -452,7 +575,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
     };
 
     fetchAllMetrics();
-  }, [area, esMaster]);
+  }, [filtroArea, esMaster]);  
 
   const pieData = [
     { name: 'Completadas', value: stats.citasCompletadas, color: '#16a34a' },
@@ -472,22 +595,21 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh', padding: '28px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
-
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}>
           <div>
-            <h1 style={{ color: C.text, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
-              Inteligencia Clínica
-            </h1>
-            <p style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>
-              Panel de métricas operativas · Actualización en tiempo real
-            </p>
+            <h1 style={{ color: C.text, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>Inteligencia Clínica</h1>
+            <p style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>Panel de métricas operativas · Actualización en tiempo real</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
-            <span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>PostgreSQL sync activo</span>
-          </div>
+
+          {esMaster && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+              <button onClick={() => setFiltroArea('general')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${isGeneralView ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Todo</button>
+              <button onClick={() => setFiltroArea('nutricion')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${filtroArea === 'nutricion' ? 'bg-orange-100 text-orange-700 shadow-sm border border-orange-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Nutrición</button>
+              <button onClick={() => setFiltroArea('fisioterapia')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${filtroArea === 'fisioterapia' ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Fisioterapia</button>
+            </div>
+          )}
         </div>
 
         {/* ── Tarjetas KPI superiores ── */}
@@ -556,11 +678,11 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: C.faint, fontSize: 11 }} />
                   <Tooltip contentStyle={tooltipStyle} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 12, color: C.muted }} />
-                  {(area === 'todos' || area === 'general' || area === 'nutricion' || !area) && (
+                  {isNutritionView && (
                     <Line type="monotone" dataKey="nutricion" name="Nutrición"
                       stroke="#d97706" strokeWidth={2.5} dot={{ fill: '#d97706', r: 3 }} activeDot={{ r: 5 }} animationDuration={1500} />
                   )}
-                  {(area === 'todos' || area === 'general' || area === 'fisioterapia' || !area) && (
+                  {isFisioterapiaView && (
                     <Line type="monotone" dataKey="fisioterapia" name="Fisioterapia"
                       stroke={C.accent.indigo.top} strokeWidth={2.5} dot={{ fill: C.accent.indigo.top, r: 3 }} activeDot={{ r: 5 }} animationDuration={1500} />
                   )}
@@ -573,21 +695,20 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
             <div style={{ height: 300, width: '100%' }}>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%" cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100} innerRadius={56}
-                    dataKey="value"
-                    animationDuration={1200}
-                  >
-                    {pieData.map((entry, i) => (
-                      <Cell key={`pie-cell-${i}`} fill={entry.color} opacity={0.88} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} />
-                </PieChart>
+  <Pie
+    data={pieData}
+    cx="50%" cy="50%"
+    outerRadius={100} innerRadius={56}
+    dataKey="value"
+    animationDuration={1200}
+  >
+    {pieData.map((entry, i) => (
+      <Cell key={`pie-cell-${i}`} fill={entry.color} opacity={0.88} />
+    ))}
+  </Pie>
+  <Tooltip contentStyle={tooltipStyle} />
+  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 12, color: C.muted }} />
+</PieChart>
               </ResponsiveContainer>
             </div>
           </SectionCard>
@@ -596,7 +717,8 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         {/* ── Gráfica de Área ── */}
         <SectionCard
           title="Flujo de Consultas Semanal"
-          description={area === 'todos' || area === 'general' ? 'Comparativa Nutrición vs Fisioterapia' : `Rendimiento: ${area}`}
+          description={isGeneralView ? 'Comparativa Nutrición vs Fisioterapia' : `Rendimiento: ${filtroArea}`}
+
           icon={Activity}
           accentColor={C.accent.teal.top}
         >
@@ -618,11 +740,11 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: C.faint, fontSize: 11 }} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 12, color: C.muted }} />
-                {(area === 'todos' || area === 'general' || area === 'nutricion' || !area) && (
+                {isNutritionView && (
                   <Area type="monotone" dataKey="nutricion" name="Nutrición"
                     stroke="#d97706" strokeWidth={2.5} fill="url(#areaNut)" animationDuration={1500} />
                 )}
-                {(area === 'todos' || area === 'general' || area === 'fisioterapia' || !area) && (
+                {isFisioterapiaView && (
                   <Area type="monotone" dataKey="fisioterapia" name="Fisioterapia"
                     stroke={C.accent.indigo.top} strokeWidth={2.5} fill="url(#areaFisio)" animationDuration={1500} />
                 )}
@@ -672,8 +794,8 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
 
         {/* ── Botón Exportar Excel ── */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => exportToExcel(stats)}
+         <button
+  onClick={() => exportToExcel(stats, rawData, filtroArea, esMaster)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -715,13 +837,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
               Data Engine v5.2
             </span>
           </div>
-          <span style={{ width: 1, height: 14, background: C.border, display: 'inline-block' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Activity size={10} style={{ color: C.faint }} />
-            <span style={{ color: C.faint, fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              PostgreSQL Sync Active
-            </span>
-          </div>
+          
           <span style={{ width: 1, height: 14, background: C.border, display: 'inline-block' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Users2 size={10} style={{ color: C.faint }} />
