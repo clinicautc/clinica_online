@@ -66,14 +66,13 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
     }
   }, [currentUser, isAdmin, isRescheduling]);
 
-  const generateAvailableSlots = () => {
+const generateAvailableSlots = () => {
     const slots = [];
-    for (let hour = 0; hour <= 16; hour++) {
+    // Iniciamos el ciclo a las 8 y terminamos a las 17 (5:00 PM)
+    for (let hour = 8; hour <= 17; hour++) {
       const hh = hour.toString().padStart(2, '0');
-      slots.push(`${hh}:00`);
-      slots.push(`${hh}:30`);
+      slots.push(`${hh}:00`); // Solo agregamos la hora en punto
     }
-    slots.push("17:00");
     return slots;
   };
 
