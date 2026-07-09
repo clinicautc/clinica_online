@@ -39,6 +39,34 @@ interface ExtendedStats {
   pacientesNuevosSemana: number;
   velocidadAsignacionDocente: number;
 }
+interface Cita {
+  id: string | number;
+  fecha?: string;
+  date?: string;
+  hora?: string;
+  time?: string;
+  tipo?: 'nutricion' | 'fisioterapia';
+  area?: 'nutricion' | 'fisioterapia';
+  estado: 'completada' | 'programada' | 'cancelada' | 'reagendada' | 're-agendada';
+  paciente_nombre?: string;
+  practicante_id?: string | number;
+  practicante_nombre?: string;
+  docente_nombre?: string;
+  numero_consulta?: string | number;
+  appointment_id?: string | number;
+}
+
+interface Usuario {
+  id: string | number;
+  rol: 'master' | 'docente' | 'practicante' | 'paciente';
+  nombre: string;
+  email?: string;
+  area?: 'nutricion' | 'fisioterapia' | 'general';
+  estado?: 'activo' | 'inactivo';
+  status?: 'activo' | 'inactivo';
+  matricula?: string;
+  creado_por_nombre?: string;
+}
 
 interface StatisticsPanelProps {
   area?: 'nutricion' | 'fisioterapia' | 'todos' | 'general';
@@ -257,215 +285,621 @@ function SectionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Exportar a Excel (Versión Avanzada con Auditoría)
+// Exportar a Excel — Informe Clínico Integral (9 hojas profesionales)
 // ---------------------------------------------------------------------------
 async function exportToExcel(
   stats: ExtendedStats,
-  rawData: { citas: any[]; usuarios: any[] },
+  rawData: { citas: any[]; usuarios: any[]; historiales?: any[] },
   filtroArea: string,
   esMaster: boolean
 ) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Clínica UTC';
+  workbook.creator = 'Sistema Clínico UTC';
   workbook.created = new Date();
+  workbook.modified = new Date();
 
-  const colors = {
-    blueUTC: 'FF1E3A8A',
-    orangeUTC: 'FFEA580C',
-    emerald: 'FF10B981',
-    darkSlate: 'FF334155',
-    zebraGray: 'FFF8FAFC',
-    borderGray: 'FFCBD5E1',
+  // ── Paleta institucional ──────────────────────────────────────────────────
+  const COL = {
+    blueUTC:    'FF1E3A8A',
+    blueLight:  'FF3B82F6',
+    blueTint:   'FFDBEAFE',
+    orange:     'FFEA580C',
+    orangeTint: 'FFFFEDD5',
+    green:      'FF16A34A',
+    greenTint:  'FFF0FDF4',
+    red:        'FFDC2626',
+    redTint:    'FFFEF2F2',
+    purple:     'FF7C3AED',
+    purpleTint: 'FFF5F3FF',
+    indigo:     'FF4F46E5',
+    indigoTint: 'FFEEF2FF',
+    amber:      'FFD97706',
+    amberTint:  'FFFFFBEB',
+    white:      'FFFFFFFF',
+    darkText:   'FF1E293B',
+    mutedText:  'FF64748B',
+    border:     'FFE2E8F0',
+    zebra:      'FFF8FAFC',
+    headerRow:  'FFF1F5F9',
   };
 
-  const thinBorder = {
-    top: { style: 'thin' as const, color: { argb: colors.borderGray } },
-    left: { style: 'thin' as const, color: { argb: colors.borderGray } },
-    bottom: { style: 'thin' as const, color: { argb: colors.borderGray } },
-    right: { style: 'thin' as const, color: { argb: colors.borderGray } },
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const cap = (v?: string) => !v ? '' : v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+  const pct = (n: number, d: number) => d > 0 ? `${((n / d) * 100).toFixed(1)}%` : '0.0%';
+  const dateNow = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+  const timeNow = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+  const normalizedFiltro = filtroArea === 'general' || filtroArea === 'todos' ? 'general' : filtroArea;
+  const textoFiltro      = normalizedFiltro === 'general' ? 'TODAS LAS ÁREAS' : normalizedFiltro.toUpperCase();
+  const scopeLabel       = esMaster ? 'INFORME MASTER' : 'INFORME OPERATIVO';
+
+  // ── Estilos helpers ───────────────────────────────────────────────────────
+  const bd = (argb = COL.border) => ({
+    top:    { style: 'thin' as const, color: { argb } },
+    left:   { style: 'thin' as const, color: { argb } },
+    bottom: { style: 'thin' as const, color: { argb } },
+    right:  { style: 'thin' as const, color: { argb } },
+  });
+  const hCell = (cell: any, bg: string, fg = COL.white, sz = 10) => {
+    cell.font      = { name: 'Arial', size: sz, bold: true, color: { argb: fg } };
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border    = bd();
+  };
+  const dCell = (cell: any, zebra = false, align: 'left' | 'center' | 'right' = 'left') => {
+    cell.font      = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+    cell.alignment = { vertical: 'middle', horizontal: align };
+    cell.border    = bd();
+    if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
   };
 
-  const applyHeaderStyle = (cell: any, bgColor: string) => {
-    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  // ── Pre-cálculos desde rawData ────────────────────────────────────────────
+  const allCitas   = rawData.citas;
+  const byStatus   = (arr: any[], s: string) => arr.filter((c: any) => (c.estado || '').toLowerCase() === s.toLowerCase()).length;
+  // Normalizador seguro
+  const getArea = (c: Cita) => (c.tipo || c.area || '').toLowerCase();
+
+  const citasNut = allCitas.filter((c: any) => getArea(c) === 'nutricion');
+  const citasFisio = allCitas.filter((c: any) => getArea(c) === 'fisioterapia');
+
+  const nutTotal        = citasNut.length;
+  const nutComp         = byStatus(citasNut,   'completada');
+  const nutCanc         = byStatus(citasNut,   'cancelada');
+  const nutProg         = byStatus(citasNut,   'programada');
+  const nutReag         = byStatus(citasNut,   'reagendada') + byStatus(citasNut, 're-agendada');
+  const fisioTotal      = citasFisio.length;
+  const fisioComp       = byStatus(citasFisio, 'completada');
+  const fisioCanc       = byStatus(citasFisio, 'cancelada');
+  const fisioProg       = byStatus(citasFisio, 'programada');
+  const fisioReag       = byStatus(citasFisio, 'reagendada') + byStatus(citasFisio, 're-agendada');
+
+  // Totales globales para Excel (independientes del filtro visual)
+  const exTotal = allCitas.length;
+  const exComp  = byStatus(allCitas, 'completada');
+  const exProg  = byStatus(allCitas, 'programada');
+  const exCanc  = byStatus(allCitas, 'cancelada');
+  const exReag  = byStatus(allCitas, 'reagendada') + byStatus(allCitas, 're-agendada');
+
+  const practicantes  = rawData.usuarios.filter((u: any) => u.rol === 'practicante');
+  const docentes      = rawData.usuarios.filter((u: any) => u.rol === 'docente');
+
+  const timeCount: Record<string, number> = {};
+  allCitas.forEach((c: any) => {
+    const h = (c.hora || c.time || '').substring(0, 5);
+    if (h) timeCount[h] = (timeCount[h] || 0) + 1;
+  });
+  const horariosOrdenados = Object.entries(timeCount)
+    .map(([horario, cantidad]) => ({ horario, cantidad: cantidad as number }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
+  const pracPerf = practicantes.map((p: Usuario) => {
+    const sc  = allCitas.filter((c: any) => String(c.practicante_id) === String(p.id));
+    const comp = byStatus(sc, 'completada');
+    const canc = byStatus(sc, 'cancelada');
+    const prog = byStatus(sc, 'programada');
+    const tot  = sc.length;
+    
+    // Evitar NaN en efectividad si tot es 0
+    const eff  = tot > 0 ? (comp / tot) * 100 : 0; 
+    
+    // Lógica de calificación ajustada (si no tiene citas, N/A directo)
+    const grade = tot === 0 ? 'N/A' : (eff >= 90 ? 'A' : eff >= 75 ? 'B' : eff >= 60 ? 'C' : 'D');
+    
+    return { ...p, tot, comp, canc, prog, eff, grade };
+  }).sort((a: any, b: any) => b.eff - a.eff);
+
+  const statusColorMap: Record<string, { text: string; bg: string }> = {
+    completada:    { text: COL.green,  bg: COL.greenTint  },
+    cancelada:     { text: COL.red,    bg: COL.redTint    },
+    programada:    { text: COL.indigo, bg: COL.indigoTint },
+    reagendada:    { text: COL.purple, bg: COL.purpleTint },
+    're-agendada': { text: COL.purple, bg: COL.purpleTint },
   };
-
-  const capitalize = (value?: string) => {
-    if (!value) return '';
-    return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  const areaColorMap: Record<string, string> = {
+    nutricion: COL.orange, fisioterapia: COL.indigo,
   };
+  const gradeColor: Record<string, string> = {
+    'A': COL.green, 'B': COL.blueLight, 'C': COL.amber, 'D': COL.red, 'N/A': COL.mutedText,
+  };
+  const rolColorMap: Record<string, string> = {
+    master: COL.purple, docente: COL.blueUTC, practicante: COL.green, paciente: COL.amber,
+  };
+  const COLS6 = ['B', 'C', 'D', 'E', 'F', 'G'];
 
-  const normalizedFiltroArea = filtroArea === 'general' || filtroArea === 'todos' ? 'general' : filtroArea;
-  const textoFiltro = normalizedFiltroArea === 'general' ? 'TODAS LAS ÁREAS' : normalizedFiltroArea.toUpperCase();
-  const scopeLabel = esMaster ? 'AUDITORÍA MASTER' : 'AUDITORÍA OPERATIVA';
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 1 — PORTADA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsP = workbook.addWorksheet('📋 Portada', { views: [{ showGridLines: false }] });
+  wsP.columns = [{ width: 4 }, { width: 22 }, { width: 20 }, { width: 20 }, { width: 20 }, { width: 18 }, { width: 4 }];
+  wsP.getRow(1).height = 12;
+  wsP.getRow(2).height = 90;
+  wsP.getRow(3).height = 28;
 
-  const ws1 = workbook.addWorksheet('Resumen de KPIs', { views: [{ showGridLines: false }] });
-  ws1.columns = [
-    { width: 3 },
-    { width: 35 },
-    { width: 18 },
-    { width: 5 },
-    { width: 18 },
-    { width: 15 },
-    { width: 15 },
+  wsP.mergeCells('B2:F2');
+  const pTitle = wsP.getCell('B2');
+  pTitle.value = 'CLÍNICA UTC\nINFORME CLÍNICO INTEGRAL';
+  pTitle.font  = { name: 'Arial', size: 24, bold: true, color: { argb: COL.white } };
+  pTitle.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.blueUTC } };
+  pTitle.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+  wsP.mergeCells('B3:F3');
+  const pSub = wsP.getCell('B3');
+  pSub.value = 'Sistema de Gestión de Academias UTC · 2026';
+  pSub.font  = { name: 'Arial', size: 11, bold: true, color: { argb: COL.white } };
+  pSub.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.orange } };
+  pSub.alignment = { vertical: 'middle', horizontal: 'center' };
+
+  wsP.getRow(4).height = 10;
+  const infoRows: [string, string][] = [
+    ['📅  Fecha de generación:', `${dateNow}  ·  ${timeNow} hrs`],
+    ['🔍  Alcance del informe:', textoFiltro],
+    ['🛡️  Tipo de acceso:', scopeLabel],
+    ['📊  Total de registros:', `${allCitas.length} citas  ·  ${rawData.usuarios.length} usuarios`],
+    ['📁  Hojas incluidas:', '9 hojas: KPIs · Comparativo · Tendencia · Horarios · Estados · Citas · Practicantes · Personal'],
   ];
+  infoRows.forEach(([label, val], i) => {
+    wsP.getRow(5 + i).height = 22;
+    wsP.mergeCells(`B${5 + i}:C${5 + i}`);
+    wsP.mergeCells(`D${5 + i}:F${5 + i}`);
+    const lc = wsP.getCell(`B${5 + i}`);
+    const vc = wsP.getCell(`D${5 + i}`);
+    lc.value = label; vc.value = val;
+    lc.font  = { name: 'Arial', size: 9, bold: true, color: { argb: COL.mutedText } };
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.headerRow } };
+    lc.border = bd(); lc.alignment = { vertical: 'middle', horizontal: 'left' };
+    vc.font  = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+    vc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.white } };
+    vc.border = bd(); vc.alignment = { vertical: 'middle', horizontal: 'left' };
+  });
 
-  ws1.mergeCells('B2:G3');
-  const banner = ws1.getCell('B2');
-  banner.value = `${scopeLabel} - ${textoFiltro}`;
-  banner.font = { name: 'Arial', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
-  banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.blueUTC } };
-  banner.alignment = { vertical: 'middle', horizontal: 'center' };
+  wsP.getRow(11).height = 14;
+  wsP.getRow(12).height = 22;
+  wsP.mergeCells('B12:F12');
+  hCell(wsP.getCell('B12'), COL.blueUTC, COL.white, 10);
+  wsP.getCell('B12').value = 'ÍNDICE DE CONTENIDO';
 
-  ws1.mergeCells('B6:C6');
-  ws1.getCell('B6').value = 'MÉTRICAS CLAVE';
-  applyHeaderStyle(ws1.getCell('B6'), colors.darkSlate);
-
-  const kpiData = [
-    ['Total Citas', stats.totalCitas],
-    ['Citas Completadas', stats.citasCompletadas],
-    ['Citas Canceladas', stats.citasCanceladas],
-    ['Citas Programadas', stats.citasProgramadas],
-    ['Promedio de Consulta (min)', stats.tiempoPromedioConsulta],
-    ['Nuevos Expedientes (7 días)', stats.pacientesNuevosSemana],
+  const toc = [
+    ['1', '📋 Portada',                  'Esta hoja: metadatos del informe'],
+    ['2', '📊 Resumen Ejecutivo',         'KPIs globales, tasas y volumen operativo'],
+    ['3', '🔀 Análisis Comparativo',      'Nutrición vs Fisioterapia en paralelo'],
+    ['4', '📈 Tendencia Semanal',         'Flujo de consultas por día de la semana'],
+    ['5', '⏰ Franjas Horarias',          'Top de horarios con mayor demanda y visualización'],
+    ['6', '🔵 Distribución de Estados',  'Completadas / Canceladas / Programadas / Re-agendadas'],
+    ['7', '📁 Bitácora de Citas',        'Registro completo con filtros automáticos'],
+    ['8', '🎓 Rendimiento Practicantes', 'Efectividad, ranking, calificación A-D por alumno'],
+    ['9', '👥 Directorio Personal',      'Directorio ordenado por rol con datos completos'],
   ];
+  toc.forEach(([num, name, desc], i) => {
+    wsP.getRow(13 + i).height = 17;
+    wsP.mergeCells(`D${13 + i}:F${13 + i}`);
+    const nc = wsP.getCell(`B${13 + i}`);
+    const nm = wsP.getCell(`C${13 + i}`);
+    const dc = wsP.getCell(`D${13 + i}`);
+    nc.value = num; nm.value = name; dc.value = desc;
+    [nc, nm, dc].forEach((c, ci) => {
+      c.font   = { name: 'Arial', size: 9, color: { argb: ci === 0 ? COL.blueUTC : COL.darkText }, bold: ci === 0 };
+      c.border = bd();
+      c.alignment = { vertical: 'middle', horizontal: ci === 0 ? 'center' : 'left' };
+      if (i % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
+    });
+  });
 
-  kpiData.forEach((row, index) => {
-    const labelCell = ws1.getCell(`B${7 + index}`);
-    const valueCell = ws1.getCell(`C${7 + index}`);
-    labelCell.value = row[0];
-    valueCell.value = row[1];
-    labelCell.border = thinBorder;
-    valueCell.border = thinBorder;
-    valueCell.alignment = { horizontal: 'center' };
-    if (index % 2 === 0) {
-      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
-      valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 2 — RESUMEN EJECUTIVO
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsK = workbook.addWorksheet('📊 Resumen Ejecutivo', { views: [{ showGridLines: false }] });
+  wsK.columns = [{ width: 4 }, { width: 38 }, { width: 16 }, { width: 16 }, { width: 4 }];
+  wsK.getRow(2).height = 34;
+  wsK.mergeCells('B2:D2');
+  hCell(wsK.getCell('B2'), COL.blueUTC, COL.white, 13);
+  wsK.getCell('B2').value = `RESUMEN EJECUTIVO  ·  ${textoFiltro}`;
+  wsK.getRow(3).height = 16;
+  wsK.mergeCells('B3:D3');
+  wsK.getCell('B3').value = `Generado: ${dateNow}  ·  ${timeNow}`;
+  wsK.getCell('B3').font  = { name: 'Arial', size: 9, color: { argb: COL.mutedText } };
+  wsK.getCell('B3').alignment = { horizontal: 'center', vertical: 'middle' };
+  wsK.getCell('B3').fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.indigoTint } };
+
+  wsK.getRow(5).height = 20;
+  hCell(wsK.getCell('B5'), COL.darkText, COL.white, 9); wsK.getCell('B5').value = 'INDICADOR';
+  hCell(wsK.getCell('C5'), COL.darkText, COL.white, 9); wsK.getCell('C5').value = 'VALOR';
+  hCell(wsK.getCell('D5'), COL.darkText, COL.white, 9); wsK.getCell('D5').value = '% DEL TOTAL';
+
+  const kpiRows: [string, number | string, string, string][] = [
+    ['Total de Citas (ambas áreas)',        exTotal,                        '100%',                      COL.blueUTC ],
+    ['Citas Completadas',                   exComp,                         pct(exComp, exTotal),        COL.green   ],
+    ['Citas Programadas (pendientes)',       exProg,                         pct(exProg, exTotal),        COL.indigo  ],
+    ['Citas Canceladas',                    exCanc,                         pct(exCanc, exTotal),        COL.red     ],
+    ['Citas Re-agendadas',                  exReag,                         pct(exReag, exTotal),        COL.purple  ],
+    ['Nuevos Expedientes (últimos 7 días)', stats.pacientesNuevosSemana,    '—',                                           COL.amber   ],
+    ['Tiempo Promedio de Consulta',         `${stats.tiempoPromedioConsulta} min`, '—',                                    COL.blueLight],
+    ['Practicantes activos',                practicantes.length,            '—',                                           COL.green   ],
+    ['Docentes registrados',                docentes.length,                '—',                                           COL.blueUTC ],
+    ['Total de usuarios en sistema',        rawData.usuarios.length,        '—',                                           COL.darkText],
+  ];
+  kpiRows.forEach(([label, val, pctVal, accent], i) => {
+    wsK.getRow(6 + i).height = 20;
+    const lc = wsK.getCell(`B${6 + i}`);
+    const vc = wsK.getCell(`C${6 + i}`);
+    const pc = wsK.getCell(`D${6 + i}`);
+    lc.value = label; vc.value = val; pc.value = pctVal;
+    lc.font  = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+    lc.border = { ...bd(), left: { style: 'medium', color: { argb: accent } } };
+    lc.alignment = { vertical: 'middle', horizontal: 'left' };
+    vc.font  = { name: 'Arial', size: 12, bold: true, color: { argb: accent } };
+    vc.border = bd(); vc.alignment = { vertical: 'middle', horizontal: 'center' };
+    pc.font  = { name: 'Arial', size: 9, color: { argb: COL.mutedText } };
+    pc.border = bd(); pc.alignment = { vertical: 'middle', horizontal: 'center' };
+    if (i % 2 === 0) {
+      [lc, vc, pc].forEach(c => c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } });
     }
   });
 
-  const ws2 = workbook.addWorksheet('Bitácora de Citas', { views: [{ showGridLines: true }] });
-  ws2.columns = [
-    { width: 8 },
-    { width: 15 },
-    { width: 12 },
-    { width: 35 },
-    { width: 15 },
-    { width: 30 },
-    { width: 15 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 3 — ANÁLISIS COMPARATIVO
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsC = workbook.addWorksheet('🔀 Análisis Comparativo', { views: [{ showGridLines: false }] });
+  wsC.columns = [{ width: 4 }, { width: 28 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 12 }, { width: 14 }, { width: 4 }];
+  wsC.getRow(2).height = 34;
+  wsC.mergeCells('B2:G2');
+  hCell(wsC.getCell('B2'), COL.blueUTC, COL.white, 13);
+  wsC.getCell('B2').value = 'ANÁLISIS COMPARATIVO  ·  NUTRICIÓN vs FISIOTERAPIA';
+
+  wsC.getRow(4).height = 22;
+  ['INDICADOR', 'NUTRICIÓN', '%', 'FISIOTERAPIA', '%', 'TOTAL'].forEach((h, i) => {
+    hCell(wsC.getCell(`${COLS6[i]}4`), [COL.darkText,COL.orange,COL.orange,COL.indigo,COL.indigo,COL.blueUTC][i], COL.white, 10);
+    wsC.getCell(`${COLS6[i]}4`).value = h;
+  });
+
+  const compRows: [string, number, number, number][] = [
+    ['Total de Citas',     nutTotal,  fisioTotal,  nutTotal + fisioTotal],
+    ['Citas Completadas',  nutComp,   fisioComp,   nutComp  + fisioComp ],
+    ['Citas Canceladas',   nutCanc,   fisioCanc,   nutCanc  + fisioCanc ],
+    ['Citas Programadas',  nutProg,   fisioProg,   nutProg  + fisioProg ],
+    ['Citas Re-agendadas', nutReag,   fisioReag,   nutReag  + fisioReag ],
   ];
-  ws2.getRow(1).values = ['ID', 'Fecha', 'Hora', 'Paciente', 'Área', 'Practicante', 'Estado'];
-  ws2.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.orangeUTC));
-
-  rawData.citas.forEach((cita, index) => {
-    const row = ws2.addRow({
-      id: cita.id,
-      fecha: cita.fecha?.split('T')[0] || 'N/A',
-      hora: cita.hora?.substring(0, 5) || 'N/A',
-      paciente: capitalize(cita.paciente_nombre),
-      area: cita.tipo?.toUpperCase() || 'N/A',
-      practicante: capitalize(cita.practicante_nombre) || 'Sin asignar',
-      estado: cita.estado?.toUpperCase() || 'N/A',
-    });
-
-    row.eachCell((cell: any) => {
-      cell.border = thinBorder;
-      cell.font = { size: 10 };
-      if (index % 2 === 0) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
-      }
-      if (cell.value === 'COMPLETADA') {
-        cell.font = { ...cell.font, color: { argb: 'FF16A34A' }, bold: true };
-      }
-      if (cell.value === 'CANCELADA') {
-        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
-      }
+  compRows.forEach(([label, nv, fv, tot], i) => {
+    wsC.getRow(5 + i).height = 20;
+    const vals = [label, nv, pct(nv, tot), fv, pct(fv, tot), tot];
+    const colors = [COL.darkText, COL.orange, COL.mutedText, COL.indigo, COL.mutedText, COL.blueUTC];
+    const bolds  = [false, true, false, true, false, true];
+    vals.forEach((v, ci) => {
+      const cell = wsC.getCell(`${COLS6[ci]}${5 + i}`);
+      cell.value = v;
+      cell.font  = { name: 'Arial', size: 10, bold: bolds[ci], color: { argb: colors[ci] } };
+      cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 ? 'left' : 'center' };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
     });
   });
 
-  const ws3 = workbook.addWorksheet('Rendimiento Alumnos', { views: [{ showGridLines: true }] });
-  ws3.columns = [
-    { width: 35 },
-    { width: 15 },
-    { width: 15 },
-    { width: 15 },
-    { width: 15 },
-    { width: 22 },
-    { width: 20 },
-    { width: 15 },
+  wsC.getRow(10).height = 22;
+  wsC.mergeCells('B10:G10');
+  hCell(wsC.getCell('B10'), COL.darkText, COL.white, 10);
+  wsC.getCell('B10').value = 'TASAS DE RENDIMIENTO';
+
+  const rateRows: [string, string, string][] = [
+    ['Tasa de Completación', pct(nutComp, nutTotal), pct(fisioComp, fisioTotal)],
+    ['Tasa de Cancelación',  pct(nutCanc, nutTotal), pct(fisioCanc, fisioTotal)],
+    ['Tasa de Pendientes',   pct(nutProg, nutTotal), pct(fisioProg, fisioTotal)],
   ];
-  ws3.getRow(1).values = ['Nombre del Alumno', 'Matrícula', 'Área', 'Estado Cuenta', 'Total Asignadas', 'Completadas (Presente)', 'Canceladas (Falta)', '% Efectividad'];
-  ws3.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.emerald));
-
-  const practicantes = rawData.usuarios.filter((usuario: any) => usuario.rol === 'practicante');
-  practicantes.forEach((prac, index) => {
-    const susCitas = rawData.citas.filter((cita: any) => String(cita.practicante_id) === String(prac.id));
-    const completadas = susCitas.filter((cita: any) => cita.estado === 'completada').length;
-    const canceladas = susCitas.filter((cita: any) => cita.estado === 'cancelada').length;
-    const total = susCitas.length;
-    const efectividad = total > 0 ? `${((completadas / total) * 100).toFixed(1)}%` : 'N/A';
-
-    const row = ws3.addRow({
-      nombre: capitalize(prac.nombre),
-      matricula: prac.matricula || 'N/A',
-      area: prac.area?.toUpperCase() || 'N/A',
-      estado: prac.estado?.toUpperCase() || prac.status?.toUpperCase() || 'ACTIVO',
-      total,
-      completadas,
-      canceladas,
-      efectividad,
-    });
-
-    row.eachCell((cell: any) => {
-      cell.border = thinBorder;
-      cell.font = { size: 10 };
-      if (index % 2 === 0) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
-      }
-      if (cell.value === 'INACTIVO') {
-        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
-      }
+  rateRows.forEach(([label, nR, fR], i) => {
+    wsC.getRow(11 + i).height = 18;
+    wsC.mergeCells(`C${11+i}:D${11+i}`);
+    wsC.mergeCells(`E${11+i}:F${11+i}`);
+    const lc = wsC.getCell(`B${11+i}`); const nc = wsC.getCell(`C${11+i}`);
+    const fc = wsC.getCell(`E${11+i}`); const tc = wsC.getCell(`G${11+i}`);
+    lc.value = label; nc.value = nR; fc.value = fR; tc.value = '—';
+    [[lc,COL.darkText,false],[nc,COL.orange,true],[fc,COL.indigo,true],[tc,COL.mutedText,false]].forEach(([c,color,bold]: any) => {
+      c.font   = { name: 'Arial', size: 10, bold, color: { argb: color } };
+      c.border = bd();
+      c.alignment = { vertical: 'middle', horizontal: c === lc ? 'left' : 'center' };
+      if (i % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
     });
   });
 
-  const ws4 = workbook.addWorksheet('Auditoría Personal', { views: [{ showGridLines: true }] });
-  ws4.columns = [
-    { width: 10 },
-    { width: 35 },
-    { width: 30 },
-    { width: 15 },
-    { width: 15 },
-    { width: 15 },
-    { width: 20 },
-  ];
-  ws4.getRow(1).values = ['ID Sistema', 'Nombre', 'Correo Registrado', 'Rol', 'Área', 'Estado', 'Registrado Por'];
-  ws4.getRow(1).eachCell((cell: any) => applyHeaderStyle(cell, colors.blueUTC));
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 4 — TENDENCIA SEMANAL
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsT = workbook.addWorksheet('📈 Tendencia Semanal', { views: [{ showGridLines: true }] });
+  wsT.columns = [{ width: 4 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 4 }];
+  wsT.getRow(2).height = 34;
+  wsT.mergeCells('B2:G2');
+  hCell(wsT.getCell('B2'), COL.blueUTC, COL.white, 13);
+  wsT.getCell('B2').value = 'TENDENCIA SEMANAL — FLUJO DE CONSULTAS POR DÍA';
 
-  rawData.usuarios.forEach((usuario, index) => {
-    const row = ws4.addRow({
-      id: usuario.id,
-      nombre: capitalize(usuario.nombre),
-      email: usuario.email?.toLowerCase() || 'N/A',
-      rol: usuario.rol?.toUpperCase() || 'N/A',
-      area: usuario.area?.toUpperCase() || 'N/A',
-      estado: usuario.estado?.toUpperCase() || usuario.status?.toUpperCase() || 'ACTIVO',
-      creador: usuario.creado_por_nombre ? capitalize(usuario.creado_por_nombre) : 'Admin Sistema',
+  wsT.getRow(4).height = 22;
+  ['DÍA', 'NUTRICIÓN', 'FISIOTERAPIA', 'TOTAL', '% NUT.', '% FISIO.'].forEach((h, i) => {
+    hCell(wsT.getCell(`${COLS6[i]}4`), [COL.darkText,COL.orange,COL.indigo,COL.blueUTC,COL.orange,COL.indigo][i], COL.white, 10);
+    wsT.getCell(`${COLS6[i]}4`).value = h;
+  });
+
+  let sumNut = 0, sumFisio = 0;
+  
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+  const excelDayData = dayNames.map((name) => ({ name, nutricion: 0, fisioterapia: 0 }));
+
+  allCitas.forEach((c: any) => {
+    const fechaStr = c.fecha || c.date;
+    if (!fechaStr) return;
+    const [year, month, day] = fechaStr.split('T')[0].split('-');
+    const dateObj = new Date(Number(year), Number(month) - 1, Number(day));
+    const dayIdx = getDay(dateObj);
+    
+    if (!isNaN(dayIdx) && dayIdx >= 0 && dayIdx <= 6) {
+      const area = (c.tipo || c.area || '').toLowerCase();
+      if (area === 'nutricion') excelDayData[dayIdx].nutricion++;
+      if (area === 'fisioterapia') excelDayData[dayIdx].fisioterapia++;
+    }
+  });
+
+  excelDayData.forEach((day, i) => {
+    const tot = day.nutricion + day.fisioterapia;
+    sumNut += day.nutricion; sumFisio += day.fisioterapia;
+    wsT.getRow(5 + i).height = 18;
+    [day.name, day.nutricion, day.fisioterapia, tot, pct(day.nutricion, tot), pct(day.fisioterapia, tot)].forEach((v, ci) => {
+      const cell = wsT.getCell(`${COLS6[ci]}${5 + i}`);
+      cell.value = v;
+      cell.font  = { name: 'Arial', size: 10, bold: ci === 0 || ci === 3, color: { argb: [COL.darkText,COL.orange,COL.indigo,COL.blueUTC,COL.mutedText,COL.mutedText][ci] } };
+      cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 ? 'left' : 'center' };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
     });
+  });
+  const tRow = 5 + excelDayData.length;
+  wsT.getRow(tRow).height = 22;
+  const sumTot = sumNut + sumFisio;
+  ['TOTAL SEMANA', sumNut, sumFisio, sumTot, pct(sumNut, sumTot), pct(sumFisio, sumTot)].forEach((v, ci) => {
+    const cell = wsT.getCell(`${COLS6[ci]}${tRow}`);
+    cell.value = v;
+    cell.font  = { name: 'Arial', size: 10, bold: true, color: { argb: COL.white } };
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: [COL.darkText,COL.orange,COL.indigo,COL.blueUTC,COL.orange,COL.indigo][ci] } };
+    cell.border = bd(COL.white);
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
 
-    row.eachCell((cell: any) => {
-      cell.border = thinBorder;
-      cell.font = { size: 10 };
-      if (index % 2 === 0) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.zebraGray } };
-      }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 5 — FRANJAS HORARIAS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsH = workbook.addWorksheet('⏰ Franjas Horarias', { views: [{ showGridLines: false }] });
+  wsH.columns = [{ width: 4 }, { width: 8 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 32 }, { width: 4 }];
+  wsH.getRow(2).height = 34;
+  wsH.mergeCells('B2:F2');
+  hCell(wsH.getCell('B2'), COL.blueUTC, COL.white, 13);
+  wsH.getCell('B2').value = 'ANÁLISIS DE FRANJAS HORARIAS — DEMANDA POR TURNO';
+
+  wsH.getRow(4).height = 22;
+  ['#', 'HORARIO', 'CONSULTAS', '% DEL TOTAL', 'VISUALIZACIÓN DE DEMANDA'].forEach((h, i) => {
+    hCell(wsH.getCell(`${'BCDEF'[i]}4`), COL.blueUTC, COL.white, 10);
+    wsH.getCell(`${'BCDEF'[i]}4`).value = h;
+  });
+
+  const horasTotal = horariosOrdenados.reduce((s, h) => s + h.cantidad, 0);
+  horariosOrdenados.slice(0, 15).forEach((item, i) => {
+    wsH.getRow(5 + i).height = 18;
+    const pctVal = horasTotal > 0 ? (item.cantidad / horasTotal) * 100 : 0;
+    const filled = Math.round(pctVal / 3.5);
+    const bar = '█'.repeat(filled) + '░'.repeat(Math.max(0, 25 - filled));
+    const accent = i < 3 ? COL.orange : i < 7 ? COL.amber : COL.mutedText;
+    [i + 1, item.horario, item.cantidad, `${pctVal.toFixed(1)}%`, bar].forEach((v, ci) => {
+      const cell = wsH.getCell(`${'BCDEF'[ci]}${5 + i}`);
+      cell.value = v;
+      cell.font  = { name: ci === 4 ? 'Courier New' : 'Arial', size: ci === 4 ? 8 : 10, bold: ci === 0 || ci === 2, color: { argb: ci === 4 ? accent : COL.darkText } };
+      cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 || ci === 1 ? 'center' : ci === 4 ? 'left' : 'center' };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
     });
   });
 
-  const fileName = `Auditoria_${textoFiltro.replace(/\s+/g, '_')}_UTC_${new Date().getTime()}.xlsx`;
-  const buffer = await workbook.xlsx.writeBuffer();
-  const dataBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(dataBlob, fileName);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 6 — DISTRIBUCIÓN DE ESTADOS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsE = workbook.addWorksheet('🔵 Distribución de Estados', { views: [{ showGridLines: false }] });
+  wsE.columns = [{ width: 4 }, { width: 22 }, { width: 14 }, { width: 14 }, { width: 12 }, { width: 38 }, { width: 4 }];
+  wsE.getRow(2).height = 34;
+  wsE.mergeCells('B2:F2');
+  hCell(wsE.getCell('B2'), COL.blueUTC, COL.white, 13);
+  wsE.getCell('B2').value = 'DISTRIBUCIÓN DE ESTADOS DE CITAS';
+
+  wsE.getRow(4).height = 22;
+  ['ESTADO', 'CANTIDAD', '% TOTAL', 'META', 'DESCRIPCIÓN'].forEach((h, i) => {
+    hCell(wsE.getCell(`${'BCDEF'[i]}4`), COL.darkText, COL.white, 10);
+    wsE.getCell(`${'BCDEF'[i]}4`).value = h;
+  });
+
+  [
+    { estado: 'Completada',  count: exComp, col: COL.green,  bg: COL.greenTint,  meta: '≥ 80%', desc: 'Cita atendida y finalizada exitosamente' },
+    { estado: 'Programada',  count: exProg, col: COL.indigo, bg: COL.indigoTint, meta: '< 25%', desc: 'Cita agendada, pendiente de atención' },
+    { estado: 'Cancelada',   count: exCanc, col: COL.red,    bg: COL.redTint,    meta: '< 10%', desc: 'Cita no realizada por cualquier motivo' },
+    { estado: 'Re-agendada', count: exReag, col: COL.purple, bg: COL.purpleTint, meta: '< 15%', desc: 'Cita reprogramada a nueva fecha/hora' },
+  ].forEach((item, i) => {
+    wsE.getRow(5 + i).height = 20;
+    [item.estado, item.count, pct(item.count, exTotal), item.meta, item.desc].forEach((v, ci) => {
+      const cell = wsE.getCell(`${'BCDEF'[ci]}${5 + i}`);
+      cell.value = v;
+      cell.font  = { name: 'Arial', size: 10, bold: ci === 0, color: { argb: ci === 0 ? item.col : COL.darkText } };
+      cell.border = { ...bd(), left: ci === 0 ? { style: 'thick' as const, color: { argb: item.col } } : bd().left };
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 || ci === 4 ? 'left' : 'center' };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 7 — BITÁCORA COMPLETA DE CITAS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsCitas = workbook.addWorksheet('📁 Bitácora de Citas', {
+    views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+  });
+  wsCitas.columns = [
+    { width: 8 }, { width: 13 }, { width: 8 }, { width: 28 }, { width: 16 },
+    { width: 26 }, { width: 26 }, { width: 14 }, { width: 10 },
+  ];
+  wsCitas.getRow(1).height = 20;
+  ['ID', 'FECHA', 'HORA', 'PACIENTE', 'ÁREA', 'PRACTICANTE', 'DOCENTE / SUPERVISOR', 'ESTADO', 'CONSULTA #'].forEach((h, i) => {
+    hCell(wsCitas.getRow(1).getCell(i + 1), COL.blueUTC);
+    wsCitas.getRow(1).getCell(i + 1).value = h;
+  });
+
+  allCitas.forEach((cita: any, i: number) => {
+    wsCitas.getRow(i + 2).height = 15;
+    const estado = (cita.estado || '').toLowerCase();
+    const area   = (cita.tipo || cita.area || '').toLowerCase();
+    const sc = statusColorMap[estado] || { text: COL.darkText, bg: COL.white };
+    const ac = areaColorMap[area] || COL.mutedText;
+    [
+      cita.id,
+      cita.fecha?.split('T')[0] || 'N/A',
+      (cita.hora || cita.time || 'N/A').substring(0, 5),
+      cap(cita.paciente_nombre),
+      area.toUpperCase() || 'N/A',
+      cap(cita.practicante_nombre) || 'Sin asignar',
+      cap(cita.docente_nombre) || '—',
+      estado.toUpperCase() || 'N/A',
+      cita.numero_consulta || cita.appointment_id || '—',
+    ].forEach((v, ci) => {
+      const cell = wsCitas.getRow(i + 2).getCell(ci + 1);
+      cell.value = v;
+      cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 || ci === 8 ? 'center' : 'left' };
+      cell.font = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+      if (i % 2 === 0 && ci !== 4 && ci !== 7) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
+      if (ci === 4) { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: ac } }; }
+      if (ci === 7) { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: sc.text } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sc.bg } }; }
+    });
+  });
+
+  const citasTR = allCitas.length + 2;
+  wsCitas.getRow(citasTR).height = 18;
+  [`TOTAL: ${allCitas.length} registros`, '', '', '', `NUT: ${nutTotal}  ·  FISIO: ${fisioTotal}`, '', '', '', ''].forEach((v, ci) => {
+    const cell = wsCitas.getRow(citasTR).getCell(ci + 1);
+    cell.value = v; cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: COL.white } };
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.blueUTC } };
+    cell.border = bd(COL.white); cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+  wsCitas.autoFilter = { from: { row: 1, column: 1 }, to: { row: allCitas.length + 1, column: 9 } };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 8 — RENDIMIENTO PRACTICANTES
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsRend = workbook.addWorksheet('🎓 Rendimiento Practicantes', {
+    views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+  });
+  wsRend.columns = [
+    { width: 6 }, { width: 30 }, { width: 14 }, { width: 16 }, { width: 12 },
+    { width: 12 }, { width: 14 }, { width: 13 }, { width: 13 }, { width: 14 }, { width: 10 },
+  ];
+  wsRend.getRow(1).height = 20;
+  ['RANK', 'NOMBRE', 'MATRÍCULA', 'ÁREA', 'ESTADO', 'TOTAL', 'COMPLETADAS', 'CANCELADAS', 'PROGRAMADAS', 'EFECTIVIDAD', 'CALIF.'].forEach((h, i) => {
+    hCell(wsRend.getRow(1).getCell(i + 1), COL.green);
+    wsRend.getRow(1).getCell(i + 1).value = h;
+  });
+
+  pracPerf.forEach((p: any, i: number) => {
+    wsRend.getRow(i + 2).height = 15;
+    const ac  = areaColorMap[(p.area || '').toLowerCase()] || COL.mutedText;
+    const gc  = gradeColor[p.grade] || COL.mutedText;
+    [i + 1, cap(p.nombre), p.matricula || 'N/A', (p.area || 'N/A').toUpperCase(),
+     (p.estado || p.status || 'ACTIVO').toUpperCase(),
+     p.tot, p.comp, p.canc, p.prog,
+     p.tot > 0 ? `${p.eff.toFixed(1)}%` : 'N/A', p.grade,
+    ].forEach((v, ci) => {
+      const cell = wsRend.getRow(i + 2).getCell(ci + 1);
+      cell.value = v; cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 1 ? 'left' : 'center' };
+      cell.font = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
+      if (ci === 0)  { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: i < 3 ? COL.orange : COL.mutedText } }; }
+      if (ci === 3)  { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: ac } }; }
+      if (ci === 9)  { cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: gc } }; }
+      if (ci === 10) { cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: COL.white } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: gc } }; }
+      if (ci === 4 && v === 'INACTIVO') { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: COL.red } }; }
+    });
+  });
+
+  if (pracPerf.length > 0) {
+    const perfTR  = pracPerf.length + 2;
+    wsRend.getRow(perfTR).height = 18;
+    const totComp = pracPerf.reduce((s: number, p: any) => s + p.comp, 0);
+    const totCanc = pracPerf.reduce((s: number, p: any) => s + p.canc, 0);
+    const totAll  = pracPerf.reduce((s: number, p: any) => s + p.tot, 0);
+    const active  = pracPerf.filter((p: any) => p.tot > 0);
+    const avgEff  = active.length > 0 ? active.reduce((s: number, p: any) => s + p.eff, 0) / active.length : 0;
+    [`${pracPerf.length} practicantes`, '', '', '', '', totAll, totComp, totCanc, '', `${avgEff.toFixed(1)}% prom.`, ''].forEach((v, ci) => {
+      const cell = wsRend.getRow(perfTR).getCell(ci + 1);
+      cell.value = v; cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: COL.white } };
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.green } };
+      cell.border = bd(COL.white); cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    wsRend.autoFilter = { from: { row: 1, column: 1 }, to: { row: pracPerf.length + 1, column: 11 } };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOJA 9 — DIRECTORIO PERSONAL
+  // ═══════════════════════════════════════════════════════════════════════════
+  const wsDir = workbook.addWorksheet('👥 Directorio Personal', {
+    views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+  });
+  wsDir.columns = [
+    { width: 10 }, { width: 30 }, { width: 30 }, { width: 16 },
+    { width: 16 }, { width: 14 }, { width: 16 }, { width: 24 },
+  ];
+  wsDir.getRow(1).height = 20;
+  ['ID SISTEMA', 'NOMBRE COMPLETO', 'CORREO ELECTRÓNICO', 'ROL', 'ÁREA', 'ESTADO', 'MATRÍCULA', 'REGISTRADO POR'].forEach((h, i) => {
+    hCell(wsDir.getRow(1).getCell(i + 1), COL.blueUTC);
+    wsDir.getRow(1).getCell(i + 1).value = h;
+  });
+
+  const usuariosOrdenados = [...rawData.usuarios].sort((a: any, b: any) => {
+    const ro: Record<string, number> = { master: 0, docente: 1, practicante: 2, paciente: 3 };
+    return (ro[a.rol] ?? 9) - (ro[b.rol] ?? 9);
+  });
+
+  usuariosOrdenados.forEach((u: any, i: number) => {
+    wsDir.getRow(i + 2).height = 15;
+    const rol = (u.rol || '').toLowerCase();
+    const rc  = rolColorMap[rol] || COL.mutedText;
+    [u.id, cap(u.nombre), (u.email || 'N/A').toLowerCase(),
+     rol.toUpperCase(), (u.area || 'GENERAL').toUpperCase(),
+     (u.estado || u.status || 'ACTIVO').toUpperCase(),
+     u.matricula || '—', cap(u.creado_por_nombre) || 'Admin Sistema',
+    ].forEach((v, ci) => {
+      const cell = wsDir.getRow(i + 2).getCell(ci + 1);
+      cell.value = v; cell.border = bd();
+      cell.alignment = { vertical: 'middle', horizontal: ci === 0 ? 'center' : 'left' };
+      cell.font = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
+      if (i % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
+      if (ci === 3) { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: rc } }; }
+      if (ci === 4 && v !== 'GENERAL') { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: areaColorMap[(u.area || '').toLowerCase()] || COL.mutedText } }; }
+      if (ci === 5 && v === 'INACTIVO') { cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: COL.red } }; }
+    });
+  });
+  wsDir.autoFilter = { from: { row: 1, column: 1 }, to: { row: usuariosOrdenados.length + 1, column: 8 } };
+
+  // ── Generar y descargar archivo ───────────────────────────────────────────
+  const dateTag  = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const fileName = `InformeClinico_UTC_${textoFiltro.replace(/\s+/g, '_')}_${dateTag}.xlsx`;
+  const buffer   = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,8 +909,9 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
   const { user } = useAuth();
   const [_loading, setLoading] = useState(true);
   const [filtroArea, setFiltroArea] = useState<FilterArea>(() => normalizeAreaFilter(area));
-  const [rawData, setRawData] = useState<{ citas: any[], usuarios: any[] }>({ citas: [], usuarios: [] });
-
+  const [rawData, setRawData] = useState<{ citas: Cita[], usuarios: Usuario[], historiales: any[] }>({ citas: [], usuarios: [], historiales: [] });
+  const [globalMetrics, setGlobalMetrics] = useState({ promedioConsulta: 0, tasaAbandono: 0, velocidadAsignacionDocente: 0 });
+  const [isExporting, setIsExporting] = useState(false);
 
   const [stats, setStats] = useState<ExtendedStats>({
     totalCitas: 0,
@@ -501,81 +936,86 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
     setFiltroArea(normalizeAreaFilter(area));
   }, [area]);
 
+  // Carga inicial única — descarga data pesada una sola vez
   useEffect(() => {
-    const fetchAllMetrics = async () => {
+    const fetchRawData = async () => {
       try {
         setLoading(true);
-
-        // 1. Obtención de datos base y analíticos (Consumiendo la nueva tabla metricas)
-        // 1. Obtención de datos base y analíticos + USUARIOS
         const [citas, historiales, dbStats, usuarios] = await Promise.all([
           citasAPI.getAll(),
           historialesAPI.getAll(),
-          metricasAPI.getDashboardStats(),
-          usuariosAPI.getAll().catch(() => []) // Prevenimos fallos si la API de usuarios falla
+          metricasAPI.getDashboardStats({}),
+          usuariosAPI.getAll().catch(() => []),
         ]);
-
-        // --- LÓGICA DE FILTRADO SEGURO POR ÁREA ---
-        const filterData = (item: any) => {
-          if (filtroArea === 'general') return true;
-          return item.area?.toLowerCase() === filtroArea || item.tipo?.toLowerCase() === filtroArea;
-        };
-
-        const filteredCitas = citas.filter(filterData);
-        const filteredUsuarios = usuarios.filter(filterData);
-        
-        // Guardamos los datos puros para exportarlos luego al Excel
-        setRawData({ citas: filteredCitas, usuarios: filteredUsuarios });
-
-        // --- CÁLCULO DE MÉTRICAS CLÁSICAS PARA GRÁFICAS ---
-        const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-        const dayData = dayNames.map((name) => ({ name, nutricion: 0, fisioterapia: 0 }));
-        const timeCount: Record<string, number> = {};
-
-        citas.forEach((apt: any) => {
-          const fechaStr = apt.fecha || apt.date;
-          if (!fechaStr) return;
-          const dayIdx = getDay(parseISO(fechaStr));
-          if (isNaN(dayIdx) || dayIdx < 0 || dayIdx > 6) return;
-          if (apt.tipo === 'nutricion') dayData[dayIdx].nutricion++;
-          else if (apt.tipo === 'fisioterapia') dayData[dayIdx].fisioterapia++;
-
-          if (filteredCitas.includes(apt)) {
-            const horaKey = (apt.hora || apt.time || '').substring(0, 5);
-            timeCount[horaKey] = (timeCount[horaKey] || 0) + 1;
-          }
-        });
-
-        // --- INTEGRACIÓN DE DATOS DESDE LA TABLA 'METRICAS' ---
-        setStats({
-          totalCitas: dbStats.totalCitas,
-          citasCompletadas: dbStats.citasCompletadas,
-          citasCanceladas: dbStats.citasCanceladas, // Viene de tabla metricas
-          citasProgramadas: dbStats.citasProgramadas,
-          reagendadas: dbStats.reagendadas,          // Viene de tabla metricas
-          datosGrafica: dayData,
-          horariosMasVisitados: Object.entries(timeCount)
-            .map(([horario, count]) => ({ horario, cantidad: count as number }))
-            .sort((a, b) => b.cantidad - a.cantidad)
-            .slice(0, 5),
-          tiempoPromedioConsulta: dbStats.promedioConsulta, // Viene de tabla metricas
-          tasaAbandono: 0, // Implementar log de abandono después
-          pacientesNuevosSemana: historiales.filter((h: any) => {
-            const fecha = h.creado_en || h.fecha || h.created_at;
-            if (!fecha) return false;
-            return parseISO(fecha) >= subDays(new Date(), 7);
-          }).length,
-          velocidadAsignacionDocente: 0,
+        setRawData({ citas, usuarios, historiales });
+        setGlobalMetrics({
+          promedioConsulta:          dbStats.promedioConsulta          || 0,
+          tasaAbandono:              dbStats.tasaAbandono              || 0,
+          velocidadAsignacionDocente: dbStats.velocidadAsignacionDocente || 0,
         });
       } catch (error) {
-        console.error('Error al procesar métricas avanzadas:', error);
+        console.error('Error al descargar datos:', error);
       } finally {
         setLoading(false);
       }
     };
+    fetchRawData();
+  }, []);
 
-    fetchAllMetrics();
-  }, [filtroArea, esMaster]);  
+  // Filtrado local — se ejecuta sin red al cambiar filtroArea
+  useEffect(() => {
+    if (rawData.citas.length === 0) return;
+
+    const filteredCitas = rawData.citas.filter((item: Cita) => {
+      if (filtroArea === 'general') return true;
+      return (item.area || item.tipo)?.toLowerCase() === filtroArea;
+    });
+
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+    const dayData = dayNames.map((name) => ({ name, nutricion: 0, fisioterapia: 0 }));
+    const timeCount: Record<string, number> = {};
+
+    filteredCitas.forEach((apt: Cita) => {
+      const fechaStr = apt.fecha || apt.date;
+      if (!fechaStr) return;
+      const [year, month, day] = fechaStr.split('T')[0].split('-');
+      const dateObj = new Date(Number(year), Number(month) - 1, Number(day));
+      const dayIdx = getDay(dateObj);
+      if (!isNaN(dayIdx) && dayIdx >= 0 && dayIdx <= 6) {
+        const area = (apt.tipo || apt.area)?.toLowerCase();
+        if (area === 'nutricion') dayData[dayIdx].nutricion++;
+        if (area === 'fisioterapia') dayData[dayIdx].fisioterapia++;
+      }
+      const horaKey = (apt.hora || apt.time || '').substring(0, 5);
+      if (horaKey) timeCount[horaKey] = (timeCount[horaKey] || 0) + 1;
+    });
+
+    const limiteUnaSemana = subDays(new Date(), 7);
+    const comp = filteredCitas.filter((c: Cita) => c.estado?.toLowerCase() === 'completada').length;
+    const canc = filteredCitas.filter((c: Cita) => c.estado?.toLowerCase() === 'cancelada').length;
+    const prog = filteredCitas.filter((c: Cita) => c.estado?.toLowerCase() === 'programada').length;
+    const reag = filteredCitas.filter((c: Cita) => ['reagendada', 're-agendada'].includes(c.estado?.toLowerCase() || '')).length;
+
+    setStats({
+      totalCitas:               filteredCitas.length,
+      citasCompletadas:         comp,
+      citasCanceladas:          canc,
+      citasProgramadas:         prog,
+      reagendadas:              reag,
+      datosGrafica:             dayData,
+      horariosMasVisitados:     Object.entries(timeCount)
+        .map(([horario, count]) => ({ horario, cantidad: count }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5),
+      tiempoPromedioConsulta:        globalMetrics.promedioConsulta,
+      tasaAbandono:                  globalMetrics.tasaAbandono,
+      pacientesNuevosSemana:         rawData.historiales.filter((h: any) => {
+        const fecha = h.creado_en || h.fecha || h.created_at;
+        return fecha ? parseISO(fecha) >= limiteUnaSemana : false;
+      }).length,
+      velocidadAsignacionDocente:    globalMetrics.velocidadAsignacionDocente,
+    });
+  }, [filtroArea, rawData, globalMetrics]);
 
   const pieData = [
     { name: 'Completadas', value: stats.citasCompletadas, color: '#16a34a' },
@@ -795,7 +1235,17 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         {/* ── Botón Exportar Excel ── */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
          <button
-  onClick={() => exportToExcel(stats, rawData, filtroArea, esMaster)}
+            disabled={isExporting}
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                await exportToExcel(stats, rawData, filtroArea, esMaster);
+              } catch (error) {
+                console.error("Error al exportar:", error);
+              } finally {
+                setIsExporting(false);
+              }
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -807,17 +1257,20 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
               color: C.text,
               fontSize: 13,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isExporting ? 'not-allowed' : 'pointer',
+              opacity: isExporting ? 0.7 : 1,
               boxShadow: C.shadow,
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
+              if (isExporting) return;
               const b = e.currentTarget;
               b.style.borderColor = C.accent.green.top;
               b.style.boxShadow = C.shadowMd;
               b.style.color = C.accent.green.top;
             }}
             onMouseLeave={(e) => {
+              if (isExporting) return;
               const b = e.currentTarget;
               b.style.borderColor = C.border;
               b.style.boxShadow = C.shadow;
@@ -825,7 +1278,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
             }}
           >
             <Download size={15} style={{ color: 'inherit' }} />
-            Exportar a Excel
+            {isExporting ? 'Generando...' : 'Exportar a Excel'}
           </button>
         </div>
 

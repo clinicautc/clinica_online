@@ -47,12 +47,12 @@ export default function NutritionRecommendations({
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   const theme = {
-    color: area === 'fisioterapia' ? 'text-blue-900' : 'text-green-800',
-    colorAlt: area === 'fisioterapia' ? 'text-blue-600' : 'text-green-600',
-    border: area === 'fisioterapia' ? 'border-blue-900/20' : 'border-green-700/20',
-    bgLight: area === 'fisioterapia' ? 'bg-blue-50' : 'bg-green-50',
-    bgIcon: area === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100',
-    btn: area === 'fisioterapia' ? 'bg-blue-900 hover:bg-blue-800' : 'bg-green-700 hover:bg-green-800',
+    color: area === 'fisioterapia' ? 'text-blue-900' : 'text-amber-700',
+    colorAlt: area === 'fisioterapia' ? 'text-blue-600' : 'text-amber-500',
+    border: area === 'fisioterapia' ? 'border-blue-900/20' : 'border-amber-400/20',
+    bgLight: area === 'fisioterapia' ? 'bg-blue-50' : 'bg-amber-50',
+    bgIcon: area === 'fisioterapia' ? 'bg-blue-100' : 'bg-amber-100',
+    btn: area === 'fisioterapia' ? 'bg-blue-900 hover:bg-blue-800' : 'bg-amber-600 hover:bg-amber-700',
   };
 
   useEffect(() => {
@@ -99,8 +99,8 @@ export default function NutritionRecommendations({
   return (
     <div className="space-y-6">
       {!readOnly && (
-        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-          <CardHeader className={`${theme.bgLight} border-b p-8`}>
+        <Card className="border-none shadow-2xl rounded-2xl overflow-hidden bg-white/95">
+          <CardHeader className={`${theme.bgLight} border-b p-7`}>
             <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
               <MessageSquare className="w-7 h-7" />
               Nueva Recomendación
@@ -109,7 +109,7 @@ export default function NutritionRecommendations({
               Escribe las recomendaciones para {pacienteNombre}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-8">
+          <CardContent className="p-7">
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-black text-slate-700 mb-2 block uppercase tracking-wider">
@@ -119,7 +119,7 @@ export default function NutritionRecommendations({
                   value={recomendaciones}
                   onChange={(e) => setRecomendaciones(e.target.value)}
                   placeholder={`Escribe aquí las recomendaciones de ${area} para el paciente...`}
-                  className="min-h-[200px] rounded-2xl border-2 border-blue-900/10 focus:border-blue-900/30 resize-none text-sm"
+                  className={`min-h-[200px] rounded-2xl border-2 ${theme.border} focus:ring-1 resize-none text-sm`}
                   disabled={loading}
                 />
               </div>
@@ -146,8 +146,8 @@ export default function NutritionRecommendations({
       )}
 
       {/* Historial de recomendaciones */}
-      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-        <CardHeader className={`${theme.bgLight} border-b p-8`}>
+      <Card className="border-none shadow-2xl rounded-2xl overflow-hidden bg-white/95">
+        <CardHeader className={`${theme.bgLight} border-b p-7`}>
           <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
             <FileText className="w-7 h-7" />
             Historial de Recomendaciones
@@ -156,7 +156,7 @@ export default function NutritionRecommendations({
             Recomendaciones previas guardadas para este paciente
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-8">
+        <CardContent className="p-7">
           {loadingHistory ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <Loader2 className={`w-12 h-12 animate-spin ${theme.colorAlt}`} />

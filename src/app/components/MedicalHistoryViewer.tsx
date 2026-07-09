@@ -188,29 +188,29 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
    * 4. CONFIGURACIÓN DINÁMICA DE COLORES (THEME)
    */
   const theme = {
-    color: detectedArea === 'fisioterapia' ? 'text-blue-900' : 'text-green-700',
-    colorAlt: detectedArea === 'fisioterapia' ? 'text-blue-600' : 'text-green-600',
-    border: detectedArea === 'fisioterapia' ? 'border-blue-900/20' : 'border-green-600/20',
-    bgLight: detectedArea === 'fisioterapia' ? 'bg-blue-50' : 'bg-green-50',
-    bgGradient: detectedArea === 'fisioterapia' 
-      ? 'bg-gradient-to-br from-blue-50 to-blue-100' 
-      : 'bg-gradient-to-br from-green-50 to-green-100',
-    bgIcon: detectedArea === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100',
-    btn: detectedArea === 'fisioterapia' 
-      ? 'bg-blue-900 hover:bg-blue-800' 
-      : 'bg-green-700 hover:bg-green-800',
+    color: detectedArea === 'fisioterapia' ? 'text-blue-900' : 'text-orange-700',
+    colorAlt: detectedArea === 'fisioterapia' ? 'text-blue-600' : 'text-orange-500',
+    border: detectedArea === 'fisioterapia' ? 'border-blue-900/20' : 'border-orange-400/20',
+    bgLight: detectedArea === 'fisioterapia' ? 'bg-blue-50' : 'bg-orange-50',
+    bgGradient: detectedArea === 'fisioterapia'
+      ? 'bg-gradient-to-br from-blue-50 to-blue-100'
+      : 'bg-gradient-to-br from-orange-50 to-orange-100',
+    bgIcon: detectedArea === 'fisioterapia' ? 'bg-blue-100' : 'bg-orange-100',
+    btn: detectedArea === 'fisioterapia'
+      ? 'bg-blue-900 hover:bg-blue-800'
+      : 'bg-orange-600 hover:bg-orange-700',
     btnOutline: detectedArea === 'fisioterapia'
       ? 'border-blue-900 text-blue-900 hover:bg-blue-900'
-      : 'border-green-700 text-green-700 hover:bg-green-700',
+      : 'border-orange-600 text-orange-600 hover:bg-orange-600',
     badge: detectedArea === 'fisioterapia'
       ? 'bg-blue-900 text-white'
-      : 'bg-green-700 text-white',
+      : 'bg-orange-600 text-white',
     header: detectedArea === 'fisioterapia'
       ? 'from-blue-600 to-blue-400'
-      : 'from-green-600 to-green-400',
+      : 'from-orange-500 to-orange-300',
     tabActive: detectedArea === 'fisioterapia'
       ? 'data-[state=active]:bg-blue-900 data-[state=active]:text-white'
-      : 'data-[state=active]:bg-green-700 data-[state=active]:text-white'
+      : 'data-[state=active]:bg-orange-600 data-[state=active]:text-white'
   };
 
   
@@ -282,10 +282,10 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
             <TabsContent value="historiales">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="bg-gray-50/80 border-b p-7">
+                <CardHeader className={`${theme.bgLight} border-b p-7`}>
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
-                      <CardTitle className="text-blue-900 font-extrabold text-2xl flex items-center gap-3"><ClipboardList /> Historiales Registrados</CardTitle>
+                      <CardTitle className={`${theme.color} font-extrabold text-2xl flex items-center gap-3`}><ClipboardList /> Historiales Registrados</CardTitle>
                       <CardDescription className="font-bold italic text-slate-500">Lista completa de evaluaciones de {detectedArea}</CardDescription>
                     </div>
                     <div className="relative w-full md:w-96">
@@ -305,13 +305,13 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                       {filteredHistories.map((history, index) => {
                         const isExpanded = expandedId === history.id;
                         const isFisio = history.tipo === 'fisioterapia';
-                        const accentBorder = isFisio ? 'border-blue-100' : 'border-green-100';
-                        const accentBg    = isFisio ? 'bg-blue-50'  : 'bg-green-50';
-                        const accentText  = isFisio ? 'text-blue-900' : 'text-green-800';
-                        const accentIcon  = isFisio ? 'bg-blue-100' : 'bg-green-100';
-                        const accentIconC = isFisio ? 'text-blue-600' : 'text-green-600';
-                        const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
-                        const accentBtn   = isFisio ? 'bg-blue-900' : 'bg-green-700';
+                        const accentBorder = isFisio ? 'border-blue-100' : 'border-orange-100';
+                        const accentBg    = isFisio ? 'bg-blue-50'  : 'bg-orange-50';
+                        const accentText  = isFisio ? 'text-blue-900' : 'text-orange-700';
+                        const accentIcon  = isFisio ? 'bg-blue-100' : 'bg-orange-100';
+                        const accentIconC = isFisio ? 'text-blue-600' : 'text-orange-500';
+                        const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
+                        const accentBtn   = isFisio ? 'bg-blue-900' : 'bg-orange-600';
 
                         return (
                           <div key={history.id} className={`border ${accentBorder} rounded-2xl bg-white overflow-hidden`}>
@@ -443,7 +443,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
             <TabsContent value="evolucion">
               <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
-                <CardHeader className="bg-slate-50 border-b p-8">
+                <CardHeader className={`${theme.bgLight} border-b p-7`}>
                   <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
                 </CardHeader>
                 <CardContent className="p-7">
@@ -458,13 +458,13 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                         .sort((a, b) => new Date(a.fecha_creacion).getTime() - new Date(b.fecha_creacion).getTime())
                         .map((history, index, sorted) => {
                           const isFisio = history.tipo === 'fisioterapia';
-                          const accentLine  = isFisio ? 'bg-blue-200'  : 'bg-green-200';
-                          const accentDot   = isFisio ? 'bg-blue-600'  : 'bg-green-600';
-                          const accentBorder= isFisio ? 'border-blue-100' : 'border-green-100';
-                          const accentBg    = isFisio ? 'bg-blue-50'   : 'bg-green-50';
-                          const accentText  = isFisio ? 'text-blue-900': 'text-green-800';
-                          const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
-                          const accentBtn   = isFisio ? 'bg-blue-900'  : 'bg-green-700';
+                          const accentLine  = isFisio ? 'bg-blue-200'  : 'bg-orange-200';
+                          const accentDot   = isFisio ? 'bg-blue-600'  : 'bg-orange-500';
+                          const accentBorder= isFisio ? 'border-blue-100' : 'border-orange-100';
+                          const accentBg    = isFisio ? 'bg-blue-50'   : 'bg-orange-50';
+                          const accentText  = isFisio ? 'text-blue-900': 'text-orange-700';
+                          const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
+                          const accentBtn   = isFisio ? 'bg-blue-900'  : 'bg-orange-600';
                           const isExpanded  = expandedEvolucionId === history.id;
                           const numConsulta = history.numero_consulta ?? history.appointment_id;
                           const isLast      = index === sorted.length - 1;
@@ -577,8 +577,8 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
                     <TabsContent value="recomendaciones">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="bg-gray-50/80 border-b p-7">
-                  <CardTitle className="text-blue-900 font-extrabold text-2xl flex items-center gap-3">
+                <CardHeader className={`${theme.bgLight} border-b p-7`}>
+                  <CardTitle className={`${theme.color} font-extrabold text-2xl flex items-center gap-3`}>
                     <MessageSquare className="w-6 h-6" />
                     Recomendaciones de {detectedArea === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
                   </CardTitle>
