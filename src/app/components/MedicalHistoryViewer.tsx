@@ -12,16 +12,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  FileText, Calendar, User, Activity, Utensils, 
-  Search, Loader2, BookOpen, 
-  ClipboardList, ArrowLeft, TrendingUp, MessageSquare
+import {
+  FileText, Calendar, User, Activity, Utensils,
+  Search, Loader2, BookOpen,
+  ClipboardList, ArrowLeft, TrendingUp, MessageSquare, ShieldCheck, ExternalLink
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
-import { apiFetch } from '../lib/api';
+import { apiFetch, citasAPI } from '../lib/api';
 import NutritionRecommendations from './NutritionRecommendations';
 
 interface MedicalHistory {
@@ -33,6 +33,7 @@ interface MedicalHistory {
   creado_por_nombre: string;
   fecha_creacion: string;
   appointment_id?: string | number;
+  numero_consulta?: number | null;
 }
 
 interface MedicalHistoryViewerProps {
@@ -62,6 +63,10 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | number | null>(null);
+  const [expandedEvolucionId, setExpandedEvolucionId] = useState<string | number | null>(null);
+  type ConsentState = 'loading' | 'exists' | 'missing';
+  const [consentStatus, setConsentStatus] = useState<Record<string | number, ConsentState>>({});
+  const [consentDownloading, setConsentDownloading] = useState<string | number | null>(null);
   const [patientName, setPatientName] = useState(''); 
   
   // Usamos el área autorizada calculada arriba
@@ -151,8 +156,32 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
            fechaStr.includes(searchLower);
   });
 
-  const toggleExpand = (id: string | number) => {
-    setExpandedId(expandedId === id ? null : id);
+  const toggleExpand = (historial: MedicalHistory) => {
+    const newExpanded = expandedId === historial.id ? null : historial.id;
+    setExpandedId(newExpanded);
+    if (newExpanded !== null && historial.appointment_id && !(historial.appointment_id in consentStatus)) {
+      const aId = historial.appointment_id;
+      setConsentStatus(prev => ({ ...prev, [aId]: 'loading' as ConsentState }));
+      citasAPI.checkConsentimiento(aId).then(({ existe }) => {
+        setConsentStatus(prev => ({ ...prev, [aId]: (existe ? 'exists' : 'missing') as ConsentState }));
+      }).catch(() => {
+        setConsentStatus(prev => ({ ...prev, [aId]: 'missing' as ConsentState }));
+      });
+    }
+  };
+
+  const openConsentimiento = async (appointmentId: string | number) => {
+    setConsentDownloading(appointmentId);
+    try {
+      const { blob, mimeType } = await citasAPI.downloadConsentimiento(appointmentId);
+      const url = URL.createObjectURL(new Blob([blob], { type: mimeType }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {
+      toast.error('No se pudo abrir el consentimiento informado');
+    } finally {
+      setConsentDownloading(null);
+    }
   };
 
   /**
@@ -244,13 +273,12 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
           </div>
         ) : (
           <Tabs defaultValue="historiales" className="space-y-6">
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
-              <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
-                <TabsTrigger value="historiales" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><FileText className="w-5 h-5" />Historial Médico</TabsTrigger>
-                <TabsTrigger value="evolucion" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><TrendingUp className="w-5 h-5" />Evolución</TabsTrigger>
-                <TabsTrigger value="recomendaciones" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold"><TrendingUp className="w-5 h-5" />Recomendaciones</TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList className="bg-white/80 border shadow-sm p-1 h-auto gap-1 rounded-xl">
+              <TabsTrigger value="historiales" className={`${theme.tabActive} font-bold`}><FileText className="w-4 h-4 mr-2" />Historial Médico</TabsTrigger>
+              <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Evolución</TabsTrigger>
+              <TabsTrigger value="recomendaciones" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Recomendaciones</TabsTrigger>
+             
+            </TabsList>
 
             <TabsContent value="historiales">
               <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
@@ -274,39 +302,139 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {filteredHistories.map((history) => (
-                        <div key={history.id} className={`group border ${history.tipo === 'fisioterapia' ? 'border-blue-100' : 'border-green-100'} rounded-2xl bg-white p-6 flex flex-col md:flex-row items-center justify-between gap-4`}>
-                          <div className="flex items-center gap-5 flex-1">
-                            <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${history.tipo === 'fisioterapia' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                              {history.tipo === 'fisioterapia' ? <Activity className="text-blue-600" /> : <Utensils className="text-green-600" />}
-                            </div>
-                            <div>
-                              <h3 className={`font-black text-lg uppercase ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>{history.tipo}</h3>
-                              <div className="flex gap-4 text-[11px] font-bold text-slate-500">
-                                <span><Calendar className="w-4 h-4 inline mr-1" />{format(parseISO(history.fecha_creacion), "PPP", { locale: es })}</span>
-                                <span><User className="w-4 h-4 inline mr-1" />{history.creado_por_nombre}</span>
+                      {filteredHistories.map((history, index) => {
+                        const isExpanded = expandedId === history.id;
+                        const isFisio = history.tipo === 'fisioterapia';
+                        const accentBorder = isFisio ? 'border-blue-100' : 'border-green-100';
+                        const accentBg    = isFisio ? 'bg-blue-50'  : 'bg-green-50';
+                        const accentText  = isFisio ? 'text-blue-900' : 'text-green-800';
+                        const accentIcon  = isFisio ? 'bg-blue-100' : 'bg-green-100';
+                        const accentIconC = isFisio ? 'text-blue-600' : 'text-green-600';
+                        const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+                        const accentBtn   = isFisio ? 'bg-blue-900' : 'bg-green-700';
+
+                        return (
+                          <div key={history.id} className={`border ${accentBorder} rounded-2xl bg-white overflow-hidden`}>
+                            {/* Fila principal */}
+                            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                              <div className="flex items-center gap-5 flex-1">
+                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${accentIcon}`}>
+                                  {isFisio ? <Activity className={accentIconC} /> : <Utensils className={accentIconC} />}
+                                </div>
+                                <div>
+                                  <h3 className={`font-black text-lg uppercase ${accentText}`}>{history.tipo}</h3>
+                                  <div className="flex flex-wrap gap-4 text-[11px] font-bold text-slate-500 mt-0.5">
+                                    <span><Calendar className="w-3.5 h-3.5 inline mr-1" />{format(parseISO(history.fecha_creacion), "PPP", { locale: es })}</span>
+                                    <span><User className="w-3.5 h-3.5 inline mr-1" />{history.creado_por_nombre}</span>
+                                    {(history.numero_consulta ?? history.appointment_id) && (
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${accentPill}`}>
+                                        Consulta #{history.numero_consulta ?? history.appointment_id}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 flex-shrink-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleExpand(history)}
+                                  className="font-bold rounded-xl"
+                                >
+                                  {isExpanded ? 'CERRAR' : 'DETALLES'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className={`${accentBtn} text-white font-black`}
+                                  onClick={() => {
+                                    if (history.appointment_id) {
+                                      navigate(`/forms/${history.tipo}/${history.appointment_id}`);
+                                    } else {
+                                      toast.error("No se puede abrir: Este historial no está vinculado a ninguna cita.");
+                                    }
+                                  }}
+                                >
+                                  VER EXPEDIENTE
+                                </Button>
                               </div>
                             </div>
+
+                            {/* Panel de detalles expandido */}
+                            {isExpanded && (
+                              <div className={`border-t ${accentBorder} ${accentBg} px-6 py-5`}>
+                                <p className={`text-xs font-black uppercase tracking-widest ${accentText} mb-4`}>
+                                  Información del registro
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <div className="bg-white rounded-xl p-4 shadow-sm border border-white">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N.º de historial</p>
+                                    <p className={`font-black text-xl ${accentText}`}>#{index + 1}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">de {filteredHistories.length} registros</p>
+                                  </div>
+                                  <div className="bg-white rounded-xl p-4 shadow-sm border border-white">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Consulta origen</p>
+                                    {history.numero_consulta ? (
+                                      <>
+                                        <p className={`font-black text-xl ${accentText}`}>#{history.numero_consulta}</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">ID cita: {history.appointment_id}</p>
+                                      </>
+                                    ) : history.appointment_id ? (
+                                      <p className={`font-black text-xl ${accentText}`}>ID #{history.appointment_id}</p>
+                                    ) : (
+                                      <p className="font-bold text-slate-400 text-sm">Sin cita vinculada</p>
+                                    )}
+                                  </div>
+                                  <div className="bg-white rounded-xl p-4 shadow-sm border border-white">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Fecha de carga</p>
+                                    <p className={`font-black text-sm ${accentText}`}>
+                                      {format(parseISO(history.fecha_creacion), "d 'de' MMMM yyyy", { locale: es })}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      {format(parseISO(history.fecha_creacion), "HH:mm 'hrs'")}
+                                    </p>
+                                  </div>
+                                  <div className="bg-white rounded-xl p-4 shadow-sm border border-white">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Registrado por</p>
+                                    <p className={`font-black text-sm ${accentText} leading-tight`}>{history.creado_por_nombre}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 capitalize">{history.tipo}</p>
+                                  </div>
+                                </div>
+
+                                {/* Consentimiento informado */}
+                                {history.appointment_id && (
+                                  <div className="mt-4 pt-4 border-t border-white/60">
+                                    <p className={`text-xs font-black uppercase tracking-widest ${accentText} mb-3`}>
+                                      Consentimiento Informado
+                                    </p>
+                                    {consentStatus[history.appointment_id] === 'loading' && (
+                                      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Verificando...
+                                      </div>
+                                    )}
+                                    {consentStatus[history.appointment_id] === 'exists' && (
+                                      <button
+                                        onClick={() => openConsentimiento(history.appointment_id!)}
+                                        disabled={consentDownloading === history.appointment_id}
+                                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors disabled:opacity-50 ${accentBtn} hover:opacity-90`}
+                                      >
+                                        {consentDownloading === history.appointment_id ? (
+                                          <><Loader2 className="w-3.5 h-3.5 animate-spin" />Abriendo...</>
+                                        ) : (
+                                          <><ShieldCheck className="w-3.5 h-3.5" />Ver Consentimiento<ExternalLink className="w-3 h-3" /></>
+                                        )}
+                                      </button>
+                                    )}
+                                    {consentStatus[history.appointment_id] === 'missing' && (
+                                      <p className="text-xs text-slate-400 font-medium">Sin consentimiento registrado para esta consulta.</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => toggleExpand(history.id)} className="font-bold rounded-xl">DETALLES</Button>
-                            <Button 
-  size="sm" 
-  className={`${history.tipo === 'fisioterapia' ? 'bg-blue-900' : 'bg-green-700'} text-white font-black`} 
-  onClick={() => {
-    // NUEVA VALIDACIÓN: Solo navegar si existe el ID
-    if (history.appointment_id) {
-      navigate(`/forms/${history.tipo}/${history.appointment_id}`);
-    } else {
-      toast.error("No se puede abrir: Este historial no está vinculado a ninguna cita.");
-    }
-  }}
->
-  VER EXPEDIENTE
-</Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -314,9 +442,9 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
             </TabsContent>
 
             <TabsContent value="evolucion">
-              <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-                <CardHeader className="bg-gray-50/80 border-b p-7">
-                  <CardTitle className="text-blue-900 font-extrabold text-2xl">Evolución</CardTitle>
+              <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
+                <CardHeader className="bg-slate-50 border-b p-8">
+                  <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
                 </CardHeader>
                 <CardContent className="p-7">
                   {filteredHistories.length === 0 ? (
@@ -326,47 +454,121 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                     </div>
                   ) : (
                     <div className="relative">
-                      {filteredHistories.sort((a,b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime()).map((history, index) => {
-                        const d1 = history.datos?.pagina_1 || {};
-                        const motivo = history.tipo === 'fisioterapia' ? (d1.motivo_0 || 'Sin motivo') : (d1.motivos_y_qx?.motivos || 'Sin motivo');
-                        return (
-                          <div key={history.id} className="relative pl-8 pb-8 last:pb-0">
-                            <div className={`absolute left-3 top-8 bottom-0 w-0.5 ${history.tipo === 'fisioterapia' ? 'bg-blue-200' : 'bg-green-200'}`}></div>
-                            <div className={`absolute left-0 top-0 w-6 h-6 rounded-full ${history.tipo === 'fisioterapia' ? 'bg-blue-600' : 'bg-green-600'} border-4 border-white shadow-lg`}></div>
-                            <div className={`border ${history.tipo === 'fisioterapia' ? 'border-blue-200' : 'border-green-200'} rounded-2xl p-6 bg-white shadow-sm`}>
-                              
-                              <h4 className={`font-black text-lg ${history.tipo === 'fisioterapia' ? 'text-blue-900' : 'text-green-800'}`}>
-                                Nota evolutiva de {history.tipo} #{filteredHistories.length - index}
-                              </h4>
-                              
-                              <p className="text-sm text-slate-700 mt-2">{motivo}</p>
-                              
-                              <div className="flex gap-3 mt-4">
-                                <Button size="sm" variant="outline" onClick={() => navigate(`/forms/${history.tipo}/${history.appointment_id}`)} className="font-bold border-slate-200">
-                                  VER FORMULARIO COMPLETO
-                                </Button>
-                                
-                               <Button 
-  size="sm" 
-  onClick={() => {
-    
-    if (history.appointment_id) {
-      navigate(`/hoja-evolutiva/${history.appointment_id}`);
-    } else {
-      toast.error("No se pueden ver notas evolutivas: Falta el ID de la cita.");
-    }
-  }} 
-  className={`font-bold text-white shadow-sm transition-colors ${history.tipo === 'fisioterapia' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}
->
-  <FileText className="w-4 h-4 mr-2" />
-  Ver Notas Evolutivas
-</Button>
-                              </div>
+                      {[...filteredHistories]
+                        .sort((a, b) => new Date(a.fecha_creacion).getTime() - new Date(b.fecha_creacion).getTime())
+                        .map((history, index, sorted) => {
+                          const isFisio = history.tipo === 'fisioterapia';
+                          const accentLine  = isFisio ? 'bg-blue-200'  : 'bg-green-200';
+                          const accentDot   = isFisio ? 'bg-blue-600'  : 'bg-green-600';
+                          const accentBorder= isFisio ? 'border-blue-100' : 'border-green-100';
+                          const accentBg    = isFisio ? 'bg-blue-50'   : 'bg-green-50';
+                          const accentText  = isFisio ? 'text-blue-900': 'text-green-800';
+                          const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+                          const accentBtn   = isFisio ? 'bg-blue-900'  : 'bg-green-700';
+                          const isExpanded  = expandedEvolucionId === history.id;
+                          const numConsulta = history.numero_consulta ?? history.appointment_id;
+                          const isLast      = index === sorted.length - 1;
 
+                          return (
+                            <div key={history.id} className={`relative pl-10 ${isLast ? 'pb-0' : 'pb-6'}`}>
+                              {/* Línea vertical de timeline */}
+                              {!isLast && (
+                                <div className={`absolute left-3 top-6 bottom-0 w-0.5 ${accentLine}`} />
+                              )}
+                              {/* Dot */}
+                              <div className={`absolute left-0 top-0 w-6 h-6 rounded-full ${accentDot} border-4 border-white shadow-md`} />
+
+                              {/* Tarjeta */}
+                              <div className={`border ${accentBorder} rounded-2xl bg-white overflow-hidden shadow-sm`}>
+                                {/* Cabecera de la tarjeta */}
+                                <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                      <h4 className={`font-black text-base ${accentText}`}>
+                                        Seguimiento #{index + 1}
+                                      </h4>
+                                      {numConsulta && (
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${accentPill}`}>
+                                          Consulta #{numConsulta}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-3 text-[11px] font-bold text-slate-500">
+                                      <span><Calendar className="w-3.5 h-3.5 inline mr-1" />{format(parseISO(history.fecha_creacion), "PPP", { locale: es })}</span>
+                                      <span><User className="w-3.5 h-3.5 inline mr-1" />{history.creado_por_nombre}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 flex-shrink-0">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setExpandedEvolucionId(isExpanded ? null : history.id)}
+                                      className="font-bold rounded-xl"
+                                    >
+                                      {isExpanded ? 'CERRAR' : 'DETALLES'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className={`${accentBtn} text-white font-black`}
+                                      onClick={() => {
+                                        if (history.appointment_id) {
+                                          navigate(`/forms/${history.tipo}/${history.appointment_id}`);
+                                        } else {
+                                          toast.error("Este registro no está vinculado a ninguna cita.");
+                                        }
+                                      }}
+                                    >
+                                      VER EXPEDIENTE
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Panel de detalles expandido */}
+                                {isExpanded && (
+                                  <div className={`border-t ${accentBorder} ${accentBg} px-5 py-4`}>
+                                    <p className={`text-xs font-black uppercase tracking-widest ${accentText} mb-3`}>
+                                      Información del registro
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N.º seguimiento</p>
+                                        <p className={`font-black text-xl ${accentText}`}>#{index + 1}</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">de {sorted.length} registros</p>
+                                      </div>
+                                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Consulta origen</p>
+                                        {history.numero_consulta ? (
+                                          <>
+                                            <p className={`font-black text-xl ${accentText}`}>#{history.numero_consulta}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">ID cita: {history.appointment_id}</p>
+                                          </>
+                                        ) : history.appointment_id ? (
+                                          <p className={`font-black text-xl ${accentText}`}>ID #{history.appointment_id}</p>
+                                        ) : (
+                                          <p className="font-bold text-slate-400 text-sm">Sin cita vinculada</p>
+                                        )}
+                                      </div>
+                                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Fecha de carga</p>
+                                        <p className={`font-black text-sm ${accentText}`}>
+                                          {format(parseISO(history.fecha_creacion), "d 'de' MMMM yyyy", { locale: es })}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                          {format(parseISO(history.fecha_creacion), "HH:mm 'hrs'")}
+                                        </p>
+                                      </div>
+                                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Registrado por</p>
+                                        <p className={`font-black text-sm ${accentText} leading-tight`}>{history.creado_por_nombre}</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5 capitalize">{history.tipo}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   )}
                 </CardContent>

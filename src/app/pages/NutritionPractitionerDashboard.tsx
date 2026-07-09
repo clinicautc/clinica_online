@@ -24,14 +24,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import {
   LogOut, Users, FileText, Calendar, Clock, Utensils, Loader2,
   History, User, X, Edit2, Phone, Building, Trash2, AlertTriangle,
-  Send, FileEdit, Target
+  Send, FileEdit, Target, Play
 } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useNavigate } from 'react-router';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import PatientList from '../components/PatientList';
 import NotesViewer from '../components/NotesViewer';
 import { toast } from 'sonner';
+import { getEstadoBadgeClasses, getEstadoLabel, esFechaPasada } from '../lib/citasHelpers';
 
 // Interfaz sincronizada con las columnas de pgAdmin
 interface Appointment {
@@ -42,6 +44,7 @@ interface Appointment {
   fecha: string;
   hora: string;
   estado: string;
+  numero_consulta?: number | null;
   practicante_id?: number | null;
 }
 
@@ -50,11 +53,14 @@ export default function NutritionPractitionerDashboard() {
   const navigate = useNavigate();
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [allDateFilteredCitas, setAllDateFilteredCitas] = useState<Appointment[]>([]);
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
   const [recurrenceMap, setRecurrenceMap] = useState<Record<number, boolean>>({});
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
+  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
+  const [citaSubTab, setCitaSubTab] = useState<'programadas' | 'en_atencion'>('programadas');
 
   // ==========================================
   // ESTADOS DEL DRAWER Y PERFIL
@@ -76,6 +82,8 @@ export default function NutritionPractitionerDashboard() {
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [citaParaIniciar, setCitaParaIniciar] = useState<Appointment | null>(null);
+  const [citaFueraDeHora, setCitaFueraDeHora] = useState<Appointment | null>(null);
   const [notaNueva, setNotaNueva] = useState({
     titulo: '',
     contenido: '',
@@ -104,29 +112,25 @@ export default function NutritionPractitionerDashboard() {
    * EFECTO: Sincronización con la DB Real y Persistencia
    */
   useEffect(() => {
-    const fetchTodayAppointments = async () => {
+    const fetchTodayAppointments = async (silent = false) => {
       try {
-        setIsLoadingCitas(true);
+        if (!silent) setIsLoadingCitas(true);
         const allAppointments: Appointment[] = await citasAPI.getAll();
-        const filtered = allAppointments.filter((apt) => {
+        const dateFiltered = allAppointments.filter((apt) => {
+          if (apt.tipo !== 'nutricion') return false;
+          if (String(apt.practicante_id) !== String(user?.id)) return false;
           const cleanAptDate = apt.fecha.split('T')[0];
-          const matchesFecha = viewMode === 'day'
-            ? cleanAptDate === selectedDate
-            : cleanAptDate.startsWith(selectedMonth);
-          return (
-            matchesFecha &&
-            apt.tipo === 'nutricion' &&
-            apt.estado === 'programada' &&
-            String(apt.practicante_id) === String(user?.id)
-          );
+          return viewMode === 'day' ? cleanAptDate === selectedDate : cleanAptDate.startsWith(selectedMonth);
         });
-        filtered.sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora.localeCompare(a.hora));
-
+        const filtered = estadoFilter !== 'todos' ? dateFiltered.filter(a => a.estado === estadoFilter) : dateFiltered;
+        const sortFn = (a: Appointment, b: Appointment) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora);
+        filtered.sort(sortFn);
+        setAllDateFilteredCitas([...dateFiltered].sort(sortFn));
         setTodayAppointments(filtered);
 
         // VERIFICACIÓN DE RECURRENCIA
         const recurrenceData: Record<number, boolean> = {};
-        await Promise.all(filtered.map(async (apt) => {
+        await Promise.all(dateFiltered.map(async (apt) => {
           if (apt.paciente_id) {
             try {
               const data = await historialesAPI.verificarRecurrencia(apt.paciente_id, 'nutricion');
@@ -137,9 +141,9 @@ export default function NutritionPractitionerDashboard() {
         setRecurrenceMap(recurrenceData);
       } catch (error) {
         console.error("❌ Error de conexión Practicante Nutrición:", error);
-        toast.error("Error al sincronizar la agenda del día");
+        if (!silent) toast.error("Error al sincronizar la agenda del día");
       } finally {
-        setIsLoadingCitas(false);
+        if (!silent) setIsLoadingCitas(false);
       }
     };
 
@@ -149,7 +153,9 @@ export default function NutritionPractitionerDashboard() {
     }
 
     fetchTodayAppointments();
-  }, [user, authLoading, navigate, selectedDate, selectedMonth, viewMode]);
+    const interval = setInterval(() => fetchTodayAppointments(true), 30_000);
+    return () => clearInterval(interval);
+  }, [user, authLoading, navigate, estadoFilter, selectedDate, selectedMonth, viewMode]);
 
   // ==========================================
   // FUNCIONES DEL PERFIL (DRAWER)
@@ -254,13 +260,41 @@ export default function NutritionPractitionerDashboard() {
 
   const handleAccessForms = (appointment: Appointment) => {
     const esRecurrente = recurrenceMap[appointment.paciente_id];
-    
     if (esRecurrente) {
       navigate(`/historial/${appointment.paciente_id}/nutricion`);
     } else {
       navigate(`/forms/nutricion/${appointment.id}`);
     }
   };
+
+  const handleIniciarConsulta = (apt: Appointment) => {
+    if (apt.estado === 'programada') {
+      const horaActualHH = parseInt(
+        new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', hour12: false }),
+        10
+      );
+      const citaHH = parseInt(apt.hora.substring(0, 2), 10);
+      if (citaHH !== horaActualHH) {
+        setCitaFueraDeHora(apt);
+        return;
+      }
+    }
+    // recuperada: sin validación de hora — el admin ya autorizó la reapertura
+    setCitaParaIniciar(apt);
+  };
+
+  const doIniciarConsulta = () => {
+    if (!citaParaIniciar) return;
+    window.open(`/consulta/${citaParaIniciar.id}`, '_blank', 'width=1200,height=900,scrollbars=yes');
+    setCitaParaIniciar(null);
+  };
+
+  // Refresca las citas cuando el practicante vuelve al dashboard tras cerrar el workspace
+  useEffect(() => {
+    const onFocus = () => setRefreshKey((prev) => prev + 1);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   if (authLoading) {
     return (
@@ -352,8 +386,8 @@ export default function NutritionPractitionerDashboard() {
                     </CardTitle>
                     <CardDescription className="text-orange-800/60 italic">
                       {viewMode === 'day'
-                        ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
-                        : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                        ? `Citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}${estadoFilter !== 'todos' ? ` · ${getEstadoLabel(estadoFilter)}` : ''}`
+                        : `Citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}${estadoFilter !== 'todos' ? ` · ${getEstadoLabel(estadoFilter)}` : ''}`}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -387,21 +421,66 @@ export default function NutritionPractitionerDashboard() {
                     )}
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-1.5 pt-3">
+                  <button
+                    onClick={() => setCitaSubTab(citaSubTab === 'en_atencion' ? 'programadas' : 'en_atencion')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${citaSubTab === 'en_atencion' ? 'bg-orange-600 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Agenda
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${citaSubTab === 'en_atencion' ? 'bg-white/30 text-white' : 'bg-orange-100 text-orange-800'}`}>
+                      {allDateFilteredCitas.filter(a => a.estado === 'en_atencion' || a.estado === 'recuperada' || (a.estado === 'programada' && !esFechaPasada(a.fecha))).length}
+                    </span>
+                  </button>
+                  {[
+                    { value: 'todos',       label: 'Todos',       active: 'bg-slate-700 text-white',   inactive: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
+                    { value: 'programada',  label: 'Programadas', active: 'bg-amber-500 text-white',   inactive: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
+                    { value: 'en_atencion', label: 'En Atención', active: 'bg-purple-600 text-white',  inactive: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
+                    { value: 'completada',  label: 'Completadas', active: 'bg-green-600 text-white',   inactive: 'bg-green-100 text-green-800 hover:bg-green-200' },
+                    { value: 'no_asistio',  label: 'No Asistió',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                    { value: 'incompleta',  label: 'Incompletas', active: 'bg-red-600 text-white',     inactive: 'bg-red-100 text-red-800 hover:bg-red-200' },
+                    { value: 'recuperada',  label: 'Recuperadas', active: 'bg-sky-500 text-white',     inactive: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
+                    { value: 'cancelada',   label: 'Canceladas',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
+                  ].map(btn => (
+                    <button
+                      key={btn.value}
+                      onClick={() => setEstadoFilter(btn.value)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${estadoFilter === btn.value ? btn.active : btn.inactive}`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {isLoadingCitas ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3">
-                      <Loader2 className="w-10 h-10 animate-spin text-orange-600" />
-                      <p className="text-orange-900/50">Consultando base de datos...</p>
-                    </div>
-                  ) : todayAppointments.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed rounded-lg border-orange-100 bg-orange-50/20">
-                       <Calendar className="w-12 h-12 text-orange-200 mx-auto mb-3" />
-                       <p className="text-gray-500 font-medium italic">No se encontraron citas de nutrición para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.</p>
-                    </div>
-                  ) : (
-                    todayAppointments.map((apt) => (
+                  {(() => {
+                    const esActiva = (a: Appointment) =>
+                      a.estado === 'en_atencion' ||
+                      a.estado === 'recuperada' ||
+                      (a.estado === 'programada' && !esFechaPasada(a.fecha));
+                    const displayedAppointments = citaSubTab === 'en_atencion'
+                      ? allDateFilteredCitas.filter(esActiva)
+                      : todayAppointments;
+                    if (isLoadingCitas) return (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <Loader2 className="w-10 h-10 animate-spin text-orange-600" />
+                        <p className="text-orange-900/50">Consultando base de datos...</p>
+                      </div>
+                    );
+                    if (displayedAppointments.length === 0) return (
+                      <div className="text-center py-12 border-2 border-dashed rounded-lg border-orange-100 bg-orange-50/20">
+                        <Calendar className="w-12 h-12 text-orange-200 mx-auto mb-3" />
+                        <p className="text-gray-500 font-medium italic">
+                          {citaSubTab === 'en_atencion'
+                            ? 'No tienes consultas activas ni citas en turno ahora mismo.'
+                            : estadoFilter !== 'todos'
+                              ? `No tienes citas con estado "${getEstadoLabel(estadoFilter)}".`
+                              : `No tienes citas en agenda para ${viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.`}
+                        </p>
+                      </div>
+                    );
+                    return displayedAppointments.map((apt) => (
                       <div key={apt.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow gap-4 border-l-4 border-l-orange-600">
                         <div className="flex items-center gap-5">
                           <div className="p-3.5 rounded-full bg-orange-50">
@@ -416,27 +495,49 @@ export default function NutritionPractitionerDashboard() {
                               <p className="text-base text-gray-500 flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded font-semibold">
                                 <Clock className="w-3.5 h-3.5 text-orange-600"/> {apt.hora.substring(0,5)} hrs
                               </p>
-                              <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider self-center border border-green-200">
-                                {apt.estado}
+                              <span className={`text-xs px-2.5 py-1 rounded-full font-bold border self-center ${getEstadoBadgeClasses(apt.estado)}`}>
+                                {getEstadoLabel(apt.estado)}
                               </span>
+                              {apt.estado === 'completada' && apt.numero_consulta && (
+                                <span className="text-xs px-2 py-1 rounded-full font-black bg-slate-100 text-slate-600 self-center">
+                                  Consulta #{apt.numero_consulta}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <Button
-                          className={`h-10.75 px-5 text-base w-full sm:w-auto shadow-sm font-bold text-white ${
-                            recurrenceMap[apt.paciente_id] ? 'bg-orange-500 hover:bg-orange-600' : 'bg-orange-600 hover:bg-orange-700'
-                          }`}
-                          onClick={() => handleAccessForms(apt)}
-                        >
-                          {recurrenceMap[apt.paciente_id] ? (
-                            <><History className="w-5 h-5 mr-2" /> Ver Historial / Evolución</>
-                          ) : (
-                            <><FileText className="w-5 h-5 mr-2" /> Ver Evaluación Inicial</>
-                          )}
-                        </Button>
+                        {apt.estado === 'en_atencion' ? (
+                          <Button
+                            className="h-10.75 px-5 text-base w-full sm:w-auto shadow-sm font-bold text-white bg-purple-600 hover:bg-purple-700"
+                            onClick={() => handleIniciarConsulta(apt)}
+                          >
+                            <Play className="w-5 h-5 mr-2" /> Continuar consulta
+                          </Button>
+                        ) : apt.estado === 'recuperada' ? (
+                          <Button
+                            className="h-10.75 px-5 text-base w-full sm:w-auto shadow-sm font-bold text-white bg-sky-600 hover:bg-sky-700"
+                            onClick={() => handleIniciarConsulta(apt)}
+                          >
+                            <Play className="w-5 h-5 mr-2" /> Retomar consulta
+                          </Button>
+                        ) : apt.estado === 'programada' && !esFechaPasada(apt.fecha) ? (
+                          <Button
+                            className="h-10.75 px-5 text-base w-full sm:w-auto shadow-sm font-bold text-white bg-green-600 hover:bg-green-700"
+                            onClick={() => handleIniciarConsulta(apt)}
+                          >
+                            <Play className="w-5 h-5 mr-2" /> Iniciar consulta
+                          </Button>
+                        ) : apt.estado === 'completada' ? (
+                          <Button
+                            className="h-10.75 px-5 text-base w-full sm:w-auto shadow-sm font-bold text-white bg-orange-600 hover:bg-orange-700"
+                            onClick={() => handleAccessForms(apt)}
+                          >
+                            <History className="w-5 h-5 mr-2" /> Ver Historial
+                          </Button>
+                        ) : null}
                       </div>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -718,6 +819,58 @@ export default function NutritionPractitionerDashboard() {
         </div>
       </div>
 
+      <ConfirmDialog
+        open={citaFueraDeHora !== null}
+        onOpenChange={(open) => { if (!open) setCitaFueraDeHora(null); }}
+        icon={<Clock className="w-5 h-5 text-orange-500" />}
+        title="Fuera de horario"
+        description={
+          <>
+            Solo puedes iniciar citas en la hora en que están programadas. Esta cita es a las{' '}
+            <span className="font-black text-blue-900">{citaFueraDeHora?.hora?.substring(0, 5)}</span>.
+          </>
+        }
+        infoBox={
+          <>
+            <p className="text-xs text-blue-600 font-bold uppercase tracking-widest">Cita</p>
+            <p className="text-blue-900 font-black text-base">{citaFueraDeHora?.paciente_nombre}</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {citaFueraDeHora?.fecha ? format(new Date(citaFueraDeHora.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy') : ''} &bull; {citaFueraDeHora?.hora?.substring(0, 5)} &bull; Nutrición
+            </p>
+          </>
+        }
+        hideConfirm
+        cancelLabel="Entendido"
+      />
+
+      <ConfirmDialog
+        open={citaParaIniciar !== null}
+        onOpenChange={(open) => { if (!open) setCitaParaIniciar(null); }}
+        icon={<Play className="w-5 h-5 text-green-600" />}
+        title={citaParaIniciar?.estado === 'en_atencion' ? 'Continuar Consulta' : 'Iniciar Consulta'}
+        description={
+          <>
+            ¿Estás seguro de que deseas {citaParaIniciar?.estado === 'en_atencion' ? 'continuar' : 'iniciar'} la consulta con{' '}
+            <span className="font-black text-blue-900">{citaParaIniciar?.paciente_nombre}</span>?
+          </>
+        }
+        infoBox={
+          <>
+            <p className="text-xs text-blue-600 font-bold uppercase tracking-widest">Detalles</p>
+            <p className="text-blue-900 font-black text-base">{citaParaIniciar?.paciente_nombre}</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {citaParaIniciar?.fecha ? format(new Date(citaParaIniciar.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy') : ''} &bull; {citaParaIniciar?.hora?.substring(0, 5)} &bull; Nutrición
+            </p>
+          </>
+        }
+        confirmLabel={citaParaIniciar?.estado === 'en_atencion' ? 'Sí, continuar' : 'Sí, iniciar'}
+        confirmClass={
+          citaParaIniciar?.estado === 'en_atencion'
+            ? 'flex-1 bg-purple-600 hover:bg-purple-700 font-bold text-white shadow-md'
+            : 'flex-1 bg-green-600 hover:bg-green-700 font-bold text-white shadow-md'
+        }
+        onConfirm={doIniciarConsulta}
+      />
     </div>
   );
 }

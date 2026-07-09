@@ -76,18 +76,104 @@ async function sincronizarStatusDesdeAsistencia() {
 }
 
 // ---------------------------------------------------------------------------
+// CIERRE AUTOMÁTICO DE CITAS NO ATENDIDAS
+// Se ejecuta cada minuto.
+//
+// Regla 1: programada → no_asistio
+//   - Estado = 'programada', fecha = hoy (zona México)
+//   - Hora de la cita + 15 min de gracia ya pasó
+//   - Sin documentos clínicos vinculados
+//
+// Regla 2: en_atencion → incompleta  (reemplaza la anterior en_atencion → no_asistio)
+//   - Estado = 'en_atencion'
+//   - timer_expira_en < NOW()  (el timer de 90 min venció)
+//   - Sin importar si hay documentos: el practicante tuvo su ventana y no finalizó
+//   - El borrador se conserva para que pueda recuperarse
+// ---------------------------------------------------------------------------
+
+async function cerrarCitasNoAtendidas() {
+  try {
+    const noDocsFilter = `
+      AND NOT EXISTS (SELECT 1 FROM historiales_nutricion      WHERE appointment_id = c.id)
+      AND NOT EXISTS (SELECT 1 FROM historiales_fisioterapia   WHERE appointment_id = c.id)
+      AND NOT EXISTS (SELECT 1 FROM notas_evolucion            WHERE appointment_id = c.id)
+      AND NOT EXISTS (SELECT 1 FROM consentimientos_informados WHERE appointment_id = c.id)
+    `;
+
+    // Regla 1: programada → no_asistio: solo hoy, 15 min de gracia, sin documentos
+    const resProgramadas = await pool.query(
+      `UPDATE citas c
+          SET estado = 'no_asistio',
+              finalizada_en = NOW()
+        WHERE c.estado = 'programada'
+          AND c.fecha = (NOW() AT TIME ZONE 'America/Mexico_City')::date
+          AND (c.fecha + c.hora)::timestamp + INTERVAL '15 minutes'
+              < (NOW() AT TIME ZONE 'America/Mexico_City')::timestamp
+          ${noDocsFilter}
+        RETURNING id, paciente_id, tipo, hora`
+    );
+
+    // Regla 2: en_atencion → incompleta: timer_expira_en vencido
+    // El borrador se conserva (no se limpia) para que pueda recuperarse.
+    const resEnAtencion = await pool.query(
+      `UPDATE citas c
+          SET estado = 'incompleta',
+              finalizada_en = NOW()
+        WHERE c.estado = 'en_atencion'
+          AND c.timer_expira_en IS NOT NULL
+          AND c.timer_expira_en < NOW()
+        RETURNING id, paciente_id, tipo, hora`
+    );
+
+    const todasNoPresentaron = resProgramadas.rows.map(c => ({ ...c, estadoAnterior: 'programada' }));
+    const todasIncompletas   = resEnAtencion.rows.map(c => ({ ...c, estadoAnterior: 'en_atencion' }));
+
+    for (const cita of todasNoPresentaron) {
+      await pool.query(
+        `INSERT INTO citas_auditoria
+           (cita_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, usuario_rol, motivo)
+         VALUES ($1, $2, 'no_asistio', NULL, NULL, NULL, 'Cierre automático: paciente no se presentó')`,
+        [cita.id, cita.estadoAnterior]
+      );
+    }
+
+    for (const cita of todasIncompletas) {
+      await pool.query(
+        `INSERT INTO citas_auditoria
+           (cita_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, usuario_rol, motivo)
+         VALUES ($1, 'en_atencion', 'incompleta', NULL, NULL, NULL, 'Cierre automático: tiempo de consulta agotado')`,
+        [cita.id]
+      );
+    }
+
+    if (todasNoPresentaron.length > 0) {
+      console.log(`[auto-cierre] ${todasNoPresentaron.length} cita(s) → no_asistio: [${todasNoPresentaron.map(c => `#${c.id}`).join(', ')}]`);
+    }
+    if (todasIncompletas.length > 0) {
+      console.log(`[auto-cierre] ${todasIncompletas.length} cita(s) → incompleta: [${todasIncompletas.map(c => `#${c.id}`).join(', ')}]`);
+    }
+  } catch (error) {
+    console.error('[scheduledTasks] Error en cerrarCitasNoAtendidas:', error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // ARRANQUE
 // ---------------------------------------------------------------------------
 
+async function tick() {
+  await verificarYDesactivarPracticantes();
+  await cerrarCitasNoAtendidas();
+}
+
 function iniciarTareasProgramadas() {
-  // Al arrancar: primero correr el cierre si corresponde, luego sincronizar
-  // desde asistencia. La cadena es no bloqueante — el servidor queda listo
-  // mientras esto corre en background.
-  verificarYDesactivarPracticantes()
+  // Al arrancar: primero correr el tick completo, luego sincronizar desde asistencia.
+  // La cadena es no bloqueante — el servidor queda listo mientras esto corre en background.
+  tick()
     .then(() => sincronizarStatusDesdeAsistencia())
     .catch(err => console.error('[startup] Error en init de tareas:', err.message));
 
-  setInterval(verificarYDesactivarPracticantes, 60000);
+  setInterval(tick, 60000);
 }
 
 module.exports = { iniciarTareasProgramadas };
