@@ -241,53 +241,53 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             background-color: #525659;
             display: flex;
             justify-content: center;
-            padding: 20px;
+            padding: 20px 180px;
             min-height: 100vh;
         }
-        
+
         /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
         .page {
             background-color: #fff;
             width: 100%;
-            max-width: 215.9mm;
-            height: 279.4mm; /* Altura exacta de carta */
-            padding: 12mm 15mm;
+            max-width: calc(100% - 20px);
+            min-height: 279.4mm;
+            padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            color: #5575B3; 
+            color: #5575B3;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 20px; /* Separación ampliada entre las cajas principales */
+            gap: 10px;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
 
-        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: -5px; }
-        .logo { display: flex; flex-direction: column; color: #2A4B8C; width: 120px;}
-        .logo h1 { font-size: 42px; letter-spacing: -2px; margin-bottom: -5px; font-weight: 900; text-transform: lowercase; }
-        .logo p { font-size: 9px; line-height: 1; font-weight: bold; }
+        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0px; }
+        .logo { display: flex; flex-direction: column; color: #2A4B8C; width: 130px;}
+        .logo h1 { font-size: 48px; letter-spacing: -2px; margin-bottom: -5px; font-weight: 900; text-transform: lowercase; }
+        .logo p { font-size: 10px; line-height: 1.1; font-weight: bold; }
         .title-section { flex-grow: 1; margin-left: 15px; display: flex; flex-direction: column;}
-        
+
         .main-title {
             background-color: #2A4B8C;
             color: #fff;
             text-align: center;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
-            padding: 8px 20px;
+            padding: 10px 20px;
             border-radius: 20px;
             print-color-adjust: exact;
         }
         .title-sub-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; padding: 0 10px; }
-        .address { font-size: 10px; color: #5575B3; font-weight: bold;}
-        .fecha-container { display: flex; align-items: flex-end; width: 150px; }
-        
+        .address { font-size: 11px; color: #5575B3; font-weight: bold;}
+        .fecha-container { display: flex; align-items: flex-end; width: 160px; }
+
         .box {
             border: 2px solid #2A4B8C;
             border-radius: 8px;
             position: relative;
-            padding: 16px 12px 12px 12px; /* Padding interior aumentado */
+            padding: 20px 14px 14px 14px;
             background: transparent;
             width: 100%;
             display: flex;
@@ -295,87 +295,88 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         }
         .box-title {
             position: absolute;
-            top: -12px;
+            top: -13px;
             left: 50%;
             transform: translateX(-50%);
             background-color: #2A4B8C;
             color: white;
-            font-size: 12px; /* Letra más grande */
+            font-size: 13px;
             font-weight: bold;
-            padding: 4px 18px;
+            padding: 4px 20px;
             border-radius: 10px;
             print-color-adjust: exact;
             white-space: nowrap;
             z-index: 2;
         }
         .box-title.left-aligned { left: 15px; transform: none; }
-        
-        .form-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin-bottom: 8px; } /* Más espacio entre filas */
+
+        .form-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-bottom: 10px; }
         .field { display: flex; align-items: flex-end; flex-grow: 1; }
-        .field-label { font-weight: bold; font-size: 11px; color: #2A4B8C; margin-right: 4px; white-space: nowrap; }
+        .field-label { font-weight: bold; font-size: 12px; color: #2A4B8C; margin-right: 5px; white-space: nowrap; }
         input.line-input {
             border: none;
-            border-bottom: 1px solid #5575B3;
+            border-bottom: 1.5px solid #5575B3;
             background: transparent;
-            font-size: 11px; /* Texto escrito más grande */
+            font-size: 12px;
             color: #000;
             flex-grow: 1;
-            height: 18px; /* Líneas más altas */
-            min-height: 18px;
+            height: 22px;
+            min-height: 22px;
             outline: none;
             width: 100%;
             font-family: Arial, sans-serif;
+            text-transform: capitalize;
         }
-        
-        .chk-group { display: flex; align-items: center; gap: 6px; color: #5575B3; flex-wrap: wrap;}
-        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 11px;}
+
+        .chk-group { display: flex; align-items: center; gap: 8px; color: #5575B3; flex-wrap: wrap;}
+        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 12px;}
         input[type="checkbox"], input[type="radio"] {
             appearance: none;
-            width: 12px; height: 12px; /* Checkboxes más grandes */
-            border: 1px solid #2A4B8C;
+            width: 13px; height: 13px;
+            border: 1.5px solid #2A4B8C;
             margin-right: 4px; position: relative; cursor: pointer;
             display: grid; place-content: center;
             background-color: #fff;
         }
         input[type="checkbox"]:checked::after, input[type="radio"]:checked::after {
             content: '✓'; position: absolute; top: -3px; left: 1px;
-            font-size: 12px; color: #2A4B8C; font-weight: bold;
+            font-size: 13px; color: #2A4B8C; font-weight: bold;
         }
-        
-        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 10px; flex-wrap: wrap; gap: 5px; }
-        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 11px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 4px; }
-        
+
+        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 10px; flex-wrap: wrap; gap: 6px; }
+        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 12px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 5px; }
+
         .table-responsive { width: 100%; overflow: visible; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         .text-left { text-align: left; padding-left: 6px; }
-        
+
         /* TABLA DE ANTECEDENTES EXPANDIDA */
-        .tabla-antecedentes th, .tabla-antecedentes td { 
-            border: 1px solid #2A4B8C !important; 
-            color: #2A4B8C !important; 
-            padding: 4px 6px; 
-            height: 24px; /* Filas mucho más altas para llenar espacio */
+        .tabla-antecedentes th, .tabla-antecedentes td {
+            border: 1px solid #2A4B8C !important;
+            color: #2A4B8C !important;
+            padding: 5px 6px;
+            height: 27px;
         }
-        .tabla-antecedentes th { background-color: transparent !important; font-size: 11px; }
-        .tabla-antecedentes td.text-left { font-size: 10px; }
-        
+        .tabla-antecedentes th { background-color: transparent !important; font-size: 12px; }
+        .tabla-antecedentes td.text-left { font-size: 11px; }
+
         .grid-60-40 { display: grid; grid-template-columns: 63% 35%; gap: 2%; }
         .grid-3-col { display: grid; grid-template-columns: 28% 34% 34%; gap: 2%; flex-grow: 1;}
-        
-        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 12px; padding: 5px 0; text-align: center; width: 100%; print-color-adjust: exact; margin-bottom: 2px; }
-        
+
+        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 13px; padding: 6px 0; text-align: center; width: 100%; print-color-adjust: exact; margin-bottom: 2px; }
+
         /* LÍNEAS DE ESCRITURA SEPARADAS */
-        .blank-lines { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; flex-grow: 1; justify-content: flex-start; }
-        .motivo-container { display: flex; gap: 15px; flex-grow: 1; padding: 4px 0;}
-        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 14px; justify-content: flex-start; margin-top: 4px; }
-        
+        .blank-lines { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; flex-grow: 1; justify-content: flex-start; }
+        .motivo-container { display: flex; gap: 15px; flex-grow: 1; padding: 6px 0;}
+        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 18px; justify-content: flex-start; margin-top: 6px; }
+
         /* ALICIA AJUSTADA */
-        .alicia-box { width: 180px; font-size: 10px; border-left: 1px solid #2A4B8C; padding-left: 15px; display: flex; flex-direction: column; justify-content: center; line-height: 1.8;}
-        .alicia-box b { color: #2A4B8C; font-size: 12px; margin-bottom: 4px;}
-        
+        .alicia-box { width: 195px; font-size: 11px; border-left: 1.5px solid #2A4B8C; padding-left: 15px; display: flex; flex-direction: column; justify-content: center; line-height: 1.9;}
+        .alicia-box b { color: #2A4B8C; font-size: 13px; margin-bottom: 5px;}
+
         /* FOOTER */
-        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 8px;}
-        .page-num { font-size: 14px; font-weight: bold; color: #2A4B8C; }
+        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 10px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 8px;}
+        .page-num { font-size: 15px; font-weight: bold; color: #2A4B8C; }
         
         .btn-salir-fixed { position: fixed; top: 64px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
         .btn-siguiente-fixed { position: fixed; bottom: 32px; right: 32px; padding: 12px 32px; border-radius: 9999px; font-weight: bold; z-index: 50; border: none; transition: all 0.2s; background-color: #16a34a; color: white; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
@@ -385,16 +386,17 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             @page { size: letter portrait; margin: 0; }
             body, html { height: 100%; overflow: hidden; background-color: #fff; }
             .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: flex !important; justify-content: center !important; }
-            .page { 
-                box-shadow: none !important; 
-                border: none !important; 
-                width: 215.9mm !important; 
-                height: 279.4mm !important; 
-                padding: 10mm 15mm !important; 
-                position: relative !important; 
-                margin: 0 auto !important; 
-                transform: scale(0.96); 
-                transform-origin: top center; 
+            .page {
+                box-shadow: none !important;
+                border: none !important;
+                width: 215.9mm !important;
+                max-width: 215.9mm !important;
+                min-height: 279.4mm !important;
+                padding: 10mm 14mm 8mm 14mm !important;
+                position: relative !important;
+                margin: 0 auto !important;
+                transform: scale(0.96);
+                transform-origin: top center;
             }
             .btn-salir-fixed, .btn-siguiente-fixed { display: none !important; }
         }
@@ -613,13 +615,13 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
+            padding: 20px 180px;
             min-height: 100vh;
         }
 
         .controls-bar-p2 {
             width: 100%;
-            max-width: 215.9mm;
+            max-width: calc(100% - 20px);
             display: flex;
             justify-content: flex-end;
             margin-bottom: 10px;
@@ -692,14 +694,14 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .page-p2 {
             background-color: #fff;
             width: 100%;
-            max-width: 215.9mm;
-            height: 279.4mm;
-            padding: 10mm 15mm;
+            max-width: calc(100% - 20px);
+            min-height: 279.4mm;
+            padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             color: var(--utc-blue);
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 14px;
             position: relative;
             overflow: hidden;
             print-color-adjust: exact;
@@ -719,94 +721,95 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .box-header-p2 {
             background-color: var(--utc-blue);
             color: white;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: bold;
             text-align: center;
-            padding: 5px 0;
+            padding: 7px 0;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
 
         input.line-input-p2 {
             border: none;
-            border-bottom: 1px solid var(--utc-blue);
+            border-bottom: 1.5px solid var(--utc-blue);
             background: transparent;
-            font-size: 11px;
+            font-size: 12px;
             color: #000;
-            height: 16px;
+            height: 20px;
             outline: none;
             width: 100%;
             font-family: Arial, sans-serif;
+            text-transform: capitalize;
         }
 
         .free-text-p2 {
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
-            font-size: 11px;
+            font-size: 12px;
             color: #000;
             outline: none !important;
             resize: none;
             width: 100%;
             height: 100%;
-            min-height: 20px;
+            min-height: 24px;
             font-family: Arial, sans-serif;
-            padding: 2px 6px;
+            padding: 3px 6px;
             box-sizing: border-box;
             display: block;
         }
 
-        .chk-group-p2 { display: flex; align-items: center; gap: 15px; flex-wrap: wrap;}
-        .chk-label-p2 { display: flex; align-items: center; cursor: pointer; font-size: 11px; color: var(--utc-blue);}
-        
+        .chk-group-p2 { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;}
+        .chk-label-p2 { display: flex; align-items: center; cursor: pointer; font-size: 12px; color: var(--utc-blue);}
+
         input[type="checkbox"] {
             appearance: none; -webkit-appearance: none;
-            width: 11px; height: 11px;
-            border: 1px solid var(--utc-blue);
+            width: 13px; height: 13px;
+            border: 1.5px solid var(--utc-blue);
             margin-right: 5px; position: relative; cursor: pointer;
             display: grid; place-content: center;
             background-color: #fff;
         }
         input[type="checkbox"]:checked::before {
             content: '✓';
-            font-size: 10px; color: var(--utc-blue); font-weight: bold;
+            font-size: 11px; color: var(--utc-blue); font-weight: bold;
         }
 
-        .smart-content { display: flex; flex-grow: 1; min-height: 340px; }
-        .smart-left { width: 28%; border-right: 2px solid var(--utc-blue); padding: 10px; display: flex; flex-direction: column; }
-        .smart-right { width: 72%; display: flex; flex-direction: column; padding: 10px 10px 0 10px; }
-        .lines-container { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; flex-grow: 1; }
+        .smart-content { display: flex; flex-grow: 1; min-height: 380px; }
+        .smart-left { width: 28%; border-right: 2px solid var(--utc-blue); padding: 12px; display: flex; flex-direction: column; }
+        .smart-right { width: 72%; display: flex; flex-direction: column; padding: 12px 12px 0 12px; }
+        .lines-container { display: flex; flex-direction: column; gap: 13px; margin-top: 6px; flex-grow: 1; }
 
-        .smart-reminder { font-size: 9px; color: var(--utc-blue); margin-top: 10px; line-height: 1.3; }
-        .smart-reminder ul { list-style: none; padding-left: 0; margin-top: 4px;}
-        
+        .smart-reminder { font-size: 10px; color: var(--utc-blue); margin-top: 12px; line-height: 1.45; }
+        .smart-reminder ul { list-style: none; padding-left: 0; margin-top: 5px;}
+
         .plazos-wrapper { width: 100%; display: flex; flex-direction: column; flex-grow: 1; }
-        .plazos-header { 
-            display: flex; 
-            background-color: var(--utc-blue); 
-            color: white; 
-            border-radius: 10px; 
-            overflow: hidden; 
-            margin-top: 10px; 
+        .plazos-header {
+            display: flex;
+            background-color: var(--utc-blue);
+            color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 12px;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .plazos-header div { flex: 1; text-align: center; font-size: 11px; font-weight: bold; padding: 4px 0; border-right: 1px solid white; }
+        .plazos-header div { flex: 1; text-align: center; font-size: 12px; font-weight: bold; padding: 5px 0; border-right: 1px solid white; }
         .plazos-header div:last-child { border-right: none; }
-        .plazos-columns { display: flex; flex-grow: 1; margin-top: 5px; }
-        .plazos-columns textarea { flex: 1; border: none; border-right: 1px solid var(--utc-blue); background: transparent; resize: none; outline: none; padding: 8px; font-size: 11px; font-family: Arial, sans-serif; color: #000; }
+        .plazos-columns { display: flex; flex-grow: 1; margin-top: 6px; }
+        .plazos-columns textarea { flex: 1; border: none; border-right: 1px solid var(--utc-blue); background: transparent; resize: none; outline: none; padding: 10px; font-size: 12px; font-family: Arial, sans-serif; color: #000; }
         .plazos-columns textarea:last-child { border-right: none; }
 
-        .table-responsive-p2 { width: 100%; overflow: hidden; } 
+        .table-responsive-p2 { width: 100%; overflow: hidden; }
         .tabla-exploracion-p2 { width: 100%; border-collapse: collapse; text-align: center; }
-        .tabla-exploracion-p2 th { color: var(--utc-blue); font-size: 14px; padding: 4px; border-bottom: 1px solid var(--utc-blue); border-right: 1px solid var(--utc-blue); }
-        
-        .tabla-exploracion-p2 td { border: 1px solid var(--utc-blue); height: 22px; padding: 0; vertical-align: middle; }
-        .lbl-col-p2 { color: var(--utc-blue); font-size: 11px; width: 12%; text-align: center; padding: 4px;}
+        .tabla-exploracion-p2 th { color: var(--utc-blue); font-size: 14px; padding: 6px; border-bottom: 1px solid var(--utc-blue); border-right: 1px solid var(--utc-blue); }
 
-        .zona-content { display: flex; padding: 12px 15px; }
-        .zona-left { width: 35%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-right: 1px dashed #ccc; padding-right: 10px; }
-        .zona-right { width: 65%; padding-left: 20px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+        .tabla-exploracion-p2 td { border: 1px solid var(--utc-blue); height: 28px; padding: 0; vertical-align: middle; }
+        .lbl-col-p2 { color: var(--utc-blue); font-size: 12px; width: 12%; text-align: center; padding: 5px;}
+
+        .zona-content { display: flex; padding: 14px 16px; }
+        .zona-left { width: 35%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-right: 1px dashed #ccc; padding-right: 12px; }
+        .zona-right { width: 65%; padding-left: 22px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
 
         .image-marker-container-p2 {
             position: relative;
@@ -815,27 +818,26 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         }
         .image-marker-container-p2 img {
             max-width: 100%;
-            height: 190px;
+            height: 210px;
             object-fit: contain;
         }
         .marker-p2 {
             position: absolute;
             color: red;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 20px;
             transform: translate(-50%, -50%);
-            pointer-events: none; 
+            pointer-events: none;
             text-shadow: 1px 1px 0px white, -1px -1px 0px white, 1px -1px 0px white, -1px 1px 0px white;
         }
 
         .form-row-zona { display: flex; align-items: center; flex-wrap: wrap; }
-        .form-row-zona .lbl { width: 90px; font-weight: bold; font-size: 11px; color: var(--utc-blue); }
-        .otros-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
-        .otros-row .lbl { font-weight: bold; font-size: 11px; color: var(--utc-blue); }
+        .form-row-zona .lbl { width: 95px; font-weight: bold; font-size: 12px; color: var(--utc-blue); }
+        .otros-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+        .otros-row .lbl { font-weight: bold; font-size: 12px; color: var(--utc-blue); }
 
-        /* Ajuste: margin-top: auto empuja el footer hasta el borde inferior */
-        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 5px; }
-        .page-num-p2 { font-size: 14px; font-weight: bold; }
+        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 10px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 6px; }
+        .page-num-p2 { font-size: 15px; font-weight: bold; }
 
         @media print {
             @page { size: letter portrait; margin: 0; }
@@ -845,11 +847,11 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
             .page-p2 {
                 box-shadow: none !important;
                 width: 215.9mm !important;
-                height: 279.4mm !important;
-                padding: 10mm 15mm !important;
+                max-width: 215.9mm !important;
+                min-height: 279.4mm !important;
+                padding: 10mm 14mm 8mm 14mm !important;
                 print-color-adjust: exact !important;
                 -webkit-print-color-adjust: exact !important;
-                /* Ajuste para impresión sin desborde */
                 transform: scale(0.96);
                 transform-origin: top center;
             }
@@ -1205,7 +1207,7 @@ const appointmentId = params.id || params.appointmentId;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
+            padding: 20px 180px;
             min-height: 100vh;
         }
 
@@ -1266,14 +1268,14 @@ const appointmentId = params.id || params.appointmentId;
         .page-p3 {
             background-color: #fff;
             width: 100%;
-            max-width: 215.9mm;
+            max-width: calc(100% - 20px);
             min-height: 279.4mm;
-            padding: 12mm 15mm;
+            padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             color: #1F4287;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 14px;
             position: relative;
             overflow: hidden;
             z-index: 1;
@@ -1308,10 +1310,10 @@ const appointmentId = params.id || params.appointmentId;
         .box-title-p3 {
             background-color: #1F4287;
             color: white;
-            font-size: 14.5px;
+            font-size: 15px;
             font-weight: bold;
             text-align: center;
-            padding: 6px 0;
+            padding: 7px 0;
             border-bottom: 1.5px solid #1F4287;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -1327,18 +1329,18 @@ const appointmentId = params.id || params.appointmentId;
             width: 100%;
             height: 100%;
             font-family: Arial, sans-serif;
-            padding: 4px 6px;
+            padding: 5px 7px;
             display: block;
         }
 
         .tabla-p3 { width: 100%; border-collapse: collapse; text-align: center; height: 100%; }
-        .tabla-p3 th { color: #1F4287; font-size: 12.5px; font-weight: bold; padding: 7px 4px; border: 1px solid #1F4287; }
+        .tabla-p3 th { color: #1F4287; font-size: 13px; font-weight: bold; padding: 8px 5px; border: 1px solid #1F4287; }
         .tabla-p3 td { border: 1px solid #1F4287; padding: 0; vertical-align: middle; }
-        
+
         .movilidad-box-p3 th, .movilidad-box-p3 td, .movilidad-box-p3 textarea, .movilidad-box-p3 span {
-            font-size: 7.2px !important;
+            font-size: 8.5px !important;
         }
-        .movilidad-box-p3 td { height: 12px !important; }
+        .movilidad-box-p3 td { height: 15px !important; }
 
         .image-marker-container-p3 {
             position: relative;
@@ -1346,32 +1348,32 @@ const appointmentId = params.id || params.appointmentId;
             justify-content: center;
             align-items: center;
             height: 100%;
-            min-height: 230px;
+            min-height: 250px;
             cursor: crosshair;
             padding: 10px;
             background-color: #fff;
         }
-        .image-marker-container-p3 img { max-width: 100%; max-height: 220px; object-fit: contain; }
+        .image-marker-container-p3 img { max-width: 100%; max-height: 240px; object-fit: contain; }
         .marker-p3 {
             position: absolute;
             color: #e74c3c;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
             transform: translate(-50%, -50%);
             pointer-events: none;
             text-shadow: 1px 1px 0px white;
         }
 
-        .signatures-area-p3 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 25px; padding: 0 30px; margin-bottom: 10px; }
-        .signature-line-p3 { border-top: 1px solid #1F4287; width: 42%; text-align: center; font-size: 11.5px; color: #1F4287; font-weight: bold; padding-top: 6px; }
-        
-        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #1F4287; margin-top: auto; }
+        .signatures-area-p3 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; padding: 0 30px; margin-bottom: 10px; }
+        .signature-line-p3 { border-top: 1.5px solid #1F4287; width: 42%; text-align: center; font-size: 12px; color: #1F4287; font-weight: bold; padding-top: 7px; }
+
+        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; color: #1F4287; margin-top: auto; }
 
         @media print {
             @page { size: letter portrait; margin: 0; }
             .hc-body-p3 { padding: 0; background: white; }
             .btn-anterior-p3, .btn-finalizar-p3, .eraser-container-p3 { display: none !important; }
-            .page-p3 { box-shadow: none !important; width: 215.9mm !important; height: 279.4mm !important; padding: 10mm 15mm !important; margin: 0 !important; }
+            .page-p3 { box-shadow: none !important; width: 215.9mm !important; max-width: 215.9mm !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 !important; }
         }
       `}</style>
 
