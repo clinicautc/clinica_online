@@ -70,8 +70,8 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
 
 const generateAvailableSlots = () => {
     const slots = [];
-    // Iniciamos el ciclo a las 8 y terminamos a las 17 (5:00 PM)
-    for (let hour = 8; hour <= 17; hour++) {
+    // Iniciamos el ciclo a las 8 y terminamos a las 24 (12:00 AM)
+    for (let hour = 8; hour <= 24; hour++) {
       const hh = hour.toString().padStart(2, '0');
       slots.push(`${hh}:00`); // Solo agregamos la hora en punto
     }
