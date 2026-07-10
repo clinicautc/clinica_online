@@ -89,6 +89,29 @@ const appointmentId = params.id || params.appointmentId;
   cargarHistorialExistente();
 }, [appointmentId]);
 
+    // Auto-reduce font size as user types so text fits within the cell
+    useEffect(() => {
+      const shrink = (el: HTMLInputElement | HTMLTextAreaElement) => {
+        if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'number') return;
+        el.style.fontSize = '';
+        const base = parseFloat(window.getComputedStyle(el).fontSize) || 9;
+        let size = base;
+        while (size > 5.5) {
+          const overflowsH = el.scrollWidth > el.offsetWidth + 1;
+          const overflowsV = el.tagName === 'TEXTAREA' && el.scrollHeight > el.offsetHeight + 1;
+          if (!overflowsH && !overflowsV) break;
+          size -= 0.4;
+          el.style.fontSize = size + 'px';
+        }
+      };
+      const onInput = (e: Event) => {
+        const el = e.target as HTMLInputElement | HTMLTextAreaElement;
+        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) shrink(el);
+      };
+      document.addEventListener('input', onInput, true);
+      return () => document.removeEventListener('input', onInput, true);
+    }, []);
+
     // Función núcleo para actualizar datos sin perder los anteriores
     const updateGlobalData = (page: string, data: any) => {
       setFormData((prev: any) => ({
@@ -97,9 +120,14 @@ const appointmentId = params.id || params.appointmentId;
       }));
     };
 
+    // Capitaliza la primera letra
+    const capFirst = (val: string) => val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
+
     // Manejador de inputs para la Página 1
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, id: string) => {
-      updateGlobalData('pagina_1', { [id]: e.target.value });
+      const { type, value } = e.target;
+      const finalVal = (type !== 'checkbox' && type !== 'number' && type !== 'radio') ? capFirst(value) : value;
+      updateGlobalData('pagina_1', { [id]: finalVal });
     };
 
     const handleNext = () => setStep(2);
@@ -175,7 +203,45 @@ const appointmentId = params.id || params.appointmentId;
     }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-      <div className="bg-zinc-600 min-h-screen flex justify-center p-5 font-sans print:bg-white print:p-0 relative">
+      <>
+      <style>{`
+        @page { size: A4 portrait; margin: 0; }
+        @media print {
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          .p1-outer { background: white !important; padding: 0 !important; }
+          .p1-paper { transform: scale(0.87); transform-origin: top center; box-shadow: none !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+        .p1-paper input[type="text"], .p1-paper textarea {
+          word-break: break-word;
+          overflow-wrap: break-word;
+        }
+        .p1-paper textarea.cell-ta {
+          width: 100%;
+          height: 100%;
+          min-height: 13px;
+          border: none;
+          outline: none;
+          padding: 0 2px;
+          box-sizing: border-box;
+          background: transparent;
+          resize: none;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          overflow: hidden;
+          font-family: inherit;
+          font-size: 9px;
+          line-height: 1.2;
+          color: #333;
+          display: block;
+        }
+        @media print {
+          .p1-paper textarea { overflow: visible !important; height: auto !important; }
+          .p1-paper tr, .p1-paper td { break-inside: avoid; }
+        }
+      `}</style>
+      <div className="p1-outer bg-zinc-600 min-h-screen flex flex-col items-center px-2 sm:px-6 md:px-12 lg:px-24 xl:px-[220px] pt-5 pb-24 font-sans print:bg-white print:p-0 relative">
         
         {/* --- RENDERIZADO DINÁMICO DE PÁGINAS --- */}
         {step === 2 && (
@@ -231,7 +297,7 @@ const appointmentId = params.id || params.appointmentId;
           </button>
 
           {/* CONTENEDOR HOJA A4 (DISEÑO UNIFORME SIN SUPERPOSICIONES) */}
-          <div className="bg-white w-[210mm] h-[297mm] px-[8mm] pt-[6mm] pb-[6mm] relative shadow-2xl flex flex-col justify-between overflow-hidden text-[#2c5392] print:shadow-none print:w-[210mm] print:h-[297mm] print:p-[8mm] print:m-0">
+          <div className="p1-paper bg-white w-full px-[8mm] pt-[6mm] pb-[6mm] relative shadow-2xl flex flex-col justify-between overflow-hidden text-[#2c5392] border-[3.5px] border-[#2c5392] rounded-[25px] print:shadow-none print:m-0">
             
             {/* ENCABEZADO */}
             <header className="flex justify-between items-start mb-1 shrink-0">
@@ -550,11 +616,10 @@ const appointmentId = params.id || params.appointmentId;
                 <div className="flex flex-col justify-between h-full border-t-[1.5px] border-[#2c5392]">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="border-b-[1.5px] border-[#2c5392] last:border-b-0 flex-1 flex items-center">
-                      <input
-                        type="text"
+                      <textarea
                         value={formData.pagina_1[`diag-med-${i}`] || ''}
                         onChange={(e) => updateGlobalData('pagina_1', {[`diag-med-${i}`]: e.target.value})}
-                        className="w-full h-full border-none outline-none px-2 bg-transparent text-[9px] text-[#333]"
+                        className="cell-ta"
                       />
                     </div>
                   ))}
@@ -683,6 +748,7 @@ const appointmentId = params.id || params.appointmentId;
           </div>
         </div>
       </div>
+      </>
     );
   });
 
@@ -723,7 +789,8 @@ const appointmentId = params.id || params.appointmentId;
           lineHeight: `${lineHeight}px`,
           height: `${totalHeight}px`
         }}
-        className="w-full resize-none border-none outline-none text-[#333] text-[10px] bg-repeat-y bg-transparent px-1 m-0 p-0 block overflow-hidden box-border"
+        autoCapitalize="sentences"
+        className="w-full resize-none border-none outline-none text-[#333] text-[9px] bg-repeat-y bg-transparent px-1 m-0 p-0 block overflow-y-auto box-border break-words"
       />
     );
   };
@@ -756,9 +823,11 @@ const appointmentId = params.id || params.appointmentId;
   // Las llenaremos conforme me pases los códigos.
 
   function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext, isReadOnly }: PageProps) {
+    const capFirst2 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value, type } = e.target;
-      const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
+      const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : (isText ? capFirst2(value) : value);
       onUpdate('pagina_2', { [name]: val });
     };
 
@@ -771,19 +840,6 @@ const appointmentId = params.id || params.appointmentId;
             --border-blue: #1d4d96;
             --pdf-grey: #525659;
             --btn-cobalt: #1d4d96;
-          }
-
-          .form-container {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            margin: 0;
-            padding: 20px 20px 60px 20px; 
-            background-color: var(--pdf-grey);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            position: relative;
-            box-sizing: border-box;
           }
 
           .nav-button {
@@ -808,12 +864,13 @@ const appointmentId = params.id || params.appointmentId;
           .btn-next { right: 40px; }
 
           .page {
-            width: 800px;
+            width: 100%;
             background-color: white;
-            padding: 25px;
+            padding: 20px;
             box-sizing: border-box;
-            border: none;
-            box-shadow: 0 0 35px rgba(0,0,0,0.7);
+            border: 3.5px solid #2c5392;
+            border-radius: 25px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
             position: relative;
           }
 
@@ -1015,8 +1072,43 @@ const appointmentId = params.id || params.appointmentId;
             outline: none;
             padding: 0 3px;
             box-sizing: border-box;
-            font-size: 8.5px;
+            font-size: 7.5px;
             background: transparent;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            text-transform: capitalize;
+          }
+          td textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 14px;
+            border: none;
+            outline: none;
+            padding: 0 3px;
+            box-sizing: border-box;
+            font-size: 7.5px;
+            background: transparent;
+            resize: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            overflow: hidden;
+            font-family: inherit;
+            line-height: 1.2;
+            display: block;
+          }
+          input[type="text"], textarea {
+            word-break: break-word;
+            overflow-wrap: break-word;
+          }
+          textarea {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+          }
+          @media print {
+            td textarea { overflow: visible !important; height: auto !important; }
+            td { height: auto !important; }
+            tr { break-inside: avoid; }
           }
 
           .label-cell {
@@ -1038,15 +1130,16 @@ const appointmentId = params.id || params.appointmentId;
             padding-top: 4px;
           }
 
+          @page { size: A4 portrait; margin: 0; }
           @media print {
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .nav-button { display: none !important; }
-            .form-container { background-color: white !important; padding: 0 !important; }
-            .page { width: 100% !important; box-shadow: none !important; transform: scale(0.98); transform-origin: top center; }
+            html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+            .page { width: 100% !important; box-shadow: none !important; transform: scale(0.87); transform-origin: top center; }
           }
         `}</style>
 
-        <div className="form-container">
+        <div className="w-full">
           <button onClick={onBack} className="nav-button btn-back">← Página 1</button>
           <button onClick={onNext} className="nav-button btn-next">Página 3 →</button>
 
@@ -1163,11 +1256,10 @@ const appointmentId = params.id || params.appointmentId;
                         </td>
                         <td className={row.d ? "" : "dark-cell"}>
                           {row.d && (
-                            <input 
-                              type="text" 
-                              name={`antrop_${row.n}_int`} 
-                              value={accumulatedData.pagina_2?.[`antrop_${row.n}_int`] || ''} 
-                              onChange={handleLocalChange} 
+                            <textarea
+                              name={`antrop_${row.n}_int`}
+                              value={accumulatedData.pagina_2?.[`antrop_${row.n}_int`] || ''}
+                              onChange={handleLocalChange}
                               disabled={isReadOnly}
                             />
                           )}
@@ -1229,29 +1321,27 @@ const appointmentId = params.id || params.appointmentId;
                     {Array.from({ length: 28 }).map((_, i) => (
                       <tr key={i}>
                         <td>
-                          <input 
-                            type="text" 
-                            name={`bq_${i}_nom`} 
-                            value={accumulatedData.pagina_2?.[`bq_${i}_nom`] || ''} 
-                            onChange={handleLocalChange} 
+                          <textarea
+                            name={`bq_${i}_nom`}
+                            value={accumulatedData.pagina_2?.[`bq_${i}_nom`] || ''}
+                            onChange={handleLocalChange}
                             disabled={isReadOnly}
                           />
                         </td>
                         <td>
-                          <input 
-                            type="text" 
-                            name={`bq_${i}_vo`} 
-                            value={accumulatedData.pagina_2?.[`bq_${i}_vo`] || ''} 
-                            onChange={handleLocalChange} 
+                          <input
+                            type="text"
+                            name={`bq_${i}_vo`}
+                            value={accumulatedData.pagina_2?.[`bq_${i}_vo`] || ''}
+                            onChange={handleLocalChange}
                             disabled={isReadOnly}
                           />
                         </td>
                         <td>
-                          <input 
-                            type="text" 
-                            name={`bq_${i}_int`} 
-                            value={accumulatedData.pagina_2?.[`bq_${i}_int`] || ''} 
-                            onChange={handleLocalChange} 
+                          <textarea
+                            name={`bq_${i}_int`}
+                            value={accumulatedData.pagina_2?.[`bq_${i}_int`] || ''}
+                            onChange={handleLocalChange}
                             disabled={isReadOnly}
                           />
                         </td>
@@ -1334,20 +1424,22 @@ const appointmentId = params.id || params.appointmentId;
       }
     };
 
+    const capFirst3 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement;
       const { name, value, type } = target;
       const checked = (target as HTMLInputElement).checked;
-      const newValue = type === 'checkbox' ? checked : value;
+      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
+      const newValue = type === 'checkbox' ? checked : (isText ? capFirst3(value) : value);
       onUpdate('pagina_3', { [name]: newValue });
     };
 
     const styles: { [key: string]: React.CSSProperties } = {
       contenedorMaestro: {
         backgroundColor: '#ffffff',
-        width: '210mm', 
-        minHeight: '279mm', 
-        border: '3.5px solid #2c5697',
+        width: '100%',
+        minHeight: '279mm',
+        border: '3.5px solid #2c5392',
         borderRadius: '25px',
         padding: '12px',
         boxSizing: 'border-box',
@@ -1472,15 +1564,8 @@ const appointmentId = params.id || params.appointmentId;
               --brand-blue: #2c5697;
             }
 
-            html, body {
-              margin: 0;
-              padding: 0;
-              background-color: var(--pdf-grey) !important;
-              min-height: 100%;
-            }
-
             @page {
-              size: letter;
+              size: A4 portrait;
               margin: 0;
             }
 
@@ -1495,17 +1580,14 @@ const appointmentId = params.id || params.appointmentId;
                 color-adjust: exact !important;
               }
 
-              .form-container { 
-                background-color: #ffffff !important; 
-                padding: 0 !important; 
-              }
-
-              .contenedor-maestro-perimetral { 
-                box-shadow: none !important; 
-                border: 3.5px solid var(--brand-blue) !important; 
+              .contenedor-maestro-perimetral {
+                box-shadow: none !important;
+                border: 3.5px solid #2c5392 !important;
                 margin: 0 !important;
                 background-color: #ffffff !important;
                 -webkit-print-color-adjust: exact !important;
+                transform: scale(0.87);
+                transform-origin: top center;
               }
 
               div[style*="backgroundColor: rgb(44, 86, 151)"],
@@ -1523,19 +1605,6 @@ const appointmentId = params.id || params.appointmentId;
 
               input { border: none !important; outline: none !important; }
               .nav-button { display: none !important; }
-            }
-
-            .form-container {
-              font-family: 'Segoe UI', Arial, sans-serif;
-              margin: 0;
-              padding: 40px 20px; 
-              background-color: var(--pdf-grey);
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              min-height: 100vh;
-              position: relative;
-              box-sizing: border-box;
             }
 
             .nav-button {
@@ -1573,11 +1642,67 @@ const appointmentId = params.id || params.appointmentId;
               outline: none;
               padding: 0;
               margin: 0;
+              word-break: break-word;
+              overflow-wrap: break-word;
+            }
+            input[type="text"], textarea {
+              word-break: break-word;
+              overflow-wrap: break-word;
+            }
+            textarea {
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            textarea.ta-cell {
+              width: 100%;
+              height: 100%;
+              min-height: 14px;
+              border: none;
+              outline: none;
+              padding: 0 2px;
+              box-sizing: border-box;
+              background: transparent;
+              resize: none;
+              white-space: pre-wrap;
+              word-break: break-word;
+              overflow-wrap: break-word;
+              overflow: hidden;
+              font-family: inherit;
+              font-size: 7.2px;
+              line-height: 1.2;
+              color: #2c5697;
+              display: block;
+              text-align: left;
+            }
+            textarea.ta-linea {
+              width: 100%;
+              height: 22px;
+              border: none;
+              border-bottom: 1px solid #2c5697;
+              outline: none;
+              padding: 2px 5px;
+              box-sizing: border-box;
+              background: transparent;
+              resize: none;
+              white-space: pre-wrap;
+              word-break: break-word;
+              overflow-wrap: break-word;
+              overflow: hidden;
+              font-family: inherit;
+              font-size: inherit;
+              color: #2c5697;
+              display: block;
+              line-height: 1.2;
+            }
+            @media print {
+              textarea.ta-cell, textarea.ta-linea { overflow: visible !important; height: auto !important; }
+              tr { break-inside: avoid; }
+              td { height: auto !important; }
             }
             input[type="number"] { text-align: center; -moz-appearance: textfield; }
-            input[type="number"]::-webkit-inner-spin-button, 
+            input[type="number"]::-webkit-inner-spin-button,
             input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-            
+
             .linea-escritura {
               border-bottom: 1px solid #2c5697;
               text-align: left;
@@ -1614,7 +1739,7 @@ const appointmentId = params.id || params.appointmentId;
           `}
         </style>
         
-        <div className="form-container">
+        <div className="w-full">
           {/* BOTONES DE NAVEGACIÓN */}
           <button onClick={onBack} className="nav-button btn-back">
             ← Página 2
@@ -1694,8 +1819,8 @@ const appointmentId = params.id || params.appointmentId;
                       return (
                       <tr key={idx}>
                         <td className="celda-hallazgo-compacta" style={{ ...styles.thTd, ...styles.alignLeftPadding, width: '40%' }}>{item}</td>
-                        <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" name={`hallazgo_${itemKey}_desc`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_desc`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{textAlign: 'left', fontSize: '7.2px'}} /></td>
-                        <td className="celda-hallazgo-compacta" style={styles.thTd}><input type="text" name={`hallazgo_${itemKey}_den`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_den`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{fontSize: '7.2px'}} /></td>
+                        <td className="celda-hallazgo-compacta" style={styles.thTd}><textarea className="ta-cell" name={`hallazgo_${itemKey}_desc`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_desc`] || ''} onChange={handleLocalChange} style={{textAlign: 'left'}} /></td>
+                        <td className="celda-hallazgo-compacta" style={styles.thTd}><textarea className="ta-cell" name={`hallazgo_${itemKey}_den`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_den`] || ''} onChange={handleLocalChange} /></td>
                       </tr>
                       );
                     })}
@@ -1723,7 +1848,7 @@ const appointmentId = params.id || params.appointmentId;
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} style={{ display: 'flex' }}>
                       <div style={{ width: '20%', borderRight: '1.5px solid #2c5697' }}><input name={`rec_hora_${i}`} value={accumulatedData.pagina_3?.[`rec_hora_${i}`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} className="linea-escritura" style={{textAlign: 'center'}} /></div>
-                      <div style={{ width: '80%' }}><input name={`rec_contenido_${i}`} value={accumulatedData.pagina_3?.[`rec_contenido_${i}`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} className="linea-escritura" /></div>
+                      <div style={{ width: '80%' }}><textarea name={`rec_contenido_${i}`} value={accumulatedData.pagina_3?.[`rec_contenido_${i}`] || ''} onChange={handleLocalChange} className="ta-linea" /></div>
                     </div>
                   ))}
                 </div>
@@ -1867,11 +1992,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
     const navigate = useNavigate();
     const { appointmentId } = useParams()
 
+    const capFirst4 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement;
       const { name, value, type } = target;
       const checked = (target as HTMLInputElement).checked;
-      const newValue = type === 'checkbox' ? checked : value;
+      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
+      const newValue = type === 'checkbox' ? checked : (isText ? capFirst4(value) : value);
       onUpdate('pagina_4', { [name]: newValue });
     };
 
@@ -1928,7 +2055,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
         fontFamily: 'Segoe UI, Arial, sans-serif',
         backgroundColor: '#525659',
         minHeight: '100vh',
-        padding: '40px 20px',
+        padding: '40px 180px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -1936,16 +2063,16 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
       },
       container: {
         backgroundColor: '#ffffff',
-        width: '210mm',
+        width: '100%',
         minHeight: '279mm',
-        border: '3.5px solid #1a428a',
+        border: '3.5px solid #2c5392',
         borderRadius: '25px',
         padding: '15px',
         boxSizing: 'border-box',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
       },
       btnNavigation: {
         position: 'fixed',
@@ -2130,6 +2257,9 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
         resize: 'none',
         padding: '4px',
         boxSizing: 'border-box',
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
       },
       inputLine: {
         border: 'none',
@@ -2154,36 +2284,45 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
     };
 
     return (
-      <div style={styles.bodyWrapper}>
+      <div className="w-full">
         <style>
           {`
+            @page { size: A4 portrait; margin: 0; }
             @media print {
-              @page {
-                size: auto;
-                margin: 0mm;
-              }
               .no-print { display: none !important; }
-              html, body { 
-                background-color: white !important; 
-                margin: 0; 
-                padding: 0; 
-                height: 100%;
-                overflow: hidden;
+              html, body {
+                background-color: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-                }
+              }
+              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
               .body-wrapper { background-color: white !important; padding: 0 !important; }
-              .printable-page { 
+              .printable-page {
                 box-shadow: none !important;
-                border: 3.5px solid #1a428a !important;
-                width: 100% !important; 
+                border: 3.5px solid #2c5392 !important;
+                width: 100% !important;
                 margin: 0 !important;
-                border-radius: 0 !important;
-                transform: scale(0.97);
+                border-radius: 25px !important;
+                transform: scale(0.87);
                 transform-origin: top center;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
+            }
+            .printable-page input[type="text"], .printable-page textarea {
+              word-break: break-word;
+              overflow-wrap: break-word;
+            }
+            .printable-page textarea {
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            @media print {
+              .printable-page textarea { overflow: visible !important; height: auto !important; }
+              .printable-page tr { break-inside: avoid; }
+              .printable-page td { height: auto !important; }
             }
           `}
         </style>
@@ -2274,10 +2413,31 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
               <div style={styles.card}>
                 <div style={styles.cardHeader}>Indicación de Alimentos/Nutrimentos</div>
                 <div style={{padding: '5px'}}>
-                  <input type="text" name="indicacion_1" value={accumulatedData.pagina_4?.indicacion_1 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                  <input type="text" name="indicacion_2" value={accumulatedData.pagina_4?.indicacion_2 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                  <input type="text" name="indicacion_3" value={accumulatedData.pagina_4?.indicacion_3 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
-                  <input type="text" name="indicacion_4" value={accumulatedData.pagina_4?.indicacion_4 || ''} onChange={handleLocalChange} style={{...styles.inputLine, width: '100%', marginBottom: '4px', fontSize: '8px'}} />
+                  {(['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'] as const).map((key) => (
+                    <textarea
+                      key={key}
+                      name={key}
+                      value={accumulatedData.pagina_4?.[key] || ''}
+                      onChange={handleLocalChange}
+                      style={{
+                        ...styles.inputLine,
+                        width: '100%',
+                        marginBottom: '4px',
+                        fontSize: '8px',
+                        resize: 'none',
+                        overflow: 'hidden',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        minHeight: '18px',
+                        height: 'auto',
+                        display: 'block',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.3',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -2407,8 +2567,14 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
           </table>
 
           <div style={{marginTop: 'auto', display: 'flex', justifyContent: 'space-around', textAlign: 'center', paddingBottom: '15px', fontSize: '10px'}}>
-            <div style={{width: '40%', borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, matrícula y firma del alumno</div>
-            <div style={{width: '40%', borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, cédula y firma del docente responsable</div>
+            <div style={{width: '40%'}}>
+              <input type="text" name="firma_alumno" value={accumulatedData.pagina_4?.firma_alumno || ''} onChange={handleLocalChange} autoCapitalize="sentences" style={{width: '100%', border: 'none', borderBottom: '1px solid #1a428a', outline: 'none', fontSize: '10px', textAlign: 'center', background: 'transparent', marginBottom: '4px', color: '#1a428a'}} />
+              <div style={{borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, matrícula y firma del alumno</div>
+            </div>
+            <div style={{width: '40%'}}>
+              <input type="text" name="firma_docente" value={accumulatedData.pagina_4?.firma_docente || ''} onChange={handleLocalChange} autoCapitalize="sentences" style={{width: '100%', border: 'none', borderBottom: '1px solid #1a428a', outline: 'none', fontSize: '10px', textAlign: 'center', background: 'transparent', marginBottom: '4px', color: '#1a428a'}} />
+              <div style={{borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, cédula y firma del docente responsable</div>
+            </div>
           </div>
 
           <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '8px'}}>
