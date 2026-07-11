@@ -225,6 +225,14 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     )
   },
+  {
+    path: '/forms/seguimiento/:appointmentId',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <HojaEvolutiva />
+      </ProtectedRoute>
+    )
+  },
 
   /**
    * RUTA: WORKSPACE DE CONSULTA (popup window)

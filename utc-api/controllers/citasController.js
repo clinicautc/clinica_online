@@ -583,16 +583,20 @@ async function finalizar(req, res) {
       return res.status(409).json({ error: 'La cita no está en atención.', estadoActual: cita.estado });
     }
 
-    const documentosExistentes = await getDocumentosExistentes(id, cita.tipo, cita.tipo_consulta);
-    const documentosRequeridos = getDocumentosRequeridos(cita.tipo, cita.tipo_consulta);
-    const faltantes = documentosRequeridos.filter(d => !documentosExistentes.includes(d));
+    // La validación de documentos solo aplica a la primera consulta.
+    // Las consultas subsecuentes (nota evolutiva / seguimiento) no requieren esta verificación.
+    if (cita.tipo_consulta === 'primera') {
+      const documentosExistentes = await getDocumentosExistentes(id, cita.tipo, cita.tipo_consulta);
+      const documentosRequeridos = getDocumentosRequeridos(cita.tipo, cita.tipo_consulta);
+      const faltantes = documentosRequeridos.filter(d => !documentosExistentes.includes(d));
 
-    if (faltantes.length > 0) {
-      return res.status(422).json({
-        error: 'Faltan documentos clínicos requeridos.',
-        documentosFaltantes: faltantes,
-        documentosExistentes
-      });
+      if (faltantes.length > 0) {
+        return res.status(422).json({
+          error: 'Faltan documentos clínicos requeridos.',
+          documentosFaltantes: faltantes,
+          documentosExistentes
+        });
+      }
     }
 
     const updated = await pool.query(

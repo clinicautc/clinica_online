@@ -36,6 +36,20 @@ interface MedicalHistory {
   numero_consulta?: number | null;
 }
 
+interface EvolucionRecord {
+  id: string | number;
+  paciente_id?: string | number;
+  nombre_completo?: string;
+  numero_expediente?: string;
+  appointment_id?: string | number;
+  fecha_elaboracion?: string;
+  fecha_creacion?: string;
+  cuadro_evolucion?: Record<string, any>;
+  area?: string;
+  creado_por_nombre?: string;
+  numero_consulta?: number | null;
+}
+
 interface MedicalHistoryViewerProps {
   filterType?: 'fisioterapia' | 'nutricion';
 }
@@ -60,6 +74,8 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
   // --- ESTADOS ---
   const [histories, setHistories] = useState<MedicalHistory[]>([]);
+  const [evolucionRecords, setEvolucionRecords] = useState<EvolucionRecord[]>([]);
+  const [loadingEvolucion, setLoadingEvolucion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | number | null>(null);
@@ -114,7 +130,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
           setPatientName(userData.nombre);
         }
 
-        // PASO 2: Traer los historiales clínicos según el área seleccionada
+        // PASO 2: Traer los historiales clínicos (Historial Médico inicial) según el área seleccionada
         const response = await apiFetch(`/historiales-${selectedArea}/paciente/${id}`);
 
         if (response.ok) {
@@ -128,8 +144,25 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
           setDetectedArea(selectedArea);
         } else {
           setHistories([]);
-          // Usar setter funcional para no leer patientName del closure
           setPatientName(prev => prev || "Sin registros previos");
+        }
+
+        // PASO 3: Traer las notas evolutivas desde su endpoint exclusivo
+        try {
+          setLoadingEvolucion(true);
+          const evolResponse = await apiFetch(`/notas-evolutivas/paciente/${id}`);
+          if (evolResponse.ok) {
+            const evolData: EvolucionRecord[] = await evolResponse.json();
+            // Mostramos todos los registros de notas_evolucion; cuadro_evolucion puede llegar como objeto vacío o null según backend
+            const soloEvolucion = evolData.filter((r) => r.id != null);
+            setEvolucionRecords(soloEvolucion);
+          } else {
+            setEvolucionRecords([]);
+          }
+        } catch {
+          setEvolucionRecords([]);
+        } finally {
+          setLoadingEvolucion(false);
         }
       } catch (error) {
         console.error("Error al cargar datos desde PostgreSQL:", error);
@@ -447,40 +480,46 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                   <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
                 </CardHeader>
                 <CardContent className="p-7">
-                  {filteredHistories.length === 0 ? (
+                  {loadingEvolucion ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-4">
+                      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+                      <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Cargando notas evolutivas...</p>
+                    </div>
+                  ) : evolucionRecords.length === 0 ? (
                     <div className="text-center py-12">
                       <TrendingUp className="w-16 h-16 mx-auto text-slate-200 mb-4" />
-                      <p className="text-slate-500 font-medium">No hay datos de evolución para mostrar.</p>
+                      <p className="text-slate-500 font-medium">No hay notas de seguimiento registradas para este paciente.</p>
                     </div>
                   ) : (
                     <div className="relative">
-                      {[...filteredHistories]
-                        .sort((a, b) => new Date(a.fecha_creacion).getTime() - new Date(b.fecha_creacion).getTime())
-                        .map((history, index, sorted) => {
-                          const isFisio = history.tipo === 'fisioterapia';
-                          const accentLine  = isFisio ? 'bg-blue-200'  : 'bg-orange-200';
-                          const accentDot   = isFisio ? 'bg-blue-600'  : 'bg-orange-500';
-                          const accentBorder= isFisio ? 'border-blue-100' : 'border-orange-100';
-                          const accentBg    = isFisio ? 'bg-blue-50'   : 'bg-orange-50';
-                          const accentText  = isFisio ? 'text-blue-900': 'text-orange-700';
-                          const accentPill  = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
-                          const accentBtn   = isFisio ? 'bg-blue-900'  : 'bg-orange-600';
-                          const isExpanded  = expandedEvolucionId === history.id;
-                          const numConsulta = history.numero_consulta ?? history.appointment_id;
-                          const isLast      = index === sorted.length - 1;
+                      {[...evolucionRecords]
+                        .sort((a, b) => {
+                          const dateA = a.fecha_creacion || a.fecha_elaboracion || '';
+                          const dateB = b.fecha_creacion || b.fecha_elaboracion || '';
+                          return new Date(dateA).getTime() - new Date(dateB).getTime();
+                        })
+                        .map((evol, index, sorted) => {
+                          const isFisio = (evol.area || '').toLowerCase() === 'fisioterapia';
+                          const accentLine   = isFisio ? 'bg-blue-200'  : 'bg-orange-200';
+                          const accentDot    = isFisio ? 'bg-blue-600'  : 'bg-orange-500';
+                          const accentBorder = isFisio ? 'border-blue-100' : 'border-orange-100';
+                          const accentBg     = isFisio ? 'bg-blue-50'   : 'bg-orange-50';
+                          const accentText   = isFisio ? 'text-blue-900': 'text-orange-700';
+                          const accentPill   = isFisio ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
+                          const accentBtn    = isFisio ? 'bg-blue-900'  : 'bg-orange-600';
+                          const isExpanded   = expandedEvolucionId === evol.id;
+                          const numConsulta  = evol.numero_consulta ?? evol.appointment_id;
+                          const isLast       = index === sorted.length - 1;
+                          const fechaMostrar = evol.fecha_creacion || evol.fecha_elaboracion || '';
 
                           return (
-                            <div key={history.id} className={`relative pl-10 ${isLast ? 'pb-0' : 'pb-6'}`}>
-                              {/* Línea vertical de timeline */}
+                            <div key={evol.id} className={`relative pl-10 ${isLast ? 'pb-0' : 'pb-6'}`}>
                               {!isLast && (
                                 <div className={`absolute left-3 top-6 bottom-0 w-0.5 ${accentLine}`} />
                               )}
-                              {/* Dot */}
                               <div className={`absolute left-0 top-0 w-6 h-6 rounded-full ${accentDot} border-4 border-white shadow-md`} />
 
-                              {/* Tarjeta */}
                               <div className={`border ${accentBorder} rounded-2xl bg-white overflow-hidden shadow-sm`}>
-                                {/* Cabecera de la tarjeta */}
                                 <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -494,15 +533,19 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                       )}
                                     </div>
                                     <div className="flex flex-wrap gap-3 text-[11px] font-bold text-slate-500">
-                                      <span><Calendar className="w-3.5 h-3.5 inline mr-1" />{format(parseISO(history.fecha_creacion), "PPP", { locale: es })}</span>
-                                      <span><User className="w-3.5 h-3.5 inline mr-1" />{history.creado_por_nombre}</span>
+                                      {fechaMostrar && (
+                                        <span><Calendar className="w-3.5 h-3.5 inline mr-1" />{format(parseISO(fechaMostrar), "PPP", { locale: es })}</span>
+                                      )}
+                                      {evol.creado_por_nombre && (
+                                        <span><User className="w-3.5 h-3.5 inline mr-1" />{evol.creado_por_nombre}</span>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex gap-2 flex-shrink-0">
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setExpandedEvolucionId(isExpanded ? null : history.id)}
+                                      onClick={() => setExpandedEvolucionId(isExpanded ? null : evol.id)}
                                       className="font-bold rounded-xl"
                                     >
                                       {isExpanded ? 'CERRAR' : 'DETALLES'}
@@ -511,8 +554,8 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                       size="sm"
                                       className={`${accentBtn} text-white font-black`}
                                       onClick={() => {
-                                        if (history.appointment_id) {
-                                          navigate(`/forms/${history.tipo}/${history.appointment_id}`);
+                                        if (evol.appointment_id) {
+                                          navigate(`/forms/seguimiento/${evol.appointment_id}`);
                                         } else {
                                           toast.error("Este registro no está vinculado a ninguna cita.");
                                         }
@@ -523,7 +566,6 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                   </div>
                                 </div>
 
-                                {/* Panel de detalles expandido */}
                                 {isExpanded && (
                                   <div className={`border-t ${accentBorder} ${accentBg} px-5 py-4`}>
                                     <p className={`text-xs font-black uppercase tracking-widest ${accentText} mb-3`}>
@@ -537,30 +579,35 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                       </div>
                                       <div className="bg-white rounded-xl p-4 shadow-sm">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Consulta origen</p>
-                                        {history.numero_consulta ? (
+                                        {evol.numero_consulta ? (
                                           <>
-                                            <p className={`font-black text-xl ${accentText}`}>#{history.numero_consulta}</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">ID cita: {history.appointment_id}</p>
+                                            <p className={`font-black text-xl ${accentText}`}>#{evol.numero_consulta}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">ID cita: {evol.appointment_id}</p>
                                           </>
-                                        ) : history.appointment_id ? (
-                                          <p className={`font-black text-xl ${accentText}`}>ID #{history.appointment_id}</p>
+                                        ) : evol.appointment_id ? (
+                                          <p className={`font-black text-xl ${accentText}`}>ID #{evol.appointment_id}</p>
                                         ) : (
                                           <p className="font-bold text-slate-400 text-sm">Sin cita vinculada</p>
                                         )}
                                       </div>
                                       <div className="bg-white rounded-xl p-4 shadow-sm">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Fecha de carga</p>
-                                        <p className={`font-black text-sm ${accentText}`}>
-                                          {format(parseISO(history.fecha_creacion), "d 'de' MMMM yyyy", { locale: es })}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">
-                                          {format(parseISO(history.fecha_creacion), "HH:mm 'hrs'")}
-                                        </p>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Fecha de registro</p>
+                                        {fechaMostrar ? (
+                                          <>
+                                            <p className={`font-black text-sm ${accentText}`}>
+                                              {format(parseISO(fechaMostrar), "d 'de' MMMM yyyy", { locale: es })}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                              {format(parseISO(fechaMostrar), "HH:mm 'hrs'")}
+                                            </p>
+                                          </>
+                                        ) : (
+                                          <p className="font-bold text-slate-400 text-sm">Sin fecha</p>
+                                        )}
                                       </div>
                                       <div className="bg-white rounded-xl p-4 shadow-sm">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Registrado por</p>
-                                        <p className={`font-black text-sm ${accentText} leading-tight`}>{history.creado_por_nombre}</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5 capitalize">{history.tipo}</p>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Área</p>
+                                        <p className={`font-black text-sm ${accentText} leading-tight capitalize`}>{evol.area || 'N/A'}</p>
                                       </div>
                                     </div>
                                   </div>

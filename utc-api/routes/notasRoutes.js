@@ -7,6 +7,7 @@ const STAFF        = ['practicante', 'admin', 'master'];
 const COORDINACION = ['admin', 'master'];
 
 router.get('/notas-evolucion/:id', requireAuth, requireRole(STAFF), notasController.getEvolucion);
+router.get('/notas-evolutivas/paciente/:id', notasController.getEvolucionByPaciente);
 router.post('/notas-evolucion', requireAuth, requireRole(STAFF), notasController.createEvolucion);
 router.put('/notas-evolucion/:id', requireAuth, requireRole(STAFF), notasController.updateEvolucion);
 

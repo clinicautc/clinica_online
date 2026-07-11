@@ -223,7 +223,8 @@ const ConsultaWorkspace: React.FC = () => {
   const handleSaveSuccess = async (_formKey: string) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     try {
-      if (pendingConsent) {
+      // El consentimiento solo se sube en la primera consulta
+      if (pendingConsent && cita?.tipo_consulta === 'primera') {
         await citasAPI.uploadConsentimiento(citaId!, pendingConsent.base64, pendingConsent.mimeType);
         setPendingConsent(null);
       }
@@ -595,7 +596,7 @@ const ConsultaWorkspace: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Tarjeta: Consentimiento Informado */}
-                {cita?.documentosRequeridos?.includes('consentimiento') && (
+                {cita?.documentosRequeridos?.includes('consentimiento') && cita?.tipo_consulta === 'primera' && (
                   <div className={`p-5 rounded-xl shadow-sm transition-all ${consentSubido ? accent.cardBorder : 'bg-white border border-gray-200'}`}>
                     <div className="flex items-start gap-3">
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${consentSubido ? accent.iconBg : 'bg-gray-100'}`}>

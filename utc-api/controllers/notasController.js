@@ -99,6 +99,27 @@ async function updateEvolucion(req, res) {
   }
 }
 
+// OBTENER TODAS LAS NOTAS EVOLUTIVAS DE UN PACIENTE
+async function getEvolucionByPaciente(req, res) {
+  const { id } = req.params; // ID del paciente
+  try {
+    const result = await pool.query(
+      'SELECT * FROM notas_evolucion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      [id]
+    );
+    // Convertimos el string del cuadro_evolucion a JSON si es necesario
+    const filas = result.rows.map(fila => {
+      if (typeof fila.cuadro_evolucion === 'string') {
+        try { fila.cuadro_evolucion = JSON.parse(fila.cuadro_evolucion); } catch(e){}
+      }
+      return fila;
+    });
+    res.json(filas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
 async function getUniversitarias(req, res) {
   const { id: userId, rol, area } = req.user;
 
@@ -250,6 +271,7 @@ module.exports = {
   getEvolucion,
   createEvolucion,
   updateEvolucion,
+  getEvolucionByPaciente, // 👈 ¡ESTA ES LA LÍNEA QUE LE FALTA A TU ARCHIVO!
   getUniversitarias,
   createUniversitaria,
   responderUniversitaria

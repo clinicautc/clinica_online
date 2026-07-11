@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Save, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
-import { notasAPI, historialesAPI } from '../lib/api';
+import { notasAPI } from '../lib/api';
 import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
 
 type FormDataState = Record<string, string | boolean>;
@@ -83,36 +83,22 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
     try {
       const aId = appointmentId ? parseInt(appointmentId as string, 10) : null;
 
-      if (props.formKey === 'seguimiento_nutricion') {
-        // Nutrición subsecuente: debe guardarse en historiales_nutricion
-        // para que getDocumentosExistentes lo encuentre y permita finalizar la consulta.
-        await historialesAPI.guardar(null, {
-          paciente_id: props.pacienteId ?? null,
-          paciente_nombre: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
-          tipo: 'nutricion',
-          datos: formData,
-          creado_por: user?.id,
-          creado_por_nombre: user?.nombre,
-          appointment_id: aId,
-        });
+      // Siempre guardamos en notas_evolutivas — nunca en historiales_nutricion
+      const payload = {
+        paciente_id: props.pacienteId ?? null,
+        practicante_id: user?.id,
+        appointment_id: aId,
+        nombre_completo: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
+        numero_expediente: (formData.paciente_expediente as string) || 'S/N',
+        edad: null,
+        fecha_elaboracion: new Date().toISOString(),
+        cuadro_evolucion: formData,
+        area: props.formKey === 'seguimiento_nutricion' ? 'nutricion' : (user?.area || 'fisioterapia')
+      };
+      if (notaId) {
+        await notasAPI.updateEvolucion(notaId, payload);
       } else {
-        // Fisioterapia subsecuente (nota_evolutiva) y modo standalone
-        const payload = {
-          paciente_id: props.pacienteId ?? null,
-          practicante_id: user?.id,
-          appointment_id: aId,
-          nombre_completo: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
-          numero_expediente: (formData.paciente_expediente as string) || 'S/N',
-          edad: null,
-          fecha_elaboracion: new Date().toISOString(),
-          cuadro_evolucion: formData,
-          area: user?.area || 'fisioterapia'
-        };
-        if (notaId) {
-          await notasAPI.updateEvolucion(notaId, payload);
-        } else {
-          await notasAPI.createEvolucion(payload);
-        }
+        await notasAPI.createEvolucion(payload);
       }
 
       toast.success("¡Expediente guardado correctamente!");
