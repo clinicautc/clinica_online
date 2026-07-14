@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -47,20 +47,37 @@ export default function MonthFilterPicker({ selectedMonth, onChange, theme = 'bl
     onChange(format(newDate, 'yyyy-MM'));
   };
 
+  const computePosition = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const PANEL_W = 280;
+    const PANEL_H = 220;
+    const left = Math.min(rect.left, window.innerWidth - PANEL_W - 8);
+    const top  = window.innerHeight - rect.bottom >= PANEL_H + 8
+      ? rect.bottom + 8
+      : rect.top - PANEL_H - 8;
+    setPanelPosition({ top, left });
+  };
+
   const handleOpenPicker = () => {
-    if (!isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const PANEL_W = 280;
-      const PANEL_H = 220;
-      const left = Math.min(rect.left, window.innerWidth - PANEL_W - 8);
-      const top  = window.innerHeight - rect.bottom >= PANEL_H + 8
-        ? rect.bottom + 8
-        : rect.top - PANEL_H - 8;
-      setPanelPosition({ top, left });
+    if (!isOpen) {
+      computePosition();
       setPopupYear(selectedYear);
     }
     setIsOpen(prev => !prev);
   };
+
+  // Recalcula la posición del panel si el usuario rota el dispositivo o
+  // redimensiona la ventana mientras está abierto.
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('resize', computePosition);
+    window.addEventListener('orientationchange', computePosition);
+    return () => {
+      window.removeEventListener('resize', computePosition);
+      window.removeEventListener('orientationchange', computePosition);
+    };
+  }, [isOpen]);
 
   const selectMonth = (mesIndex: number) => {
     const newDate = setMonth(setYear(currentDate, popupYear), mesIndex);

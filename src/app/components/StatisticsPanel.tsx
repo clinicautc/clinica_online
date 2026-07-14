@@ -1037,14 +1037,14 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
     <div style={{ background: C.bg, minHeight: '100vh', padding: '28px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 4 }}>
           <div>
             <h1 style={{ color: C.text, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>Inteligencia Clínica</h1>
             <p style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>Panel de métricas operativas · Actualización en tiempo real</p>
           </div>
 
           {esMaster && (
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+            <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
               <button onClick={() => setFiltroArea('general')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${isGeneralView ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Todo</button>
               <button onClick={() => setFiltroArea('nutricion')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${filtroArea === 'nutricion' ? 'bg-orange-100 text-orange-700 shadow-sm border border-orange-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Nutrición</button>
               <button onClick={() => setFiltroArea('fisioterapia')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${filtroArea === 'fisioterapia' ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}>Fisioterapia</button>
@@ -1053,7 +1053,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         </div>
 
         {/* ── Tarjetas KPI superiores ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatCard icon={Calendar}     label="Total Citas"    value={stats.totalCitas}        accent="slate"  tag="GENERAL"    />
           <StatCard icon={CheckCircle}  label="Completadas"    value={stats.citasCompletadas}  accent="green"  tag="COMPLETADO" />
           <StatCard icon={XCircle}      label="Canceladas"     value={stats.citasCanceladas}   accent="red"    tag="ALERTA"     />
@@ -1062,7 +1062,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         </div>
 
         {/* ── KPIs secundarios ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiCard
             icon={Clock}
             label="Promedio de Consulta"
@@ -1108,7 +1108,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         </div>
 
         {/* ── Gráficas: Línea + Pastel ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <SectionCard title="Tendencia Semanal" description="Flujo de consultas por día" icon={TrendingUp} accentColor={C.accent.indigo.top}>
             <div style={{ height: 300, width: '100%' }}>
               <ResponsiveContainer width="100%" height={300}>
@@ -1195,7 +1195,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
 
         {/* ── Horarios de Mayor Demanda ── */}
         <SectionCard title="Horarios de Mayor Demanda" description="Top 5 franjas horarias" icon={Clock} accentColor={C.accent.teal.top}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {stats.horariosMasVisitados.map((item, index) => (
               <div
                 key={item.horario}

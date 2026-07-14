@@ -127,8 +127,8 @@ export default function CambiarPasswordInicial() {
       {/* Contenedor Principal (Tarjeta Dividida) - mismo diseño que Login/Registro */}
       <div className="relative z-10 flex flex-col lg:flex-row w-full max-w-[1000px] bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-300">
 
-        {/* PANEL IZQUIERDO (Instrucciones) */}
-        <div className="hidden lg:flex lg:w-5/12 bg-[#002f6c] relative items-center justify-center p-8 overflow-hidden">
+        {/* PANEL IZQUIERDO (Instrucciones) — en móvil se muestra completo arriba del formulario. */}
+        <div className="order-1 flex lg:w-5/12 bg-[#002f6c] relative items-center justify-center p-8 overflow-hidden">
           {/* Patrón de fondo */}
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')" }}></div>
 
@@ -171,15 +171,8 @@ export default function CambiarPasswordInicial() {
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-2xl opacity-50"></div>
         </div>
 
-        {/* PANEL DERECHO (Formulario) */}
-        <div className="w-full lg:w-7/12 p-6 sm:p-10 lg:px-14 lg:py-8 flex flex-col justify-center bg-white/95 backdrop-blur-md overflow-y-auto">
-
-          {/* Header móvil */}
-          <div className="flex lg:hidden justify-center mb-6">
-            <div className="w-16 h-16 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center bg-white">
-              <img src="/logo-mark.png" alt="Logo UTC" className="w-full h-full object-contain p-1.5" />
-            </div>
-          </div>
+        {/* PANEL DERECHO (Formulario) — debajo del panel azul en móvil */}
+        <div className="order-2 w-full lg:w-7/12 p-6 sm:p-10 lg:px-14 lg:py-8 flex flex-col justify-center bg-white/95 backdrop-blur-md overflow-y-auto">
 
           <div className="mb-5 text-center lg:text-left">
             <h3 className="text-2xl lg:text-3xl font-extrabold text-[#002f6c] mb-1">Cambia tu contraseña</h3>

@@ -324,32 +324,32 @@ export default function NutritionPractitionerDashboard() {
       <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-orange-900/10 mb-6">
           
-          <div className="flex justify-between items-center px-6 py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-500 rounded-full flex items-center justify-center relative shadow-md">
-                <Utensils className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-600 to-orange-500 rounded-full flex items-center justify-center relative shadow-md shrink-0">
+                <Utensils className="w-4.5 h-4.5 sm:w-6 sm:h-6 text-white" />
                 <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-orange-900">Clínica UTC - Nutrición</h1>
-                <p className="text-sm text-orange-900/60 font-medium">Panel de Practicante</p>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-2xl font-bold text-orange-900 truncate">Clínica UTC - Nutrición</h1>
+                <p className="text-[10px] sm:text-sm text-orange-900/60 font-medium truncate">Panel de Practicante</p>
               </div>
             </div>
 
             {/* Perfil del Usuario Integrado */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="flex items-center gap-4 text-right hidden sm:flex hover:bg-orange-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="flex items-center gap-2 sm:gap-4 text-right hover:bg-orange-50 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 min-w-0"
             >
-              <div>
-                <p className="text-sm font-bold text-orange-900">{nombreCortoDisplay}</p>
-                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Practicante</p>
-                <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
-                  <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold text-orange-900 truncate">{nombreCortoDisplay}</p>
+                <p className="text-[8px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest truncate">Practicante</p>
+                <p className="text-xs sm:text-sm text-slate-600 font-black flex items-center justify-end gap-0.5 leading-tight mt-0.5 whitespace-nowrap">
+                  <LogOut className="w-2.5 h-2.5 shrink-0" /> cerrar sesión
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center overflow-hidden">
-                <User className="h-5 w-5 text-orange-600" />
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center overflow-hidden shrink-0">
+                <User className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
               </div>
             </button>
           </div>
@@ -482,13 +482,13 @@ export default function NutritionPractitionerDashboard() {
                     );
                     return displayedAppointments.map((apt) => (
                       <div key={apt.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow gap-4 border-l-4 border-l-orange-600">
-                        <div className="flex items-center gap-5">
-                          <div className="p-3.5 rounded-full bg-orange-50">
-                            <Utensils className="w-6 h-6 text-orange-600"/>
+                        <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                          <div className="p-2.5 sm:p-3.5 rounded-full bg-orange-50 shrink-0">
+                            <Utensils className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600"/>
                           </div>
-                          <div>
-                            <p className="font-bold text-orange-900 text-xl">{apt.paciente_nombre}</p>
-                            <div className="flex gap-3.5 mt-1">
+                          <div className="min-w-0">
+                            <p className="font-bold text-orange-900 text-base sm:text-xl truncate">{apt.paciente_nombre}</p>
+                            <div className="flex flex-wrap gap-2 sm:gap-3.5 mt-1">
                               <p className="text-base text-gray-500 flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded font-semibold">
                                 <Calendar className="w-3.5 h-3.5 text-orange-600"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
                               </p>
@@ -549,7 +549,7 @@ export default function NutritionPractitionerDashboard() {
 
           <TabsContent value="notes">
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-orange-950">Comunicados Internos</h2>
                   <p className="text-sm text-slate-500 font-medium">Avisos del área de Nutrición.</p>

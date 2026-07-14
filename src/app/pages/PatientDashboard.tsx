@@ -208,36 +208,34 @@ export default function PatientDashboard() {
 
       <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
-          <div className="px-6 py-3">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="relative w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
-                  <span className="text-white font-bold text-sm">UTC</span>
+          <div className="px-3 sm:px-6 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="relative w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-white font-bold text-[10px] sm:text-sm">UTC</span>
                   <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
                 </div>
-                <div className="overflow-hidden">
-                  <h1 className="text-2xl font-bold text-blue-900 truncate">Clínica Universitaria</h1>
-                  <p className="text-sm text-blue-900/60 truncate">Fisioterapia y Nutrición</p>
+                <div className="min-w-0">
+                  <h1 className="text-sm sm:text-2xl font-bold text-blue-900 truncate">Clínica Universitaria</h1>
+                  <p className="text-[10px] sm:text-sm text-blue-900/60 truncate">Fisioterapia y Nutrición</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0">
-                {/* PERFIL DEL USUARIO (mismo ícono/botón que los demás paneles) */}
-                <button
-                  onClick={() => setIsDrawerOpen(true)}
-                  className="flex items-center gap-4 text-left sm:text-right w-full sm:w-auto justify-between sm:justify-end hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <div>
-                    <p className="text-sm font-bold text-blue-900 leading-none mb-1">{patientName}</p>
-                    <p className="text-[10px] font-black text-blue-900/60 uppercase tracking-wider">{patientRole}</p>
-                    <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
-                      <LogOut className="w-2.5 h-2.5" /> cerrar sesión
-                    </p>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden shrink-0">
-                    <User className="h-5 w-5 text-blue-600" />
-                  </div>
-                </button>
-              </div>
+              {/* PERFIL DEL USUARIO (mismo ícono/botón que los demás paneles) */}
+              <button
+                onClick={() => setIsDrawerOpen(true)}
+                className="flex items-center gap-2 sm:gap-4 text-right hover:bg-blue-50 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none mb-1 truncate">{patientName}</p>
+                  <p className="text-[8px] sm:text-[10px] font-black text-blue-900/60 uppercase tracking-wider truncate">{patientRole}</p>
+                  <p className="text-xs sm:text-sm text-slate-600 font-black flex items-center justify-end gap-0.5 leading-tight mt-0.5 whitespace-nowrap">
+                    <LogOut className="w-2.5 h-2.5 shrink-0" /> cerrar sesión
+                  </p>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden shrink-0">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                </div>
+              </button>
             </div>
           </div>
         </header>
@@ -276,7 +274,7 @@ export default function PatientDashboard() {
                 <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200/60 shadow-inner w-full max-w-lg md:max-w-2xl relative gap-1.5">
                   <button 
                     onClick={() => { setAreaFiltro('nutricion'); setReagendarCitaId(null); }}
-                    className={`flex-1 flex items-center justify-center gap-2.5 py-4 px-6 md:px-10 rounded-[1.5rem] text-xs md:text-sm font-extrabold uppercase transition-all duration-300 ease-in-out tracking-wide ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2.5 py-4 px-2.5 sm:px-6 md:px-10 rounded-[1.5rem] text-xs md:text-sm font-extrabold uppercase transition-all duration-300 ease-in-out tracking-wide ${
                       areaFiltro === 'nutricion' ? 'bg-white text-blue-950 shadow-md transform scale-[1.01]' : 'text-slate-400 hover:text-slate-500'
                     }`}
                   >
@@ -285,7 +283,7 @@ export default function PatientDashboard() {
                   </button>
                   <button 
                     onClick={() => { setAreaFiltro('fisioterapia'); setReagendarCitaId(null); }}
-                    className={`flex-1 flex items-center justify-center gap-2.5 py-4 px-6 md:px-10 rounded-[1.5rem] text-xs md:text-sm font-extrabold uppercase transition-all duration-300 ease-in-out tracking-wide ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2.5 py-4 px-2.5 sm:px-6 md:px-10 rounded-[1.5rem] text-xs md:text-sm font-extrabold uppercase transition-all duration-300 ease-in-out tracking-wide ${
                       areaFiltro === 'fisioterapia' ? 'bg-white text-blue-950 shadow-md transform scale-[1.01]' : 'text-slate-400 hover:text-slate-500'
                     }`}
                   >

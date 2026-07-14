@@ -394,32 +394,32 @@ export default function PhysiotherapyAdminDashboard() {
 
       <div className="px-4 pt-6 sm:px-6 lg:px-6 relative z-10">
         <header className="bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-blue-900/10 mb-6">
-          <div className="flex justify-between items-center px-6 py-3">
-            <div className="flex items-center gap-3">
-              <div className="relative w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
-                <Activity className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="relative w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                <Activity className="w-4.5 h-4.5 sm:w-6 sm:h-6 text-white" />
                 <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-blue-900">Clínica UTC - Fisioterapia</h1>
-                <p className="text-sm text-blue-900/60">Panel de Coordinación Administrativa</p>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-2xl font-bold text-blue-900 truncate">Clínica UTC - Fisioterapia</h1>
+                <p className="text-[10px] sm:text-sm text-blue-900/60 truncate">Panel de Coordinación Administrativa</p>
               </div>
             </div>
 
             {/* Perfil del Usuario Integrado (Botón que abre el Drawer) */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="flex items-center gap-4 text-right hidden sm:flex hover:bg-blue-50 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex items-center gap-2 sm:gap-4 text-right hover:bg-blue-50 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
             >
-              <div>
-                <p className="text-sm font-bold text-blue-900">{nombreCortoDisplay}</p>
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Coordinación de Área</p>
-                <p className="text-sm text-slate-600 font-black flex items-center gap-0.5 leading-tight mt-0.5">
-                  <LogOut className="w-2.5 h-2.5" /> cerrar sesión
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold text-blue-900 truncate">{nombreCortoDisplay}</p>
+                <p className="text-[8px] sm:text-[10px] font-black text-blue-500 uppercase tracking-widest truncate">Coordinación de Área</p>
+                <p className="text-xs sm:text-sm text-slate-600 font-black flex items-center justify-end gap-0.5 leading-tight mt-0.5 whitespace-nowrap">
+                  <LogOut className="w-2.5 h-2.5 shrink-0" /> cerrar sesión
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
-                <User className="h-5 w-5 text-blue-600" />
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden shrink-0">
+                <User className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
               </div>
             </button>
           </div>
@@ -526,14 +526,14 @@ export default function PhysiotherapyAdminDashboard() {
                   ) : (
                     todayAppointments.map((apt) => (
                       <div key={apt.id} className="space-y-2">
-                        <div className="flex items-center justify-between p-6 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
-                          <div className="flex items-center gap-5">
-                            <div className="p-3.5 rounded-full bg-blue-50 text-blue-900">
-                              <Activity className="w-6 h-6"/>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
+                          <div className="flex items-start sm:items-center gap-3 sm:gap-5 min-w-0">
+                            <div className="p-2.5 sm:p-3.5 rounded-full bg-blue-50 text-blue-900 shrink-0">
+                              <Activity className="w-5 h-5 sm:w-6 sm:h-6"/>
                             </div>
-                            <div>
-                              <p className="font-black text-blue-950 uppercase text-base">{apt.paciente_nombre}</p>
-                              <div className="flex gap-3.5 items-center">
+                            <div className="min-w-0">
+                              <p className="font-black text-blue-950 uppercase text-sm sm:text-base truncate">{apt.paciente_nombre}</p>
+                              <div className="flex flex-wrap gap-2 sm:gap-3.5 items-center mt-1">
                                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
                                   <Calendar className="w-3.5 h-3.5"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}
                                 </span>
@@ -552,9 +552,9 @@ export default function PhysiotherapyAdminDashboard() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-7">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-7">
                             {apt.practicante_id && (
-                              <div className="flex flex-col items-end">
+                              <div className="flex flex-col items-start sm:items-end">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                                   Responsable:
                                 </span>
@@ -660,13 +660,13 @@ export default function PhysiotherapyAdminDashboard() {
 
           <TabsContent value="practitioners" className="animate-in fade-in duration-500">
             <Card className="border-none shadow-2xl bg-white/95 overflow-hidden rounded-2xl">
-              <CardHeader className="flex flex-row items-center justify-between border-b bg-gray-50/80 p-7 gap-4">
-                <div className="shrink-0">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between border-b bg-gray-50/80 p-7 gap-4">
+                <div className="min-w-0">
                   <CardTitle className="text-blue-900 font-extrabold text-2xl">Personal Académico</CardTitle>
                   <CardDescription className="text-gray-500 font-medium italic text-base">Registro y filtro de practicantes y docentes · Área de Fisioterapia</CardDescription>
                 </div>
                 <div className="flex flex-row items-center gap-2 flex-wrap justify-end">
-                  <div className="relative min-w-[280px]">
+                  <div className="relative w-full sm:w-auto sm:min-w-[280px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
                       placeholder="Buscar por nombre o correo..."
@@ -681,43 +681,26 @@ export default function PhysiotherapyAdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-0 overflow-y-auto max-h-[600px]">
-                <Table>
-                  <TableHeader className="bg-white sticky top-0 z-20 border-b">
-                    <TableRow>
-                      <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información</TableHead>
-                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
-                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
-                      <TableHead className="text-right pr-4 text-blue-900 font-black uppercase tracking-widest">Citas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {personalFiltrado.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-10 text-slate-400 font-bold text-sm italic">
-                          No se encontró personal académico.
-                        </TableCell>
-                      </TableRow>
-                    ) : personalFiltrado.map((p) => {
-                      const citaEstaActiva = (c: Appointment) => c.estado !== 'cancelada' && c.estado !== 'completada';
-                      const citasMetric = todasCitas.filter(c => String(c.practicante_id) === String(p.id) && citaEstaActiva(c)).length;
-                      return (
-                        <TableRow key={p.id} className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}>
-                          <TableCell className="pl-4">
+                {personalFiltrado.length === 0 ? (
+                  <p className="text-center py-10 text-slate-400 font-bold text-sm italic">No se encontró personal académico.</p>
+                ) : (
+                  <>
+                    {/* VISTA MÓVIL — misma información que la tabla, en tarjetas apiladas */}
+                    <div className="block md:hidden divide-y divide-slate-100">
+                      {personalFiltrado.map((p) => {
+                        const citaEstaActiva = (c: Appointment) => c.estado !== 'cancelada' && c.estado !== 'completada';
+                        const citasMetric = todasCitas.filter(c => String(c.practicante_id) === String(p.id) && citaEstaActiva(c)).length;
+                        return (
+                          <div key={p.id} className={`p-4 space-y-3 ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'bg-white'}`}>
                             <div className="flex flex-col">
                               <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>{p.name}</span>
                               <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="outline" className="bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 text-blue-500 border-blue-400/40">
                                 <Shield className="w-3.5 h-3.5" />
                                 Practicante
                               </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
                               <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
                                 p.status === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
                               }`}>
@@ -725,18 +708,70 @@ export default function PhysiotherapyAdminDashboard() {
                                 {p.status}
                               </span>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-right pr-4">
-                            <div className="flex flex-col items-end">
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Asignadas</span>
                               <span className={`text-lg font-black ${citasMetric > 0 ? 'text-blue-900' : 'text-slate-300'}`}>{citasMetric}</span>
-                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight whitespace-nowrap">Asignadas</span>
                             </div>
-                          </TableCell>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* VISTA ESCRITORIO */}
+                    <div className="hidden md:block">
+                    <Table>
+                      <TableHeader className="bg-white sticky top-0 z-20 border-b">
+                        <TableRow>
+                          <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información</TableHead>
+                          <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
+                          <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
+                          <TableHead className="text-right pr-4 text-blue-900 font-black uppercase tracking-widest">Citas</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {personalFiltrado.map((p) => {
+                          const citaEstaActiva = (c: Appointment) => c.estado !== 'cancelada' && c.estado !== 'completada';
+                          const citasMetric = todasCitas.filter(c => String(c.practicante_id) === String(p.id) && citaEstaActiva(c)).length;
+                          return (
+                            <TableRow key={p.id} className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}>
+                              <TableCell className="pl-4">
+                                <div className="flex flex-col">
+                                  <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>{p.name}</span>
+                                  <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <Badge variant="outline" className="bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 text-blue-500 border-blue-400/40">
+                                    <Shield className="w-3.5 h-3.5" />
+                                    Practicante
+                                  </Badge>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
+                                    p.status === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                                  }`}>
+                                    <div className={`w-2 h-2 rounded-full ${p.status === 'activo' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                    {p.status}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right pr-4">
+                                <div className="flex flex-col items-end">
+                                  <span className={`text-lg font-black ${citasMetric > 0 ? 'text-blue-900' : 'text-slate-300'}`}>{citasMetric}</span>
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight whitespace-nowrap">Asignadas</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -853,7 +888,7 @@ export default function PhysiotherapyAdminDashboard() {
                 </Dialog>
               </div>
 
-              <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-8 border border-white shadow-2xl">
+              <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-3 sm:p-8 border border-white shadow-2xl">
                 <NotesViewer key={refreshKey} readOnly={false} filterCategory="fisioterapia" />
               </div>
             </div>

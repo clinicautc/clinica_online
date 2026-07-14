@@ -6,9 +6,9 @@ import { citasAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { FormClinicoCallbacks, FormClinicoHandle } from '../lib/types/formClinico';
 import ConfirmDialog from '../components/ConfirmDialog';
-import HojaEvolutiva from './HojaEvolutiva';
-import NutritionMasterForm from './NutritionMasterForm';
-import PhysiotherapyMasterForm from './PhysiotherapyMasterForm';
+import EvolucionSeguimientoCaptura from './captura/EvolucionSeguimientoCaptura';
+import NutricionPrimeraConsultaCaptura from './captura/NutricionPrimeraConsultaCaptura';
+import FisioterapiaPrimeraConsultaCaptura from './captura/FisioterapiaPrimeraConsultaCaptura';
 
 type CitaDetalle = {
   id: number;
@@ -507,10 +507,10 @@ const ConsultaWorkspace: React.FC = () => {
 
       {/* ── VISTA FORMULARIO (siempre montado para que el ref sea válido) ─── */}
       <div className={activeView === 'form' ? 'block' : 'hidden'}>
-        {tipo === 'nutricion'    && tipo_consulta === 'primera'     && <NutritionMasterForm    ref={formRef} {...callbacks} />}
-        {tipo === 'nutricion'    && tipo_consulta === 'subsecuente' && <HojaEvolutiva           ref={formRef} {...callbacks} />}
-        {tipo === 'fisioterapia' && tipo_consulta === 'primera'     && <PhysiotherapyMasterForm ref={formRef} {...callbacks} />}
-        {tipo === 'fisioterapia' && tipo_consulta === 'subsecuente' && <HojaEvolutiva           ref={formRef} {...callbacks} />}
+        {tipo === 'nutricion'    && tipo_consulta === 'primera'     && <NutricionPrimeraConsultaCaptura     ref={formRef} {...callbacks} />}
+        {tipo === 'nutricion'    && tipo_consulta === 'subsecuente' && <EvolucionSeguimientoCaptura         ref={formRef} {...callbacks} />}
+        {tipo === 'fisioterapia' && tipo_consulta === 'primera'     && <FisioterapiaPrimeraConsultaCaptura  ref={formRef} {...callbacks} />}
+        {tipo === 'fisioterapia' && tipo_consulta === 'subsecuente' && <EvolucionSeguimientoCaptura         ref={formRef} {...callbacks} />}
         {!formKey && (
           <div className="min-h-[60vh] flex items-center justify-center text-gray-500 text-sm">
             Tipo de formulario no disponible para esta cita.

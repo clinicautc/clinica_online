@@ -1,13 +1,11 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner';
-import { apiFetch, historialesAPI } from '../lib/api';
-import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
+import React, { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { usePhysiotherapyValoracionData } from '../hooks/formClinico/usePhysiotherapyValoracionData';
 
 // IMPORTACIÓN DE IMÁGENES
 import caritasImg from './Caritas.png';
-import Humano1Img from './Humano_1.png'; 
+import Humano1Img from './Humano_1.png';
 import Humano2Img from './Humano_2.png';
 
 interface PageProps {
@@ -21,189 +19,60 @@ interface PageProps {
   historialId?: number | null;
   onGuardarDirecto?: () => void;
   isYaGuardado?: boolean;
+  onFinalizarDirecto?: () => void | Promise<void>;
+  isReadOnly?: boolean;
 }
 
-const PhysiotherapyMasterForm = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
-  const [_isReadOnly, setIsReadOnly] = useState(false);
+/**
+ * Representación documental de la Valoración Inicial de Fisioterapia — hoja
+ * impresa en mm, solo lectura. La captura en vivo vive en
+ * captura/FisioterapiaPrimeraConsultaCaptura.tsx (ver
+ * docs/RESPONSIVE_DESIGN_STRATEGY.md sección 9); este componente ya no
+ * implementa FormClinicoHandle ni persiste cambios. Las 3 páginas se
+ * muestran apiladas (no wizard paginado) — mismo patrón aplicado en
+ * NutritionMasterForm.tsx tras descubrir que un fieldset anidado no puede
+ * "des-deshabilitar" lo que un fieldset ancestro ya deshabilitó.
+ */
+const PhysiotherapyMasterForm = () => {
   const navigate = useNavigate();
-  const params = useParams();
-  // Acepta tanto /forms/fisioterapia/:appointmentId como /consulta/:id (workspace)
-  const appointmentId = params.id || params.appointmentId;
-  const { user } = useAuth();
-  const [step, setStep] = useState(1);
-  const [isSaving, setIsSaving] = useState(false);
-  const [historialId, setHistorialId] = useState<number | null>(null);
-  const [yaGuardado, setYaGuardado] = useState(false);
-
-
-  const [formData, setFormData] = useState<any>(() => ({
-    pagina_1: { paciente_id: props.pacienteId ?? undefined },
-    pagina_2: { markers: [] },
-    pagina_3: { markers: [] }
-  }));
-
-  // Lógica de carga automática desde PostgreSQL
-  // Lógica de carga automática desde PostgreSQL
-  useEffect(() => {
-  const cargarHistorialExistente = async () => {
-    if (!appointmentId) return;
-    // En modo workspace el borrador se restaura vía restoreDraft; saltamos la carga de BD.
-    if (props.formKey) return;
-
-    try {
-      const response = await apiFetch(`/historiales-fisioterapia/detalle/${appointmentId}`);
-
-      if (response.ok) {
-        const dataGuardada = await response.json();
-        console.log("¡DATOS RECUPERADOS DEL BACKEND!", dataGuardada);
-        
-setHistorialId(dataGuardada.id)
-
-        // HIDRATACIÓN: datos ya tiene la estructura {pagina_1, pagina_2, pagina_3}
-        const datosGuardados = dataGuardada.datos || {};
-        setFormData((prevData: any) => ({
-          ...prevData,
-          ...datosGuardados,
-          paciente_id: dataGuardada.paciente_id,
-          pagina_1: {
-            ...(prevData.pagina_1 || {}),
-            ...(datosGuardados.pagina_1 || {}),
-            paciente_id: dataGuardada.paciente_id
-          }
-        }));
-
-
-        setIsReadOnly(true); 
-        toast.success("Expediente cargado correctamente");
-      }
-    } catch (error) {
-      console.error("Error al cargar historial:", error);
-      toast.error("Hubo un problema al recuperar el expediente.");
-    }
-  };
-
-  cargarHistorialExistente();
-}, [appointmentId]);
-
-  // ... (Sigue el resto del código: updateGlobalData, handleNext, etc.)
-
-  // Función núcleo para actualizar datos globalmente
-  const updateGlobalData = (page: string, data: any) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      [page]: { ...prev[page], ...data }
-    }));
-  };
-
-  const handleNext = () => setStep((prev) => prev + 1);
-  const handleBack = () => setStep((prev) => prev - 1);
-
-  // Función de guardado expuesta al workspace mediante useImperativeHandle.
-  const handleFinalizarYGuardar = async () => {
-    try {
-      setIsSaving(true);
-      const pId = props.pacienteId ?? null;
-      const pNombre = props.pacienteNombre ?? 'Paciente sin nombre';
-      const parsedAId = parseInt(appointmentId ?? '', 10);
-      const aId = !isNaN(parsedAId) ? parsedAId : null;
-
-      if (!pId) {
-        toast.error('Error: no se pudo identificar al paciente.');
-        setIsSaving(false);
-        return;
-      }
-
-      const payload = {
-        paciente_id: pId,
-        paciente_nombre: pNombre,
-        tipo: 'fisioterapia',
-        datos: formData,
-        creado_por: user?.id || 1,
-        creado_por_nombre: user?.nombre || 'Practicante Fisioterapia',
-        appointment_id: aId,
-      };
-
-      await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'fisioterapia' });
-      toast.success('¡Historial guardado correctamente!');
-
-      if (props.onSaveSuccess) {
-        props.onSaveSuccess(props.formKey ?? '');
-      } else {
-        setTimeout(() => navigate(`/historial/${pId}/fisioterapia`, { replace: true }), 1500);
-      }
-    } catch (error: any) {
-      console.error('Error en el guardado final:', error);
-      toast.error(`Error: ${error.message || 'Revisa la conexión con la API'}`);
-      props.onSaveFailure?.(props.formKey ?? '', error.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Regresa al hub sin guardar en BD; el guardado real ocurre en "Finalizar Consulta".
-  const handleGuardarSinFinalizar = () => {
-    setYaGuardado(true);
-    props.onBack?.();
-  };
-
-  useImperativeHandle(ref, () => ({
-    triggerSave: handleFinalizarYGuardar,
-    canSave: !!(formData?.pagina_1?.nombre_completo?.trim()),
-    restoreDraft: (draft) => {
-      const d = (draft as any) ?? { pagina_1: {}, pagina_2: { markers: [] }, pagina_3: { markers: [] } };
-      setFormData({
-        ...d,
-        pagina_1: {
-          ...d.pagina_1,
-          ...(props.pacienteId != null ? { paciente_id: props.pacienteId } : {}),
-        },
-      });
-    },
-  }));
-
-  useEffect(() => {
-    props.onStateChange?.(props.formKey ?? '', formData);
-  }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { formData } = usePhysiotherapyValoracionData({});
 
   return (
     <div className="min-h-screen bg-zinc-600">
-      
-      {step === 1 && (
+      <button
+        onClick={() => navigate(-1)}
+        className="fixed top-4 right-4 bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Volver
+      </button>
+
+      <fieldset disabled className="contents">
         <PhysiotherapyPage1Component
           accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={props.onBack ?? (() => { if (!props.formKey) navigate(-1); })}
-          onNext={handleNext}
-          appointmentId={appointmentId}
+          onUpdate={() => {}}
+          onBack={() => {}}
+          onNext={() => {}}
         />
-      )}
-
-      {step === 2 && (
-        <PhysiotherapyPage2Component 
+        <PhysiotherapyPage2Component
           accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={handleBack}
-          onNext={handleNext}
+          onUpdate={() => {}}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly
         />
-      )}
-
-      {step === 3 && (
         <PhysiotherapyPage3Component
           accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={handleBack}
+          onUpdate={() => {}}
+          onBack={() => {}}
           onNext={() => {}}
-          isSaving={isSaving}
-          setIsSaving={setIsSaving}
-          historialId={historialId}
-          onGuardarDirecto={props.formKey ? handleGuardarSinFinalizar : undefined}
-          isYaGuardado={yaGuardado}
+          isYaGuardado
+          isReadOnly
         />
-      )}
-
+      </fieldset>
     </div>
   );
-});
+};
 
 
 /**
@@ -565,16 +434,18 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
  * ADAPTACIÓN: Contenido íntegro de PhysiotherapyFormPage2.tsx
  * ============================================================================
  */
-const PhysiotherapyPage2Component: React.FC<PageProps> = ({ 
-  accumulatedData, 
-  onUpdate, 
-  onBack, 
-  onNext 
+const PhysiotherapyPage2Component: React.FC<PageProps> = ({
+  accumulatedData,
+  onUpdate,
+  onBack,
+  onNext,
+  isReadOnly,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Lógica de marcadores (X) adaptada para persistencia global en accumulatedData
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isReadOnly) return;
     // Evita marcar si se hace clic en el botón de borrar
     if ((e.target as HTMLElement).closest('.btn-clear-as-icon')) return;
 
@@ -1109,28 +980,23 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
   onUpdate,
   onBack,
   isSaving,
-  setIsSaving,
-  historialId,
-  onGuardarDirecto,
   isYaGuardado,
+  onFinalizarDirecto,
+  isReadOnly,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showConfirm, setShowConfirm] = React.useState(false);
-  const { user } = useAuth();
-  const params = useParams();
-// Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
-const appointmentId = params.id || params.appointmentId;
-  const navigate = useNavigate();
 
   // --- LÓGICA DE MARCADORES (P3 - Dermatomas) ---
   const addMarker = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isReadOnly) return;
     if ((e.target as HTMLElement).closest('.btn-clear-as-icon')) return;
 
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      
+
       const currentMarkers = accumulatedData.pagina_3.markers || [];
       onUpdate('pagina_3', {
         markers: [...currentMarkers, { x, y, id: Date.now() }]
@@ -1144,53 +1010,6 @@ const appointmentId = params.id || params.appointmentId;
 
   const handleLocalInputChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>, id: string) => {
     onUpdate('pagina_3', { [id]: e.target.value });
-  };
-
-  // --- LÓGICA DE GUARDADO FINAL EN BASE DE DATOS ---
-  const handleFinalizarYGuardar = async () => {
-    try {
-      setIsSaving?.(true);
-
-      // 1. Extraemos los valores de forma segura (usamos paciente_id de la p1)
-      const parsedId = parseInt(accumulatedData?.pagina_1?.paciente_id, 10);
-      const pId = !isNaN(parsedId) ? parsedId : (accumulatedData?.paciente_id ?? null);
-      const pNombre = accumulatedData?.pagina_1?.nombre_completo || "Paciente sin nombre";
-      const parsedAId = parseInt(appointmentId ?? '', 10);
-      const aId = !isNaN(parsedAId) ? parsedAId : null;
-
-      if (!pId) {
-        toast.error("Error: no se pudo identificar al paciente. Regresa al paso 1.");
-        setIsSaving?.(false);
-        return;
-      }
-
-      const payload = {
-        paciente_id: pId,
-        paciente_nombre: pNombre,
-        tipo: 'fisioterapia',
-        datos: accumulatedData, 
-        creado_por: user?.id || (user as any)?.id || 1, 
-        creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Fisioterapia",
-        appointment_id: aId 
-      };
-
-      // 2. LÓGICA CONDICIONAL DINÁMICA: PUT SI YA EXISTE, POST SI ES NUEVO
-      // 3. Ejecución de la petición (Aseguramos enviar el tipo)
-      await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'fisioterapia' });
-
-      toast.success('¡Historial guardado/actualizado con éxito!');
-
-      // REDIRECCIÓN INTELIGENTE AL EXPEDIENTE DEL PACIENTE
-      setTimeout(() => {
-        // AGREGA EL { replace: true } AQUÍ
-        navigate(`/historial/${pId}/fisioterapia`, { replace: true });
-      }, 1500);
-    } catch (error: any) {
-      console.error("Error en el guardado final:", error);
-      toast.error(`Error: ${error.message || 'Revisa la conexión con la API'}`);
-    } finally {
-      setIsSaving?.(false);
-    }
   };
 
   return (
@@ -1379,13 +1198,19 @@ const appointmentId = params.id || params.appointmentId;
 
       <div className="hc-body-p3">
         <button className="btn-anterior-p3" onClick={onBack}>Anterior</button>
-        <button
-          className="btn-finalizar-p3"
-          onClick={() => !isYaGuardado && setShowConfirm(true)}
-          disabled={isSaving || isYaGuardado}
-        >
-          {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
-        </button>
+        {/* En modo solo lectura no se renderiza — consistente con
+            HojaEvolutiva.tsx y NutritionMasterForm.tsx: un botón "Guardar"
+            visible sobre un documento ya finalizado es una señal engañosa,
+            aunque hoy ya se muestre atenuado vía :disabled. */}
+        {!isReadOnly && (
+          <button
+            className="btn-finalizar-p3"
+            onClick={() => !isYaGuardado && setShowConfirm(true)}
+            disabled={isSaving || isYaGuardado}
+          >
+            {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
+          </button>
+        )}
 
         {showConfirm && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1404,11 +1229,7 @@ const appointmentId = params.id || params.appointmentId;
                 <button
                   onClick={() => {
                     setShowConfirm(false);
-                    if (onGuardarDirecto) {
-                      onGuardarDirecto();
-                    } else {
-                      handleFinalizarYGuardar();
-                    }
+                    onFinalizarDirecto?.();
                   }}
                   style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
                 >

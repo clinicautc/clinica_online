@@ -297,7 +297,7 @@ export default function ManagePersonnelPage() {
       <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] bg-blue-800 transform rotate-45 opacity-10" />
 
       <header className="relative z-10 bg-white/90 backdrop-blur-sm border-b border-blue-900/10 shadow-sm sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold">UTC</div>
             <div>
@@ -317,7 +317,7 @@ export default function ManagePersonnelPage() {
             SECCIÓN 1 — REGISTRO DE PERSONAL
         ====================================================== */}
         <Card className="border-blue-900/10 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <CardTitle className="text-blue-900 text-lg font-bold">
                 {tipoAcceso === 'docente' ? 'Autorizar Nuevo Docente' : 'Autorizar Nuevo Practicante'}
@@ -507,61 +507,35 @@ export default function ManagePersonnelPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto max-h-[600px]">
-            <Table>
-              <TableHeader className="bg-white sticky top-0 z-20 border-b">
-                <TableRow>
-                  <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información del Docente</TableHead>
-                  <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
-                  <TableHead className="text-blue-900 font-black uppercase tracking-widest text-center">Área</TableHead>
-                  <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
-                  <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Horario</TableHead>
-                  <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Activar</TableHead>
-                  <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Desactivar</TableHead>
-                  <TableHead className="text-right pr-4 text-blue-900 font-black uppercase tracking-widest">Eliminar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {docentesFiltrados.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10 text-slate-400 italic">
-                      No hay registros encontrados.
-                    </TableCell>
-                  </TableRow>
-                ) : docentesFiltrados.map(docente => (
-                  <TableRow
-                    key={docente.id}
-                    className={`group transition-all ${docente.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
-                  >
-                    <TableCell className="pl-4">
+            {docentesFiltrados.length === 0 ? (
+              <p className="text-center py-10 text-slate-400 italic">No hay registros encontrados.</p>
+            ) : (
+              <>
+                {/* VISTA MÓVIL/TABLET — misma información que la tabla, en tarjetas apiladas.
+                    Usa lg: (no md:) porque esta tabla tiene 8 columnas (incl. 3 botones de
+                    acción) — a 768px sigue sin caber cómodamente, necesita el ancho de escritorio. */}
+                <div className="block lg:hidden divide-y divide-slate-100">
+                  {docentesFiltrados.map(docente => (
+                    <div key={docente.id} className={`p-4 space-y-3 ${docente.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'bg-white'}`}>
                       <div className="flex flex-col">
                         <span className={`text-base font-bold ${docente.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
                           {docente.name}
                         </span>
                         <span className="text-sm text-gray-400 font-medium italic">{docente.email}</span>
                       </div>
-                    </TableCell>
 
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className={`bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 ${
                           docente.rol === 'admin' ? 'text-purple-700 border-purple-500/40' : 'text-blue-500 border-blue-400/40'
                         }`}>
                           <Shield className="w-3.5 h-3.5" />
                           {docente.rol === 'admin' ? 'Docente Titular' : 'Practicante'}
                         </Badge>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-tighter shadow-sm ${
-                        docente.area === 'nutricion' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
-                      }`}>
-                        {docente.area || 'GENERAL'}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
+                        <Badge variant="outline" className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-tighter shadow-sm ${
+                          docente.area === 'nutricion' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                        }`}>
+                          {docente.area || 'GENERAL'}
+                        </Badge>
                         <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
                           docente.status === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
                         }`}>
@@ -569,59 +543,161 @@ export default function ManagePersonnelPage() {
                           {docente.status}
                         </span>
                       </div>
-                    </TableCell>
 
-                    {/* Botón Horario — solo para practicantes */}
-                    <TableCell className="text-center">
-                      {docente.rol === 'practicante' ? (
+                      {docente.rol === 'practicante' && (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => abrirHorarioModal(docente.id, docente.name)}
-                          className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs px-3 gap-1.5"
+                          className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs gap-1.5"
                         >
                           <CalendarClock className="w-3.5 h-3.5" /> Horario
                         </Button>
-                      ) : (
-                        <span className="text-slate-300 text-xs italic">—</span>
                       )}
-                    </TableCell>
 
-                    <TableCell className="text-center">
-                      <Button
-                        size="icon" variant="default"
-                        disabled={docente.status === 'activo'}
-                        onClick={() => handleCambiarEstado(docente.id, 'activo')}
-                        className="bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-30"
-                      >
-                        <UserCheck className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                        <Button
+                          size="sm" variant="default"
+                          disabled={docente.status === 'activo'}
+                          onClick={() => handleCambiarEstado(docente.id, 'activo')}
+                          className="bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-30 gap-1.5 text-xs"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" /> Activar
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          disabled={docente.status === 'inactivo'}
+                          onClick={() => handleCambiarEstado(docente.id, 'inactivo')}
+                          className="border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl disabled:opacity-30 gap-1.5 text-xs"
+                        >
+                          <UserMinus className="w-3.5 h-3.5" /> Desactivar
+                        </Button>
+                        <Button
+                          size="sm" variant="ghost"
+                          onClick={() => handleEliminarDocente(docente.id)}
+                          className="rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 gap-1.5 text-xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-                    <TableCell className="text-center">
-                      <Button
-                        size="icon" variant="outline"
-                        disabled={docente.status === 'inactivo'}
-                        onClick={() => handleCambiarEstado(docente.id, 'inactivo')}
-                        className="border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl disabled:opacity-30"
+                {/* VISTA ESCRITORIO */}
+                <div className="hidden lg:block">
+                <Table>
+                  <TableHeader className="bg-white sticky top-0 z-20 border-b">
+                    <TableRow>
+                      <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información del Docente</TableHead>
+                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
+                      <TableHead className="text-blue-900 font-black uppercase tracking-widest text-center">Área</TableHead>
+                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
+                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Horario</TableHead>
+                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Activar</TableHead>
+                      <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Desactivar</TableHead>
+                      <TableHead className="text-right pr-4 text-blue-900 font-black uppercase tracking-widest">Eliminar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {docentesFiltrados.map(docente => (
+                      <TableRow
+                        key={docente.id}
+                        className={`group transition-all ${docente.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
                       >
-                        <UserMinus className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
+                        <TableCell className="pl-4">
+                          <div className="flex flex-col">
+                            <span className={`text-base font-bold ${docente.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
+                              {docente.name}
+                            </span>
+                            <span className="text-sm text-gray-400 font-medium italic">{docente.email}</span>
+                          </div>
+                        </TableCell>
 
-                    <TableCell className="text-right pr-4">
-                      <Button
-                        size="icon" variant="ghost"
-                        onClick={() => handleEliminarDocente(docente.id)}
-                        className="rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Badge variant="outline" className={`bg-transparent px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-2 border-2 ${
+                              docente.rol === 'admin' ? 'text-purple-700 border-purple-500/40' : 'text-blue-500 border-blue-400/40'
+                            }`}>
+                              <Shield className="w-3.5 h-3.5" />
+                              {docente.rol === 'admin' ? 'Docente Titular' : 'Practicante'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-tighter shadow-sm ${
+                            docente.area === 'nutricion' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                          }`}>
+                            {docente.area || 'GENERAL'}
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <span className={`flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-widest border ${
+                              docente.status === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                              <div className={`w-2 h-2 rounded-full ${docente.status === 'activo' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                              {docente.status}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {/* Botón Horario — solo para practicantes */}
+                        <TableCell className="text-center">
+                          {docente.rol === 'practicante' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => abrirHorarioModal(docente.id, docente.name)}
+                              className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs px-3 gap-1.5"
+                            >
+                              <CalendarClock className="w-3.5 h-3.5" /> Horario
+                            </Button>
+                          ) : (
+                            <span className="text-slate-300 text-xs italic">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <Button
+                            size="icon" variant="default"
+                            disabled={docente.status === 'activo'}
+                            onClick={() => handleCambiarEstado(docente.id, 'activo')}
+                            className="bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-30"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <Button
+                            size="icon" variant="outline"
+                            disabled={docente.status === 'inactivo'}
+                            onClick={() => handleCambiarEstado(docente.id, 'inactivo')}
+                            className="border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl disabled:opacity-30"
+                          >
+                            <UserMinus className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+
+                        <TableCell className="text-right pr-4">
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={() => handleEliminarDocente(docente.id)}
+                            className="rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -744,7 +820,7 @@ export default function ManagePersonnelPage() {
                       return (
                         <div
                           key={p.id}
-                          className={`flex items-center justify-between px-4 py-3.5 transition-all ${
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-3.5 transition-all ${
                             locked
                               ? 'bg-slate-50/60'
                               : estado === 'presente'
@@ -769,7 +845,7 @@ export default function ManagePersonnelPage() {
                               <p className="text-xs text-slate-400 capitalize">{p.area}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             {locked ? (
                               <>
                                 <Lock className="w-3.5 h-3.5 text-slate-300" />
@@ -847,34 +923,34 @@ export default function ManagePersonnelPage() {
                     return (
                       <div key={fecha}>
                         {/* Encabezado del día */}
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                           <p className="text-xs font-black text-blue-900 uppercase tracking-widest whitespace-nowrap">
                             {format(fechaDate, "EEEE dd 'de' MMMM", { locale: es })}
                           </p>
                           <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{presentes} pres.</span>
                           <span className="text-[10px] font-black bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{ausentes} aus.</span>
-                          <div className="flex-1 h-px bg-slate-100" />
+                          <div className="flex-1 h-px bg-slate-100 min-w-8" />
                         </div>
                         {/* Lista de entradas */}
                         <div className="rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-100">
                           {entradas.map(e => (
                             <div
                               key={e.id}
-                              className={`flex items-center justify-between px-4 py-2.5 ${
+                              className={`flex items-center justify-between gap-2 px-4 py-2.5 ${
                                 e.estado === 'presente' ? 'bg-green-50/60' : 'bg-red-50/60'
                               }`}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
                                   e.estado === 'presente' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-700'
                                 }`}>
                                   {e.nombre.charAt(0).toUpperCase()}
                                 </div>
-                                <p className={`font-bold text-sm ${
+                                <p className={`font-bold text-sm truncate ${
                                   e.estado === 'presente' ? 'text-green-800' : 'text-red-700'
                                 }`}>{e.nombre}</p>
                               </div>
-                              <span className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1 rounded-full ${
+                              <span className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3 py-1 rounded-full shrink-0 ${
                                 e.estado === 'presente' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-700'
                               }`}>
                                 {e.estado === 'presente'

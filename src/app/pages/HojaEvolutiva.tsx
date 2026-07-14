@@ -1,165 +1,28 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { Save, Loader2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner';
-import { notasAPI } from '../lib/api';
-import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
+import React from 'react';
+import { useNavigate } from 'react-router';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { useHojaEvolutivaData } from '../hooks/formClinico/useHojaEvolutivaData';
 
-type FormDataState = Record<string, string | boolean>;
-
-const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
-  // 1. CAMBIO CLAVE: Copiamos la lógica infalible del NutritionMasterForm
-  const params = useParams();
-  const appointmentId = params.id || params.appointmentId; 
-  
+/**
+ * Representación documental de la Hoja Evolutiva — hoja impresa en mm, solo
+ * lectura. La captura en vivo vive en captura/EvolucionSeguimientoCaptura.tsx
+ * (ver docs/RESPONSIVE_DESIGN_STRATEGY.md sección 9); este componente ya no
+ * implementa FormClinicoHandle ni persiste cambios, solo muestra los datos
+ * ya guardados vía el mismo useHojaEvolutivaData (fuente única de datos).
+ */
+const HojaEvolutiva = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  const [formData, setFormData] = useState<FormDataState>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [notaId, setNotaId] = useState<number | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [yaGuardado, setYaGuardado] = useState(false);
+  const { formData, isLoading } = useHojaEvolutivaData({});
 
-  useEffect(() => {
-    // 2. Usar appointmentId en la validación (¡PROTEGIDO CONTRA TEXTO "null" y "undefined"!)
-    if (!appointmentId || appointmentId === 'null' || appointmentId === 'undefined') {
-      console.warn("⚠️ No se detectó el appointmentId en la URL.");
-      toast.error("Este historial no tiene una cita vinculada, no se pueden cargar datos.");
-      setIsLoading(false);
-      return;
-    }
+  const handleVolver = () => navigate(-1);
 
-    if (!user) return;
-
-    // En modo workspace el borrador se restaura vía restoreDraft(); saltamos la carga de BD.
-    if (props.formKey) {
-      setIsLoading(false);
-      return;
-    }
-
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const data = await notasAPI.getEvolucion(appointmentId as string);
-
-        if (data && data.id) {
-          setNotaId(data.id);
-        }
-
-        // 👈 HIDRATACIÓN INTELIGENTE (COMO EN NUTRITION MASTER FORM)
-        // Combinamos los datos previos con el JSON de la BD y rescatamos las columnas principales
-        if (data) {
-           setFormData((prev) => ({
-              ...prev,
-              ...(data.cuadro_evolucion || {}),
-              // Rescatamos los datos del auto-completado de Node.js
-              paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || '',
-              paciente_expediente: data.cuadro_evolucion?.paciente_expediente || data.numero_expediente || ''
-           }));
-           toast.success("Datos de evolución cargados correctamente");
-        }
-      } catch (error) {
-        console.error("Error al cargar:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadData();
-  }, [appointmentId, user]);
-
-  // --- FUNCIÓN PARA SALIR CON CONFIRMACIÓN (modo standalone) ---
-  const handleVolver = () => {
-    const confirmar = window.confirm("¿Deseas salir sin guardar los cambios?");
-    if (confirmar) navigate(-1);
-  };
-
-// --- 2. GUARDAR DATOS EN LA BASE DE DATOS ---
- const doSave = async () => {
-    setIsSaving(true);
-    try {
-      const aId = appointmentId ? parseInt(appointmentId as string, 10) : null;
-
-      // Siempre guardamos en notas_evolutivas — nunca en historiales_nutricion
-      const payload = {
-        paciente_id: props.pacienteId ?? null,
-        practicante_id: user?.id,
-        appointment_id: aId,
-        nombre_completo: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
-        numero_expediente: (formData.paciente_expediente as string) || 'S/N',
-        edad: null,
-        fecha_elaboracion: new Date().toISOString(),
-        cuadro_evolucion: formData,
-        area: props.formKey === 'seguimiento_nutricion' ? 'nutricion' : (user?.area || 'fisioterapia')
-      };
-      if (notaId) {
-        await notasAPI.updateEvolucion(notaId, payload);
-      } else {
-        await notasAPI.createEvolucion(payload);
-      }
-
-      toast.success("¡Expediente guardado correctamente!");
-      setYaGuardado(true);
-
-      if (props.onSaveSuccess) {
-        props.onSaveSuccess(props.formKey ?? '');
-      } else {
-        setTimeout(() => { navigate(-1); }, 1000);
-      }
-
-   } catch (error: any) {
-      console.error("Error al guardar:", error);
-      toast.error(`Error al guardar: ${error.message}`);
-      props.onSaveFailure?.(props.formKey ?? '', error.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  useImperativeHandle(ref, () => ({
-    triggerSave: doSave,
-    canSave: !!(props.pacienteNombre?.trim() || (formData.paciente_nombre as string)?.trim()),
-    restoreDraft: (draft) => setFormData((draft as FormDataState) ?? {}),
-  }));
-
-  useEffect(() => {
-    props.onStateChange?.(props.formKey ?? '', formData);
-  }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // --- MANEJADORES DE EVENTOS CON TIPADO ESTricto ---
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const target = e.target;
-    const { name, value, type } = target;
-    const checked = (target as HTMLInputElement).checked;
-    
-    const finalValue = type === 'checkbox' ? checked : value;
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
-  };
-
-  // Máscara inteligente para fechas (DD/MM/AAAA)
-  const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/[^0-9/]/g, '');
-    if (val.length === 8 && !val.includes('/')) {
-      val = val.replace(/(\d{2})(\d{2})(\d{4})/, '$1/$2/$3');
-    }
-    e.target.value = val;
-    handleInputChange(e);
-  };
-
-  // Máscara para números y decimales
-  const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.target.value = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-    handleInputChange(e);
-  };
-
-  // Máscara para días de la semana (1-7)
-  const handleDaysInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.target.value = e.target.value.replace(/[^1-7]/g, '');
-    handleInputChange(e);
-  };
+  // Los inputs se dejan readOnly (ver más abajo) — estos manejadores nunca se
+  // disparan por interacción del usuario; se conservan sin efecto para no
+  // tener que tocar cada uno de los ~150 elementos que los referencian.
+  const handleInputChange = () => {};
+  const handleDateInput = () => {};
+  const handleNumberInput = () => {};
+  const handleDaysInput = () => {};
 
   // Lista dinámica para la página 2
   const alimentos: string[] = [
@@ -176,53 +39,17 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
     <div className="hoja-evolutiva-wrapper">
       
       {/* ========================================================= */}
-      {/* BOTONERA FLOTANTE DE ACCIÓN (¡AHORA SÍ FUERA DEL STYLE!) */}
+      {/* BOTONERA FLOTANTE — solo lectura, únicamente "Volver" */}
       {/* ========================================================= */}
       <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 50, display: 'flex', gap: '10px' }}>
-        {!props.formKey && (
-          <button
-            onClick={handleVolver}
-            style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-          >
-            Volver
-          </button>
-        )}
-
         <button
-          onClick={() => !yaGuardado && setShowConfirm(true)}
-          disabled={isSaving || yaGuardado}
-          style={{ padding: '12px 25px', borderRadius: '50px', backgroundColor: yaGuardado ? '#27AE60' : 'var(--azul-utc)', color: 'white', border: 'none', fontWeight: 'bold', cursor: (isSaving || yaGuardado) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', opacity: yaGuardado ? 0.8 : 1 }}
+          onClick={handleVolver}
+          style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          {isSaving ? <Loader2 className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}
-          {yaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar Hoja'}
+          <ArrowLeft className="w-4 h-4" />
+          Volver
         </button>
       </div>
-
-      {showConfirm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a', fontSize: '18px' }}>¿Guardar expediente?</h3>
-            <p style={{ color: '#555', marginBottom: '24px', fontSize: '14px', lineHeight: '1.5' }}>
-              Al confirmar, el expediente quedará guardado para esta consulta. Podrás revisarlo o editarlo antes de dar por finalizada la sesión.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowConfirm(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', background: 'white', fontWeight: '500' }}>Cancelar</button>
-              <button
-                onClick={() => {
-                  setShowConfirm(false);
-                  if (props.formKey) {
-                    setYaGuardado(true);
-                    props.onBack?.();
-                  } else {
-                    doSave();
-                  }
-                }}
-                style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
-              >Sí, guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* LOADER PRINCIPAL */}
      {isLoading && (
@@ -671,11 +498,11 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
             <div className="datos-box">
               <div className="input-group" style={{ flex: 2 }}>
                 <span>Nombre completo</span>
-                <input type="text" name="paciente_nombre" value={(formData.paciente_nombre as string) || ''} onChange={handleInputChange} />
+                <input type="text" name="paciente_nombre" value={(formData.paciente_nombre as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
               </div>
               <div className="input-group" style={{ flex: 1 }}>
                 <span>Expediente</span>
-                <input type="text" name="paciente_expediente" value={(formData.paciente_expediente as string) || ''} onChange={handleInputChange} />
+                <input type="text" name="paciente_expediente" value={(formData.paciente_expediente as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
               </div>
             </div>
           </div>
@@ -690,7 +517,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={{ width: '13%' }}>
-                        <input type="text" name={`psi_fecha_${i}`} value={(formData[`psi_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                        <input type="text" name={`psi_fecha_${i}`} value={(formData[`psi_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
                   </tr>
@@ -706,7 +533,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <tr key={idx}>
                       <td className="td-label">{pregunta}</td>
                       {[1, 2, 3, 4, 5].map(col => (
-                        <td key={col}><textarea name={`psi_q${idx}_col${col}`} value={(formData[`psi_q${idx}_col${col}`] as string) || ''} onChange={handleInputChange}></textarea></td>
+                        <td key={col}><textarea name={`psi_q${idx}_col${col}`} value={(formData[`psi_q${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
                       ))}
                     </tr>
                   ))}
@@ -725,7 +552,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={{ width: '13%' }}>
-                        <input type="text" name={`sint_fecha_${i}`} value={(formData[`sint_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                        <input type="text" name={`sint_fecha_${i}`} value={(formData[`sint_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
                   </tr>
@@ -735,7 +562,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <tr key={idx}>
                       <td className="td-label">{sintoma}</td>
                       {[1, 2, 3, 4, 5].map(col => (
-                        <td key={col}><input type="text" name={`sint_${idx}_col${col}`} value={(formData[`sint_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>
+                        <td key={col}><input type="text" name={`sint_${idx}_col${col}`} value={(formData[`sint_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
                   ))}
@@ -754,7 +581,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={{ width: '13%' }}>
-                        <input type="text" name={`ejer_fecha_${i}`} value={(formData[`ejer_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                        <input type="text" name={`ejer_fecha_${i}`} value={(formData[`ejer_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
                   </tr>
@@ -764,7 +591,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
                       {[1, 2, 3, 4, 5].map(col => (
-                        <td key={col}><input type="text" name={`ejer_${idx}_col${col}`} value={(formData[`ejer_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>
+                        <td key={col}><input type="text" name={`ejer_${idx}_col${col}`} value={(formData[`ejer_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
                   ))}
@@ -783,7 +610,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={{ width: '13%' }}>
-                        <input type="text" name={`diet_fecha_${i}`} value={(formData[`diet_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                        <input type="text" name={`diet_fecha_${i}`} value={(formData[`diet_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
                   </tr>
@@ -793,7 +620,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
                       {[1, 2, 3, 4, 5].map(col => (
-                        <td key={col}><input type="text" name={`diet_${idx}_col${col}`} value={(formData[`diet_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>
+                        <td key={col}><input type="text" name={`diet_${idx}_col${col}`} value={(formData[`diet_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
                   ))}
@@ -829,7 +656,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <td className="text-right bold" style={{ width: '25%', padding: '4px', fontSize: '11px' }}>Fecha</td>
                       {[1, 2, 3, 4, 5, 6].map(i => (
                         <td key={i} className="empty-cell" style={{ padding: '2px' }}>
-                          <input type="text" name={`freq_fecha_${i}`} value={(formData[`freq_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                          <input type="text" name={`freq_fecha_${i}`} value={(formData[`freq_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                         </td>
                       ))}
                     </tr>
@@ -841,7 +668,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                         {[1, 2, 3, 4, 5, 6].map(col => (
                           <td key={col} className="empty-cell" style={{ padding: '1px' }}>
                             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2px', fontSize: '9px' }}>
-                              <input type="text" className="days-input" name={`freq_${idx}_col${col}`} value={(formData[`freq_${idx}_col${col}`] as string) || ''} onChange={handleDaysInput} maxLength={1} />
+                              <input type="text" className="days-input" name={`freq_${idx}_col${col}`} value={(formData[`freq_${idx}_col${col}`] as string) || ''} onChange={handleDaysInput} readOnly tabIndex={-1} maxLength={1} />
                               <span style={{ color: '#999' }}>/7</span>
                             </div>
                           </td>
@@ -867,7 +694,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <td className="text-right bold" style={{ width: '25%', padding: '4px', fontSize: '11px' }}>Fecha</td>
                       {[1, 2, 3, 4, 5, 6].map(i => (
                         <td key={i} className="empty-cell" style={{ padding: '2px' }}>
-                          <input type="text" name={`cual_fecha_${i}`} value={(formData[`cual_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                          <input type="text" name={`cual_fecha_${i}`} value={(formData[`cual_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                         </td>
                       ))}
                     </tr>
@@ -883,7 +710,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <tr key={idx} className="t2-row">
                         <td>{item.q}<br/><b>{item.r}</b></td>
                         {[1, 2, 3, 4, 5, 6].map(col => (
-                          <td key={col}><input type="text" name={`cual_${idx}_col${col}`} value={(formData[`cual_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>
+                          <td key={col}><input type="text" name={`cual_${idx}_col${col}`} value={(formData[`cual_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                         ))}
                       </tr>
                     ))}
@@ -918,7 +745,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <th className="th-fecha" style={{ width: '20%', border: '1px solid #9bb3d6', height: '20px', fontSize: '11px', padding: '3px 8px', color: '#2b5696' }}>Fecha</th>
                       {[1, 2, 3, 4, 5, 6].map(i => (
                         <th key={i} style={{ width: '13%', padding: 0 }}>
-                          <input type="text" name={`p3_fecha_${i}`} value={(formData[`p3_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                          <input type="text" name={`p3_fecha_${i}`} value={(formData[`p3_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                         </th>
                       ))}
                     </tr>
@@ -928,7 +755,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     {["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"].map((row, idx) => (
                       <tr key={`eq_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`eq_${idx}_col${col}`} value={(formData[`eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`eq_${idx}_col${col}`} value={(formData[`eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                       </tr>
                     ))}
 
@@ -936,7 +763,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     {["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"].map((row, idx) => (
                       <tr key={`cn_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`cn_${idx}_col${col}`} value={(formData[`cn_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`cn_${idx}_col${col}`} value={(formData[`cn_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                       </tr>
                     ))}
 
@@ -944,7 +771,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     {["Energía", "Proteína", "HCO", "Lípidos"].map((row, idx) => (
                       <tr key={`int_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`int_${idx}_col${col}`} value={(formData[`int_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`int_${idx}_col${col}`} value={(formData[`int_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                       </tr>
                     ))}
                   </tbody>
@@ -964,7 +791,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <tr>
                       <td className="t2-first-cell">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Talla: <input type="text" name="antro_talla" value={(formData.antro_talla as string) || ''} onChange={handleInputChange} style={{ width: '40px', borderBottom: '1px solid #2b5696' }} /> m</span>
+                          <span>Talla: <input type="text" name="antro_talla" value={(formData.antro_talla as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} style={{ width: '40px', borderBottom: '1px solid #2b5696' }} /> m</span>
                           <span>fecha</span>
                         </div>
                       </td>
@@ -974,7 +801,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <th className="th-fecha" style={{ width: '20%', border: '1px solid #9bb3d6' }}></th>
                       {[1, 2, 3, 4, 5, 6].map(i => (
                         <th key={i} style={{ padding: 0 }}>
-                          <input type="text" name={`antro_fecha_${i}`} value={(formData[`antro_fecha_${i}`] as string) || ''} onChange={handleDateInput} maxLength={10} placeholder="DD/MM/AAAA" />
+                          <input type="text" name={`antro_fecha_${i}`} value={(formData[`antro_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                         </th>
                       ))}
                     </tr>
@@ -1002,7 +829,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
     {/* FIN DEL CAMBIO */}
     {[1, 2, 3, 4, 5, 6].map(col => (
       <td key={col}>
-        <input type="number" step="any" name={`antro_${idx}_col${col}`} value={(formData[`antro_${idx}_col${col}`] as string) || ''} onChange={handleNumberInput} />
+        <input type="number" step="any" name={`antro_${idx}_col${col}`} value={(formData[`antro_${idx}_col${col}`] as string) || ''} onChange={handleNumberInput} readOnly tabIndex={-1} />
       </td>
     ))}
   </tr>
@@ -1039,9 +866,9 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
               <tbody>
                 {[1, 2, 3, 4].map(row => (
                   <tr key={row}>
-                    <td><input type="text" name={`diag_fecha_${row}`} value={(formData[`diag_fecha_${row}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} /></td>
-                    <td><textarea name={`diag_matriz_${row}`} value={(formData[`diag_matriz_${row}`] as string) || ''} onChange={handleInputChange}></textarea></td>
-                    <td><textarea name={`diag_interp_${row}`} value={(formData[`diag_interp_${row}`] as string) || ''} onChange={handleInputChange}></textarea></td>
+                    <td><input type="text" name={`diag_fecha_${row}`} value={(formData[`diag_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
+                    <td><textarea name={`diag_matriz_${row}`} value={(formData[`diag_matriz_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
+                    <td><textarea name={`diag_interp_${row}`} value={(formData[`diag_interp_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
                   </tr>
                 ))}
               </tbody>
@@ -1063,7 +890,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</th>
                     {[1, 2, 3, 4, 5, 6].map(i => (
                       <th key={i} style={i === 6 ? { borderRight: 'none' } : {}}>
-                        <input type="text" name={`sig_fecha_${i}`} value={(formData[`sig_fecha_${i}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} />
+                        <input type="text" name={`sig_fecha_${i}`} value={(formData[`sig_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} />
                       </th>
                     ))}
                   </tr>
@@ -1074,7 +901,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <td className="td-label">{sig}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col} style={col === 6 ? { borderRight: 'none' } : {}}>
-                          <input type="text" name={`sig_${idx}_col${col}`} value={(formData[`sig_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} />
+                          <input type="text" name={`sig_${idx}_col${col}`} value={(formData[`sig_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                         </td>
                       ))}
                     </tr>
@@ -1099,7 +926,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</th>
                     {[1, 2, 3, 4, 5, 6].map(i => (
                       <th key={i} style={i === 6 ? { borderRight: 'none' } : {}}>
-                        <input type="text" name={`bioq_fecha_${i}`} value={(formData[`bioq_fecha_${i}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} />
+                        <input type="text" name={`bioq_fecha_${i}`} value={(formData[`bioq_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} />
                       </th>
                     ))}
                   </tr>
@@ -1107,10 +934,10 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                 <tbody>
                   {[...Array(10)].map((_, idx) => (
                     <tr key={idx}>
-                      <td><input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} /></td>
+                      <td><input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col} style={col === 6 ? { borderRight: 'none' } : {}}>
-                          <input type="text" name={`bioq_${idx}_col${col}`} value={(formData[`bioq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} />
+                          <input type="text" name={`bioq_${idx}_col${col}`} value={(formData[`bioq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                         </td>
                       ))}
                     </tr>
@@ -1132,8 +959,8 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
               <tbody>
                 {[1, 2, 3, 4, 5].map(row => (
                   <tr key={row}>
-                    <td><input type="text" name={`int_bioq_fecha_${row}`} value={(formData[`int_bioq_fecha_${row}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} /></td>
-                    <td><textarea name={`int_bioq_desc_${row}`} value={(formData[`int_bioq_desc_${row}`] as string) || ''} onChange={handleInputChange}></textarea></td>
+                    <td><input type="text" name={`int_bioq_fecha_${row}`} value={(formData[`int_bioq_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
+                    <td><textarea name={`int_bioq_desc_${row}`} value={(formData[`int_bioq_desc_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
                   </tr>
                 ))}
               </tbody>
@@ -1174,7 +1001,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px', borderLeft: 'none !important' }}>Fecha</th>
                     {[1, 2, 3, 4, 5, 6].map(i => (
                       <th key={i} style={i === 6 ? { borderRight: 'none !important' } : {}}>
-                        <input type="text" name={`explor_fecha_${i}`} value={(formData[`explor_fecha_${i}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} />
+                        <input type="text" name={`explor_fecha_${i}`} value={(formData[`explor_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} />
                       </th>
                     ))}
                   </tr>
@@ -1195,7 +1022,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                             ...(isLast ? { borderBottom: 'none !important' } : {}),
                             ...(col === 6 ? { borderRight: 'none !important' } : {})
                           }}>
-                            <input type="text" name={`explor_${idx}_col${col}`} value={(formData[`explor_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} />
+                            <input type="text" name={`explor_${idx}_col${col}`} value={(formData[`explor_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                           </td>
                         ))}
                       </tr>
@@ -1221,7 +1048,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                           type="text" 
                           name={`diag_nutri_fecha_${i}`} 
                           value={(formData[`diag_nutri_fecha_${i}`] as string) || ''} 
-                          onChange={handleDateInput} 
+                          onChange={handleDateInput} readOnly tabIndex={-1} 
                           placeholder="DD/MM/AAAA" 
                           maxLength={10} 
                           style={{ fontSize: '7.5px', padding: '0' }} /* <-- ESTO LO HACE PEQUEÑO */
@@ -1237,12 +1064,12 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                       <React.Fragment key={diagGroup}>
                         <tr>
                           <td rowSpan={3} style={isLast ? { borderBottom: 'none !important' } : {}}>
-                            <textarea name={`diag_nutri_txt_${diagGroup}`} value={(formData[`diag_nutri_txt_${diagGroup}`] as string) || ''} onChange={handleInputChange}></textarea>
+                            <textarea name={`diag_nutri_txt_${diagGroup}`} value={(formData[`diag_nutri_txt_${diagGroup}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea>
                           </td>
                           <td className="estado-label">Nuevo</td>
                           {[1, 2, 3, 4, 5, 6].map(col => (
                             <td key={`nuevo_${col}`} style={col === 6 ? { borderRight: 'none !important' } : {}}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_nuevo_col${col}`} value={(formData[`diag_nutri_${diagGroup}_nuevo_col${col}`] as string) || ''} onChange={handleInputChange} />
+                              <input type="text" name={`diag_nutri_${diagGroup}_nuevo_col${col}`} value={(formData[`diag_nutri_${diagGroup}_nuevo_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1250,7 +1077,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                           <td className="estado-label">Continuo</td>
                           {[1, 2, 3, 4, 5, 6].map(col => (
                             <td key={`cont_${col}`} style={col === 6 ? { borderRight: 'none !important' } : {}}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_cont_col${col}`} value={(formData[`diag_nutri_${diagGroup}_cont_col${col}`] as string) || ''} onChange={handleInputChange} />
+                              <input type="text" name={`diag_nutri_${diagGroup}_cont_col${col}`} value={(formData[`diag_nutri_${diagGroup}_cont_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1261,7 +1088,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                               ...(isLast ? { borderBottom: 'none !important' } : {}),
                               ...(col === 6 ? { borderRight: 'none !important' } : {})
                             }}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_res_col${col}`} value={(formData[`diag_nutri_${diagGroup}_res_col${col}`] as string) || ''} onChange={handleInputChange} />
+                              <input type="text" name={`diag_nutri_${diagGroup}_res_col${col}`} value={(formData[`diag_nutri_${diagGroup}_res_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1306,7 +1133,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={i === 5 ? { borderRight: 'none !important' } : {}}>
-                        <input type="text" name={`interv_fecha_${i}`} value={(formData[`interv_fecha_${i}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} />
+                        <input type="text" name={`interv_fecha_${i}`} value={(formData[`interv_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} />
                       </th>
                     ))}
                   </tr>
@@ -1314,20 +1141,20 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                 <tbody>
                   <tr>
                     <td className="td-label">Indicación de<br/>Alimentos/Nutrimentos</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange}></textarea></td>)}
+                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>)}
                   </tr>
                   <tr><td colSpan={6} className="subtitulo-p6">Contenido Nutrimental</td></tr>
                   {["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"].map((macro, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{macro}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
                   <tr><td colSpan={6} className="subtitulo-p6">Equivalentes (rac)</td></tr>
                   {["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"].map((eq, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{eq}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -1352,7 +1179,7 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                     <th className="th-fecha" style={{ backgroundColor: 'white', borderBottom: 'var(--borde-fino)' }}>Fecha</th>
                     {[1, 2, 3, 4, 5].map(i => (
                       <th key={i} style={{ backgroundColor: 'white', borderBottom: 'var(--borde-fino)', ...(i === 5 ? { borderRight: 'none !important' } : {}) }}>
-                        <input type="text" name={`edu_fecha_${i}`} value={(formData[`edu_fecha_${i}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM" maxLength={5} style={{ fontSize: '7px', padding: '0' }} />
+                        <input type="text" name={`edu_fecha_${i}`} value={(formData[`edu_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM" maxLength={5} style={{ fontSize: '7px', padding: '0' }} />
                       </th>
                     ))}
                   </tr>
@@ -1365,26 +1192,26 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                         <tr>
                           <td rowSpan={3} style={{ padding: 0, ...(isLastBlock ? { borderBottom: 'none !important' } : {}) }}>
                             <div className="cell-flex-col">
-                              <div className="cell-half"><span className="text-mini">Contenido (E-1___)</span><textarea name={`edu_cont_${rowBlock}`} value={(formData[`edu_cont_${rowBlock}`] as string) || ''} onChange={handleInputChange}></textarea></div>
-                              <div className="cell-half"><span className="text-mini">Aplicación (E-2___)</span><textarea name={`edu_apl_${rowBlock}`} value={(formData[`edu_apl_${rowBlock}`] as string) || ''} onChange={handleInputChange}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Contenido (E-1___)</span><textarea name={`edu_cont_${rowBlock}`} value={(formData[`edu_cont_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Aplicación (E-2___)</span><textarea name={`edu_apl_${rowBlock}`} value={(formData[`edu_apl_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                             </div>
                           </td>
                           <td rowSpan={3} style={{ padding: 0, ...(isLastBlock ? { borderBottom: 'none !important' } : {}) }}>
                             <div className="cell-flex-col">
-                              <div className="cell-half"><span className="text-mini">Bases/Acercamiento Teórico (C-1___)</span><textarea name={`cons_base_${rowBlock}`} value={(formData[`cons_base_${rowBlock}`] as string) || ''} onChange={handleInputChange}></textarea></div>
-                              <div className="cell-half"><span className="text-mini">Estrategias (C-2___)</span><textarea name={`cons_est_${rowBlock}`} value={(formData[`cons_est_${rowBlock}`] as string) || ''} onChange={handleInputChange}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Bases/Acercamiento Teórico (C-1___)</span><textarea name={`cons_base_${rowBlock}`} value={(formData[`cons_base_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Estrategias (C-2___)</span><textarea name={`cons_est_${rowBlock}`} value={(formData[`cons_est_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                             </div>
                           </td>
                           <td className="estado-label">Logrado</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`log_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_log_col${col}`} value={(formData[`edu_${rowBlock}_log_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                          {[1, 2, 3, 4, 5].map(col => <td key={`log_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_log_col${col}`} value={(formData[`edu_${rowBlock}_log_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                         <tr>
                           <td className="estado-label">Suspendida</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`sus_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_sus_col${col}`} value={(formData[`edu_${rowBlock}_sus_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                          {[1, 2, 3, 4, 5].map(col => <td key={`sus_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_sus_col${col}`} value={(formData[`edu_${rowBlock}_sus_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                         <tr>
                           <td className="estado-label" style={isLastBlock ? { borderBottom: 'none !important' } : {}}>No lograda</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`nol_${col}`} style={{ ...(isLastBlock ? { borderBottom: 'none !important' } : {}), ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`edu_${rowBlock}_nol_col${col}`} value={(formData[`edu_${rowBlock}_nol_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                          {[1, 2, 3, 4, 5].map(col => <td key={`nol_${col}`} style={{ ...(isLastBlock ? { borderBottom: 'none !important' } : {}), ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`edu_${rowBlock}_nol_col${col}`} value={(formData[`edu_${rowBlock}_nol_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                       </React.Fragment>
                     );
@@ -1406,17 +1233,17 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
                 <tbody>
                   <tr>
                     <td className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_fecha_col${col}`} value={(formData[`firma_fecha_col${col}`] as string) || ''} onChange={handleDateInput} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} /></td>)}
+                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_fecha_col${col}`} value={(formData[`firma_fecha_col${col}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} /></td>)}
                   </tr>
                   {["PLN.", "Matrícula", "Firma", "LN.", "Céd. Prof."].map((label, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{label}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
                   <tr>
                     <td className="td-label" style={{ borderBottom: 'none !important' }}>Firma</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} /></td>)}
+                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                   </tr>
                 </tbody>
               </table>
@@ -1434,6 +1261,6 @@ const HojaEvolutiva = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks
 
     </div>
     );
-});
+};
 
 export default HojaEvolutiva;

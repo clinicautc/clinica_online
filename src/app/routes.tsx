@@ -23,8 +23,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import CambiarPasswordInicial from './pages/CambiarPasswordInicial';
 
 // --- CORRECCIÓN DE IMPORTACIONES (Sincronizadas con archivos físicos) ---
-import NutritionMasterForm from './pages/NutritionMasterForm';
-import PhysiotherapyMasterForm from './pages/PhysiotherapyMasterForm';
+import NutritionMasterFormRouteResolver from './pages/NutritionMasterFormRouteResolver';
+import PhysiotherapyMasterFormRouteResolver from './pages/PhysiotherapyMasterFormRouteResolver';
 
 import StatisticsPage from './pages/StatisticsPage';
 import ManagePersonnelPage from './pages/ManagePersonnelPage';
@@ -36,6 +36,7 @@ import MedicalHistoryViewer from './components/MedicalHistoryViewer';
 // --- NUEVA IMPORTACIÓN: HOJA EVOLUTIVA ---
 import HojaEvolutiva from './pages/HojaEvolutiva';
 import ConsultaWorkspace from './pages/ConsultaWorkspace';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 /**
  * COMPONENTE: ProtectedRoute
@@ -119,7 +120,7 @@ function DashboardRouter() {
 /**
  * CONFIGURACIÓN DE RUTAS
  */
-export const router = createBrowserRouter([
+const routeDefinitions = [
   {
     path: '/',
     element: <Navigate to="/login" replace />
@@ -153,10 +154,10 @@ export const router = createBrowserRouter([
    * RUTAS DE FORMULARIOS (Sincronizadas con la DB)
    */
   {
-    path: '/forms/nutricion/:appointmentId', 
+    path: '/forms/nutricion/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <NutritionMasterForm />
+        <NutritionMasterFormRouteResolver />
       </ProtectedRoute>
     )
   },
@@ -164,7 +165,7 @@ export const router = createBrowserRouter([
     path: '/forms/fisioterapia/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <PhysiotherapyMasterForm />
+        <PhysiotherapyMasterFormRouteResolver />
       </ProtectedRoute>
     )
   },
@@ -251,4 +252,12 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/login" replace />
   }
-]);
+];
+
+// errorElement se agrega a todas las rutas de forma uniforme: si el DOM se
+// corrompe por un traductor automático del navegador (o cualquier otro
+// error de render), el usuario ve una pantalla recuperable en vez de la
+// pantalla cruda por defecto de React Router.
+export const router = createBrowserRouter(
+  routeDefinitions.map(route => ({ ...route, errorElement: <RouteErrorBoundary /> }))
+);

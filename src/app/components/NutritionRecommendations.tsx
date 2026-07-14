@@ -100,10 +100,10 @@ export default function NutritionRecommendations({
     <div className="space-y-6">
       {!readOnly && (
         <Card className="border-none shadow-2xl rounded-2xl overflow-hidden bg-white/95">
-          <CardHeader className={`${theme.bgLight} border-b p-7`}>
+          <CardHeader className={`${theme.bgLight} border-b p-4 sm:p-7`}>
             <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
-              <MessageSquare className="w-7 h-7" />
-              Nueva Recomendación
+              <MessageSquare className="w-7 h-7 shrink-0" />
+              <span className="min-w-0">Nueva Recomendación</span>
             </CardTitle>
             <CardDescription className="font-bold italic text-slate-500">
               Escribe las recomendaciones para {pacienteNombre}
@@ -147,10 +147,10 @@ export default function NutritionRecommendations({
 
       {/* Historial de recomendaciones */}
       <Card className="border-none shadow-2xl rounded-2xl overflow-hidden bg-white/95">
-        <CardHeader className={`${theme.bgLight} border-b p-7`}>
+        <CardHeader className={`${theme.bgLight} border-b p-4 sm:p-7`}>
           <CardTitle className={`${theme.color} text-2xl font-black flex items-center gap-3`}>
-            <FileText className="w-7 h-7" />
-            Historial de Recomendaciones
+            <FileText className="w-7 h-7 shrink-0" />
+            <span className="min-w-0">Historial de Recomendaciones</span>
           </CardTitle>
           <CardDescription className="font-bold italic text-slate-500">
             Recomendaciones previas guardadas para este paciente

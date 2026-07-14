@@ -4,12 +4,9 @@
    * PROPÓSITO: Formulario Multi-pasos con persistencia de datos local.
    * ============================================================================
    */
-  import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-  import { useNavigate, useParams } from 'react-router';
-  import { useAuth } from '../contexts/AuthContext';
-  import { toast } from 'sonner';
-  import { apiFetch, historialesAPI } from '../lib/api';
-  import type { FormClinicoHandle, FormClinicoCallbacks } from '../lib/types/formClinico';
+  import React, { useState } from 'react';
+  import { useNavigate } from 'react-router';
+  import { useNutritionHistoriaData } from '../hooks/formClinico/useNutritionHistoriaData';
   // IMPORTACIÓN DE LA IMAGEN
   import bristolImg from './bristol.jpg';
 
@@ -23,184 +20,26 @@
     historialId?: number | null;
     onGuardarDirecto?: () => void;
     isYaGuardado?: boolean;
+    isSaving?: boolean;
+    onFinalizarDirecto?: () => void;
   }
 
-  const NutritionMasterForm = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
-    // --- CONTROL DE PASOS ---
+  const NutritionMasterForm = () => {
     const navigate = useNavigate();
-    const params = useParams();
-// Tomamos el 'id' de la URL y lo renombramos a 'appointmentId' para que el código funcione
-const appointmentId = params.id || params.appointmentId;
-    const { user } = useAuth();
-    const [step, setStep] = useState(1);
-    
-    // --- OBJETO MAESTRO DE DATOS (Persistencia Total) ---
-    const [formData, setFormData] = useState<any>(() => ({
-      pagina_1: { paciente_id: props.pacienteId ?? undefined },
-      pagina_2: {},
-      pagina_3: {},
-      pagina_4: {}
-    }));
 
-    const [isReadOnly, _setIsReadOnly] = useState(false);
-    const [historialId, setHistorialId] = useState<number | null>(null);
-    const [_isSaving, setIsSaving] = useState(false);
-    const [yaGuardado, setYaGuardado] = useState(false);
+    const {
+      updateGlobalData, isSaving, yaGuardado, historialId, formData,
+    } = useNutritionHistoriaData({});
 
-      // AGREGA ESTE BLOQUE AQUÍ:
-    // Lógica de carga automática desde PostgreSQL para Nutrición
-  useEffect(() => {
-  const cargarHistorialExistente = async () => {
-    if (!appointmentId) return;
-    // En modo workspace el borrador se restaura vía restoreDraft; saltamos la carga de BD.
-    if (props.formKey) return;
+    // Este componente ahora solo se monta cuando ya existe un historial
+    // persistido (ver NutritionMasterFormRouteResolver.tsx) — es la
+    // representación documental de solo lectura, nunca la interfaz de
+    // captura en vivo (eso es NutricionPrimeraConsultaCaptura.tsx).
+    const isReadOnly = true;
 
-    try {
-      const response = await apiFetch(`/historiales-nutricion/detalle/${appointmentId}`);
-
-     if (response.ok) {
-        const filaCompleta = await response.json();
-        console.log("¡FILA COMPLETA RECUPERADA!", filaCompleta);
-        
-        // 1. Guardamos el ID del historial para que el PUT funcione
-        setHistorialId(filaCompleta.id);
-        
-        // 2. Hidratación: datos ya tiene la estructura {pagina_1, pagina_2, ...}
-        const datosGuardados = filaCompleta.datos || {};
-        setFormData((prevData: any) => ({
-          ...prevData,
-          ...datosGuardados,
-          paciente_id: filaCompleta.paciente_id,
-          pagina_1: {
-            ...(prevData.pagina_1 || {}),
-            ...(datosGuardados.pagina_1 || {}),
-            paciente_id: filaCompleta.paciente_id
-          }
-        }));
-
-        toast.success("Expediente cargado correctamente");
-      }
-    } catch (error) {
-      console.error("Error al cargar historial nutricional:", error);
-      toast.error("Hubo un problema al recuperar el expediente.");
-    }
-  };
-
-  cargarHistorialExistente();
-}, [appointmentId]);
-
-    // Auto-reduce font size as user types so text fits within the cell
-    useEffect(() => {
-      const shrink = (el: HTMLInputElement | HTMLTextAreaElement) => {
-        if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'number') return;
-        el.style.fontSize = '';
-        const base = parseFloat(window.getComputedStyle(el).fontSize) || 9;
-        let size = base;
-        while (size > 5.5) {
-          const overflowsH = el.scrollWidth > el.offsetWidth + 1;
-          const overflowsV = el.tagName === 'TEXTAREA' && el.scrollHeight > el.offsetHeight + 1;
-          if (!overflowsH && !overflowsV) break;
-          size -= 0.4;
-          el.style.fontSize = size + 'px';
-        }
-      };
-      const onInput = (e: Event) => {
-        const el = e.target as HTMLInputElement | HTMLTextAreaElement;
-        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) shrink(el);
-      };
-      document.addEventListener('input', onInput, true);
-      return () => document.removeEventListener('input', onInput, true);
-    }, []);
-
-    // Función núcleo para actualizar datos sin perder los anteriores
-    const updateGlobalData = (page: string, data: any) => {
-      setFormData((prev: any) => ({
-        ...prev,
-        [page]: { ...prev[page], ...data }
-      }));
-    };
-
-    // Capitaliza la primera letra
-    const capFirst = (val: string) => val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
-
-    // Manejador de inputs para la Página 1
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, id: string) => {
-      const { type, value } = e.target;
-      const finalVal = (type !== 'checkbox' && type !== 'number' && type !== 'radio') ? capFirst(value) : value;
-      updateGlobalData('pagina_1', { [id]: finalVal });
-    };
-
-    const handleNext = () => setStep(2);
-    const handleBack = () => setStep(1);
-
-    // Función de guardado expuesta al workspace mediante useImperativeHandle.
-    // Cuando se usa desde la ruta clásica (/forms/nutricion/:id) esta función no se llama;
-    // en ese caso el guardado lo ejecuta NutritionPage4Component directamente.
-    const handleFinalizar = async () => {
-      try {
-        setIsSaving(true);
-        const pId = props.pacienteId ?? null;
-        const pNombre = props.pacienteNombre ?? 'Paciente sin nombre';
-        const parsedAId = parseInt(appointmentId ?? '', 10);
-        const aId = !isNaN(parsedAId) ? parsedAId : null;
-
-        if (!pId) {
-          toast.error('Error: no se pudo identificar al paciente.');
-          setIsSaving(false);
-          return;
-        }
-
-        const payload = {
-          paciente_id: pId,
-          paciente_nombre: pNombre,
-          tipo: 'nutricion',
-          datos: formData,
-          creado_por: user?.id || 1,
-          creado_por_nombre: user?.nombre || 'Practicante Nutrición',
-          appointment_id: aId,
-        };
-
-        await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'nutricion' });
-        toast.success('Expediente guardado correctamente');
-
-        if (props.onSaveSuccess) {
-          props.onSaveSuccess(props.formKey ?? '');
-        } else {
-          setTimeout(() => navigate(`/historial/${pId}/nutricion`, { replace: true }), 1000);
-        }
-      } catch (error: any) {
-        console.error('Error crítico:', error);
-        toast.error('Error al guardar en la base de datos.');
-        props.onSaveFailure?.(props.formKey ?? '', error.message);
-      } finally {
-        setIsSaving(false);
-      }
-    };
-
-    // Regresa al hub sin guardar en BD; el guardado real ocurre en "Finalizar Consulta".
-    const handleGuardarSinFinalizar = () => {
-      setYaGuardado(true);
-      props.onBack?.();
-    };
-
-    useImperativeHandle(ref, () => ({
-      triggerSave: handleFinalizar,
-      canSave: !!(formData?.pagina_1?.nombre?.trim()),
-      restoreDraft: (draft) => {
-        const d = (draft as any) ?? { pagina_1: {}, pagina_2: {}, pagina_3: {}, pagina_4: {} };
-        setFormData({
-          ...d,
-          pagina_1: {
-            ...d.pagina_1,
-            ...(props.pacienteId != null ? { paciente_id: props.pacienteId } : {}),
-          },
-        });
-      },
-    }));
-
-    useEffect(() => {
-      props.onStateChange?.(props.formKey ?? '', formData);
-    }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Los manejadores de edición ya no se disparan (fieldset disabled),
+    // se conservan sin efecto para no tener que tocar cada referencia.
+    const handleInputChange = (..._args: any[]) => {};
 
     return (
       <>
@@ -241,60 +80,56 @@ const appointmentId = params.id || params.appointmentId;
           .p1-paper tr, .p1-paper td { break-inside: avoid; }
         }
       `}</style>
+      {/* Solo lectura: las 4 páginas se muestran apiladas (no hay wizard de
+          pasos que navegar, no aplica a un documento ya finalizado) con un
+          único botón "Volver", fuera del fieldset deshabilitado. */}
+      <button
+        onClick={() => navigate(-1)}
+        className="fixed top-4 right-4 bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+        Volver
+      </button>
+
+      {/* fieldset disabled bloquea todos los controles descendientes
+          (páginas 1-4) sin tener que tocar cada input individualmente;
+          display:contents lo hace invisible en el layout calibrado en mm. */}
+      <fieldset disabled={isReadOnly} className="contents">
       <div className="p1-outer bg-zinc-600 min-h-screen flex flex-col items-center px-2 sm:px-6 md:px-12 lg:px-24 xl:px-[220px] pt-5 pb-24 font-sans print:bg-white print:p-0 relative">
-        
-        {/* --- RENDERIZADO DINÁMICO DE PÁGINAS --- */}
-        {step === 2 && (
-          <NutritionPage2Component 
-            accumulatedData={formData} 
-            onUpdate={updateGlobalData} 
-            onBack={handleBack} 
-            onNext={() => setStep(3)} 
-            isReadOnly={isReadOnly}
-          />
-        )}
 
-        {step === 3 && (
-          <NutritionPage3Component 
-            accumulatedData={formData} 
-            onUpdate={updateGlobalData} 
-            onBack={() => setStep(2)} 
-            onNext={() => setStep(4)} 
-            isReadOnly={isReadOnly}
-          />
-        )}
+        {/* --- LAS 4 PÁGINAS SE MUESTRAN SIEMPRE, APILADAS --- */}
+        <NutritionPage2Component
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+        />
 
-        {step === 4 && (
-          <NutritionPage4Component
-            accumulatedData={formData}
-            onUpdate={updateGlobalData}
-            onBack={() => setStep(3)}
-            onNext={() => {}}
-            isReadOnly={isReadOnly}
-            historialId={historialId}
-            onGuardarDirecto={props.formKey ? handleGuardarSinFinalizar : undefined}
-            isYaGuardado={yaGuardado}
-          />
-        )}
+        <NutritionPage3Component
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+        />
+
+        <NutritionPage4Component
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+          historialId={historialId}
+          onGuardarDirecto={undefined}
+          isYaGuardado={yaGuardado}
+          isSaving={isSaving}
+          onFinalizarDirecto={undefined}
+        />
 {/* --- PÁGINA 1 --- */}
-        <div className={step === 1 ? "block" : "hidden"}>
-         
-          {/* BOTONES DE NAVEGACIÓN FIJOS */}
-         <button onClick={props.onBack ?? (() => navigate(-1))}
-         className={`fixed ${props.formKey ? 'top-16' : 'top-4'} right-4 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-            </svg>
-            Salir
-          </button>
-
-          <button
-            onClick={handleNext}
-            className="fixed bottom-8 right-10 bg-[#1d4d96] hover:bg-[#153a71] text-white px-8 py-3 rounded-full font-bold shadow-2xl z-50 transition-all cursor-pointer scale-105 uppercase text-sm tracking-wider print:hidden"
-          >
-            Siguiente (P2) →
-          </button>
+        <div className="block">
 
           {/* CONTENEDOR HOJA A4 (DISEÑO UNIFORME SIN SUPERPOSICIONES) */}
           <div className="p1-paper bg-white w-full px-[8mm] pt-[6mm] pb-[6mm] relative shadow-2xl flex flex-col justify-between overflow-hidden text-[#2c5392] border-[3.5px] border-[#2c5392] rounded-[25px] print:shadow-none print:m-0">
@@ -748,9 +583,10 @@ const appointmentId = params.id || params.appointmentId;
           </div>
         </div>
       </div>
+      </fieldset>
       </>
     );
-  });
+  };
 
   /* --- COMPONENTES AUXILIARES --- */
 
@@ -822,7 +658,7 @@ const appointmentId = params.id || params.appointmentId;
   /* --- DECLARACIONES DE FUNCIONES (Páginas 2, 3 y 4) --- */
   // Las llenaremos conforme me pases los códigos.
 
-  function NutritionPage2Component({ accumulatedData, onUpdate, onBack, onNext, isReadOnly }: PageProps) {
+  function NutritionPage2Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly }: PageProps) {
     const capFirst2 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value, type } = e.target;
@@ -1140,9 +976,6 @@ const appointmentId = params.id || params.appointmentId;
         `}</style>
 
         <div className="w-full">
-          <button onClick={onBack} className="nav-button btn-back">← Página 1</button>
-          <button onClick={onNext} className="nav-button btn-next">Página 3 →</button>
-
           <div className="page">
             <div className="section-header">Aspectos dietéticos</div>
             <div className="section-box">
@@ -1407,7 +1240,7 @@ const appointmentId = params.id || params.appointmentId;
     );
   }
 
-  function NutritionPage3Component({ accumulatedData, onUpdate, onBack, onNext, isReadOnly: _isReadOnly }: PageProps) {
+  function NutritionPage3Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly: _isReadOnly }: PageProps) {
     // --- LÓGICA DE NAVEGACIÓN POR TECLADO (FLECHAS) ---
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1740,13 +1573,6 @@ const appointmentId = params.id || params.appointmentId;
         </style>
         
         <div className="w-full">
-          {/* BOTONES DE NAVEGACIÓN */}
-          <button onClick={onBack} className="nav-button btn-back">
-            ← Página 2
-          </button>
-          <button onClick={onNext} className="nav-button btn-next">
-            Página 4 →
-          </button>
 
           <div className="contenedor-maestro-perimetral" style={styles.contenedorMaestro}>
             
@@ -1984,13 +1810,8 @@ const appointmentId = params.id || params.appointmentId;
    * ============================================================================
    */
 
-function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _onNext, isReadOnly: _isReadOnly, historialId, onGuardarDirecto, isYaGuardado }: PageProps) {
-  const [isSaving, setIsSaving] = useState(false);
+function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly, historialId: _historialId, onGuardarDirecto, isYaGuardado, isSaving, onFinalizarDirecto }: PageProps) {
   const [showConfirm, setShowConfirm] = useState(false);
-
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const { appointmentId } = useParams()
 
     const capFirst4 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -2002,54 +1823,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
       onUpdate('pagina_4', { [name]: newValue });
     };
 
-    // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
-    // --- LÓGICA DE GUARDADO REAL CORREGIDA ---
+    // El guardado real (antes duplicado aquí y en el componente padre) ahora
+    // vive únicamente en useNutritionHistoriaData — este componente solo
+    // dispara onFinalizarDirecto (modo standalone) u onGuardarDirecto (modo
+    // workspace, no persiste), igual que decide handleFinalizar() más abajo.
     const handleFinalizar = async () => {
-  try {
-    setIsSaving(true);
-
-    const parsedId = parseInt(accumulatedData?.pagina_1?.paciente_id, 10);
-    const pId = !isNaN(parsedId) ? parsedId : (accumulatedData?.paciente_id ?? null);
-    const pNombre = accumulatedData?.pagina_1?.nombre || "Paciente sin nombre";
-    const parsedAId = parseInt(appointmentId ?? '', 10);
-    const aId = !isNaN(parsedAId) ? parsedAId : null;
-
-    if (!pId) {
-      toast.error("Error: no se pudo identificar al paciente. Regresa al paso 1.");
-      setIsSaving(false);
-      return;
-    }
-
-    const payload = {
-      paciente_id: pId,
-      paciente_nombre: pNombre,
-      tipo: 'nutricion',
-      datos: accumulatedData, 
-      creado_por: user?.id || (user as any)?.id || 1, 
-      creado_por_nombre: user?.nombre || (user as any)?.nombre || "Practicante Nutrición",
-      appointment_id: aId 
+      await onFinalizarDirecto?.();
     };
-
-    // LÓGICA DE ACTUALIZACIÓN:
-    // Si ya tienes un historialId guardado en el estado del componente, usamos PUT (Actualizar)
-    // Si no tienes ID (es un formulario nuevo), usamos POST (Crear nuevo)
-    // 'tipo' necesario para el backend
-    await historialesAPI.guardar(historialId ?? null, { ...payload, tipo: 'nutricion' });
-
-    toast.success("Expediente guardado/actualizado correctamente");
-
-    // REDIRECCIÓN INTELIGENTE:
-    setTimeout(() => {
-      // AGREGA EL { replace: true } AQUÍ
-      navigate(`/historial/${pId}/nutricion`, { replace: true });
-    }, 1000);
-  } catch (error) {
-    console.error("Error crítico:", error);
-    toast.error("Error al guardar en la base de datos.");
-  } finally {
-    setIsSaving(false);
-  }
-};
     const styles: { [key: string]: React.CSSProperties } = {
       bodyWrapper: {
         fontFamily: 'Segoe UI, Arial, sans-serif',
@@ -2327,19 +2107,20 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack, onNext: _o
           `}
         </style>
 
-        {/* BOTONES DE NAVEGACIÓN */}
-        <button className="no-print" style={styles.btnNavigation} onClick={onBack}> 
-          ← Pagina 3 
-        </button>
 
-        <button
-          className="no-print"
-          style={styles.btnFinalizar}
-          onClick={() => !isYaGuardado && setShowConfirm(true)}
-          disabled={isSaving || isYaGuardado}
-        >
-          {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
-        </button>
+        {/* En modo solo lectura no se renderiza — un botón "Guardar" visible
+            (aunque inerte vía fieldset) es una señal visual engañosa sobre
+            un documento ya finalizado; mejor ausente que aparentemente activo. */}
+        {!isReadOnly && (
+          <button
+            className="no-print"
+            style={styles.btnFinalizar}
+            onClick={() => !isYaGuardado && setShowConfirm(true)}
+            disabled={isSaving || isYaGuardado}
+          >
+            {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
+          </button>
+        )}
 
         {showConfirm && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

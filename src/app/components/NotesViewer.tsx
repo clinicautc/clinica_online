@@ -195,7 +195,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
 
   return (
     <Card className="border-none shadow-2xl rounded-[2rem] bg-white overflow-hidden" style={arialStyle}>
-      <CardHeader className="bg-slate-50/50 border-b p-8">
+      <CardHeader className="bg-slate-50/50 border-b p-4 sm:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
             <CardTitle className="text-blue-950 text-2xl font-black flex items-center gap-3">
@@ -205,7 +205,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
             <CardDescription className="font-bold text-slate-400 italic">Gestión de avisos institucionales - Clínica UTC.</CardDescription>
           </div>
 
-          <div className="flex bg-white p-1.5 rounded-2xl shadow-inner border border-slate-200">
+          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl shadow-inner border border-slate-200">
             {esAdminDeArea ? (
               <>
                 <Button 
@@ -244,7 +244,7 @@ export default function NotesViewer({ readOnly = false, filterCategory }: NotesV
         </div>
       </CardHeader>
 
-      <CardContent className="p-8">
+      <CardContent className="p-4 sm:p-8">
         {isLoading ? (
           <div className="flex flex-col items-center py-20 gap-4"><Loader2 className="w-12 h-12 animate-spin text-blue-900 opacity-20" /></div>
         ) : filteredNotes.length === 0 ? (

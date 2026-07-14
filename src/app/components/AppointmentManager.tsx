@@ -114,7 +114,87 @@ export default function AppointmentManager() {
             <p className="text-blue-900/60 font-medium">No hay citas registradas en el sistema</p>
           </div>
         ) : (
-          <div className="border border-blue-900/10 rounded-lg overflow-x-auto">
+          <>
+            {/* VISTA MÓVIL — misma información que la tabla, en tarjetas apiladas */}
+            <div className="block md:hidden border border-blue-900/10 rounded-lg divide-y divide-blue-900/10">
+              {appointments.map((appointment) => (
+                <div key={appointment.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-blue-900">{appointment.paciente_nombre}</span>
+                    {getStatusBadge(appointment.estado)}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {appointment.tipo === 'fisioterapia' ? (
+                      <Activity className="w-4 h-4 text-blue-700" />
+                    ) : (
+                      <Utensils className="w-4 h-4 text-orange-600" />
+                    )}
+                    <span className="capitalize text-sm">{appointment.tipo}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center gap-1 font-medium">
+                      <Calendar className="w-3 h-3 text-blue-900/40" />
+                      {format(parseISO(appointment.fecha), "PPP", { locale: es })}
+                    </span>
+                    <span className="flex items-center gap-1 text-gray-500">
+                      <Clock className="w-3 h-3" />
+                      {appointment.hora.substring(0, 5)} hrs
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-blue-900/10">
+                    {(appointment.estado === 'programada' || appointment.estado === 'asignada') && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenReagendar(appointment)}
+                          className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                          title="Re-Agendar Cita"
+                        >
+                          <Edit className="w-4 h-4 mr-1" /> Re-agendar
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStatusUpdate(appointment.id, 'completada')}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title="Marcar como Completada"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" /> Completada
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStatusUpdate(appointment.id, 'cancelada')}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          title="Cancelar Cita"
+                        >
+                          <XCircle className="w-4 h-4 mr-1" /> Cancelar
+                        </Button>
+                      </>
+                    )}
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(appointment.id)}
+                      className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      title="Eliminar de la DB"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* VISTA ESCRITORIO */}
+            <div className="hidden md:block border border-blue-900/10 rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-blue-900/5 hover:bg-blue-900/5">
@@ -128,7 +208,7 @@ export default function AppointmentManager() {
               <TableBody>
                 {appointments.map((appointment) => (
                   <TableRow key={appointment.id} className="hover:bg-blue-50/30 transition-colors">
-                    
+
                     <TableCell className="font-semibold text-blue-900">
                       {appointment.paciente_nombre}
                     </TableCell>
@@ -161,7 +241,7 @@ export default function AppointmentManager() {
 
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        
+
                         {(appointment.estado === 'programada' || appointment.estado === 'asignada') && (
                           <>
                             {/* BOTÓN MAGICO DE REAGENDAR */}
@@ -184,7 +264,7 @@ export default function AppointmentManager() {
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>
-                            
+
                             <Button
                               size="sm"
                               variant="ghost"
@@ -196,7 +276,7 @@ export default function AppointmentManager() {
                             </Button>
                           </>
                         )}
-                        
+
                         <Button
                           size="sm"
                           variant="ghost"
@@ -212,13 +292,14 @@ export default function AppointmentManager() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </>
         )}
       </CardContent>
 
       {/* EL MODAL PARA REAGENDAR */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl sm:max-w-xl md:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="sr-only">Formulario de Cita</DialogTitle>
           </DialogHeader>

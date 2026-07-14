@@ -190,15 +190,15 @@ export default function StatisticsPage() {
   return (
     <div className="min-h-screen bg-slate-50" style={arialStyle}>
       <header className="bg-white border-b border-blue-900/10 shadow-sm sticky top-0 z-50 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-900 rounded-xl flex items-center justify-center text-white font-black shadow-lg">UTC</div>
-            <div>
+            <div className="w-12 h-12 bg-blue-900 rounded-xl flex items-center justify-center text-white font-black shadow-lg shrink-0">UTC</div>
+            <div className="min-w-0">
               <h1 className="text-xl font-bold text-blue-950 uppercase tracking-tighter">Inteligencia de Datos Clínica</h1>
               <p className="text-xs text-slate-500 font-medium italic">Análisis de rendimiento académico y operativo</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')} className="font-bold border-slate-300">
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="font-bold border-slate-300 shrink-0">
             <ArrowLeft className="w-4 h-4 mr-2" /> Volver al Panel
           </Button>
         </div>

@@ -68,8 +68,9 @@
         {/* Contenedor Principal (Tarjeta Dividida) */}
         <div className="relative z-10 flex flex-col lg:flex-row w-full max-w-[1000px] lg:min-h-[714px] bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-300">
 
-          {/* Panel Izquierdo (Branding e Instrucciones) */}
-          <div className="hidden lg:flex lg:w-5/12 bg-[#002f6c] relative items-center justify-center p-8 overflow-hidden">
+          {/* Panel Izquierdo (Branding e Instrucciones) — en móvil se muestra completo arriba
+              del formulario para no ocultar contenido; en desktop va a la izquierda. */}
+          <div className="order-1 flex lg:w-5/12 bg-[#002f6c] relative items-center justify-center p-8 overflow-hidden">
             {/* Patrón de fondo sutil */}
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')" }}></div>
 
@@ -115,15 +116,8 @@
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#f26522] rounded-full mix-blend-multiply filter blur-2xl opacity-30"></div>
           </div>
 
-          {/* Panel Derecho (Formulario de Login) */}
-          <div className="w-full lg:w-7/12 p-6 sm:p-10 lg:px-14 lg:py-8 flex flex-col justify-center" style={{ background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)' }}>
-
-            {/* Logo para móviles (Oculto en desktop) */}
-            <div className="flex lg:hidden justify-center mb-8">
-              <div className="w-16 h-16 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center bg-white">
-                <img src="/logo-mark.png" alt="Logo UTC" className="w-full h-full object-contain p-1.5" />
-              </div>
-            </div>
+          {/* Panel Derecho (Formulario de Login) — debajo del panel azul en móvil */}
+          <div className="order-2 w-full lg:w-7/12 p-6 sm:p-10 lg:px-14 lg:py-8 flex flex-col justify-center" style={{ background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)' }}>
 
             <div className="mb-6 text-center lg:text-left">
               <h3 className="text-2xl lg:text-3xl font-extrabold text-slate-900 mb-2">¡Bienvenido!</h3> <br /> 

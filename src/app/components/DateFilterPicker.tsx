@@ -9,7 +9,7 @@
  * ============================================================================
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar } from './ui/calendar';
 import { Button } from './ui/button';
@@ -36,19 +36,39 @@ export default function DateFilterPicker({ selectedDate, onChange, theme = 'blue
   const [panelPosition, setPanelPosition] = useState<React.CSSProperties>({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
 
-  const handleToggle = () => {
-    if (!isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const right = window.innerWidth - rect.right;
-      const PANEL_H = 330;
-      if (window.innerHeight - rect.bottom >= PANEL_H + 8) {
-        setPanelPosition({ top: rect.bottom + 8, right });
-      } else {
-        setPanelPosition({ bottom: window.innerHeight - rect.top + 8, right });
-      }
+  const computePosition = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const PANEL_W = 300;
+    const PANEL_H = 330;
+    // Si el trigger está muy a la izquierda, un `right` basado solo en el borde
+    // derecho del trigger empuja el panel fuera de la pantalla por la izquierda.
+    // Se acota para que el borde izquierdo del panel nunca quede a menos de 8px.
+    const right = Math.min(window.innerWidth - rect.right, window.innerWidth - PANEL_W - 8);
+    if (window.innerHeight - rect.bottom >= PANEL_H + 8) {
+      setPanelPosition({ top: rect.bottom + 8, right });
+    } else {
+      setPanelPosition({ bottom: window.innerHeight - rect.top + 8, right });
     }
+  };
+
+  const handleToggle = () => {
+    if (!isOpen) computePosition();
     setIsOpen(prev => !prev);
   };
+
+  // Recalcula la posición del panel si el usuario rota el dispositivo o
+  // redimensiona la ventana mientras está abierto (si no, el panel queda
+  // flotando en la posición vieja, potencialmente fuera de pantalla).
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('resize', computePosition);
+    window.addEventListener('orientationchange', computePosition);
+    return () => {
+      window.removeEventListener('resize', computePosition);
+      window.removeEventListener('orientationchange', computePosition);
+    };
+  }, [isOpen]);
 
   const tc = THEME_CLASSES[theme];
   const withArrows = onPrev !== undefined && onNext !== undefined;

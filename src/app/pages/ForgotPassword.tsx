@@ -94,8 +94,8 @@ const passwordsMatch =
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-blue-50 to-orange-50">
 
-      {/* IZQUIERDA */}
-      <div className="hidden lg:flex w-1/2 items-center justify-end pr-10">
+      {/* IZQUIERDA — en móvil se muestra completa arriba del formulario (no se oculta), centrada. */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center lg:justify-end px-6 pt-10 lg:pt-0 lg:pr-10">
         <div className="max-w-sm w-full">
 
           <h1 className="text-4xl font-bold text-blue-900 mb-4">
@@ -150,64 +150,6 @@ const passwordsMatch =
           </div>
         </div>
       </div>
-      {
-  currentStep === 'password' && (
-    <div className="
-      hidden
-      xl:flex
-      flex-col
-      justify-center
-      px-10
-      text-sm
-      space-y-3
-      min-w-[260px]
-    ">
-      <h3 className="text-blue-900 font-bold ">Contraseña segura</h3>
-
-      <p className={
-        passwordValidation.minLength
-          ? 'text-green-600 font-medium'
-          : 'text-slate-400'
-      }>
-        • Mínimo 8 caracteres
-      </p>
-
-      <p className={
-        passwordValidation.uppercase
-          ? 'text-green-600 font-medium'
-          : 'text-slate-400'
-      }>
-        • Una letra mayúscula
-      </p>
-
-      <p className={
-        passwordValidation.lowercase
-          ? 'text-green-600 font-medium'
-          : 'text-slate-400'
-      }>
-        • Una letra minúscula
-      </p>
-
-      <p className={
-        passwordValidation.number
-          ? 'text-green-600 font-medium'
-          : 'text-slate-400'
-      }>
-        • Un número
-      </p>
-
-      <p className={
-        passwordValidation.special
-          ? 'text-green-600 font-medium'
-          : 'text-slate-400'
-      }>
-        • Un carácter especial
-      </p>
-
-    </div>
-  )
-}
-
       {/* DERECHA */}
 
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 lg:p-10">
@@ -250,6 +192,8 @@ const passwordsMatch =
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-4 h-4 opacity-50" />
                 <Input
+                  type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -298,6 +242,7 @@ setCurrentStep('password');
               <div className="relative">
                 <KeyRound className="absolute left-3 top-3 w-4 h-4 opacity-50" />
                 <Input
+                  autoComplete="one-time-code"
                   value={verificationCode}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -377,6 +322,19 @@ setCurrentStep('success');
               }}
               className="space-y-4"
             >
+{/* Campo de usuario oculto: le indica al gestor de contraseñas del navegador
+    a qué cuenta corresponde este cambio (mismo patrón que CambiarPasswordInicial.tsx). */}
+<input
+  type="email"
+  name="username"
+  autoComplete="username"
+  value={email}
+  readOnly
+  aria-hidden="true"
+  tabIndex={-1}
+  style={{ position: 'absolute', opacity: 0, height: 0, width: 0, overflow: 'hidden' }}
+/>
+
 <Label>Nueva contraseña</Label>
 
 <div className="relative">
@@ -387,6 +345,7 @@ setCurrentStep('success');
         ? 'text'
         : 'password'
     }
+    autoComplete="new-password"
     value={newPassword}
     onChange={(e) => {
       setNewPassword(e.target.value);
@@ -442,6 +401,7 @@ setCurrentStep('success');
         ? 'text'
         : 'password'
     }
+    autoComplete="new-password"
     value={confirmPassword}
     onChange={(e) => {
       setConfirmPassword(e.target.value);
@@ -487,6 +447,27 @@ setCurrentStep('success');
     </p>
   )
 }
+
+<div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+  <p className="text-[11px] uppercase tracking-wider font-bold text-slate-500 mb-1.5">Requisitos de contraseña</p>
+  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4 text-xs font-medium">
+    <li className={`flex items-center gap-1.5 ${passwordValidation.minLength ? 'text-green-600' : 'text-slate-400'}`}>
+      {passwordValidation.minLength ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 h-3.5 text-center">•</span>} Mínimo 8 caracteres
+    </li>
+    <li className={`flex items-center gap-1.5 ${passwordValidation.uppercase ? 'text-green-600' : 'text-slate-400'}`}>
+      {passwordValidation.uppercase ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 h-3.5 text-center">•</span>} Una letra mayúscula
+    </li>
+    <li className={`flex items-center gap-1.5 ${passwordValidation.lowercase ? 'text-green-600' : 'text-slate-400'}`}>
+      {passwordValidation.lowercase ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 h-3.5 text-center">•</span>} Una letra minúscula
+    </li>
+    <li className={`flex items-center gap-1.5 ${passwordValidation.number ? 'text-green-600' : 'text-slate-400'}`}>
+      {passwordValidation.number ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 h-3.5 text-center">•</span>} Un número
+    </li>
+    <li className={`flex items-center gap-1.5 ${passwordValidation.special ? 'text-green-600' : 'text-slate-400'}`}>
+      {passwordValidation.special ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 h-3.5 text-center">•</span>} Un carácter especial
+    </li>
+  </ul>
+</div>
 
               <Button disabled={!isPasswordValid ||!passwordsMatch}
   className={`w-full

@@ -29,18 +29,30 @@ function Drum({ items, selected, onSelect }: DrumProps) {
   };
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const moveTo = (clientY: number) => {
       if (!dragRef.current) return;
-      const delta = Math.round((dragRef.current.startY - e.clientY) / ITEM_H);
+      const delta = Math.round((dragRef.current.startY - clientY) / ITEM_H);
       const ni = ((dragRef.current.startIdx + delta) % n + n) % n;
       selectRef.current(items[ni]);
     };
+    const onMove = (e: MouseEvent) => moveTo(e.clientY);
     const onUp = () => { dragRef.current = null; };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current) return;
+      e.preventDefault();
+      moveTo(e.touches[0].clientY);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+    document.addEventListener('touchcancel', onUp);
     return () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onUp);
+      document.removeEventListener('touchcancel', onUp);
     };
   }, [n, items]);
 
@@ -79,6 +91,9 @@ function Drum({ items, selected, onSelect }: DrumProps) {
         onMouseDown={e => {
           e.preventDefault();
           dragRef.current = { startY: e.clientY, startIdx: idx };
+        }}
+        onTouchStart={e => {
+          dragRef.current = { startY: e.touches[0].clientY, startIdx: idx };
         }}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14 bg-gradient-to-b from-white to-transparent" />
