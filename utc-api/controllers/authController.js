@@ -349,23 +349,38 @@ async function verifyResetCode(req, res) {
 }
 
 async function resetPassword(req, res) {
-  const { email, newPassword } = req.body;
+  const { email, code, newPassword } = req.body;
 
   try {
     if (!newPassword) {
       return res.status(400).json({ error: 'La nueva contraseña es requerida.' });
     }
+    if (!code) {
+      return res.status(400).json({ error: 'El código de verificación es requerido.' });
+    }
+
+    const emailNormalizado = email.trim().toLowerCase();
+
+    const codigoValido = await pool.query(
+      `SELECT * FROM password_resets WHERE email = $1 AND codigo_verificacion = $2 AND expira_en > NOW()`,
+      [emailNormalizado, code]
+    );
+
+    if (codigoValido.rows.length === 0) {
+      return res.status(400).json({ error: 'Código incorrecto o expirado.' });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await pool.query(
       `UPDATE usuarios SET password = $1 WHERE email = $2 RETURNING *`,
-      [hashedPassword, email.trim().toLowerCase()]
+      [hashedPassword, emailNormalizado]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
 
-    await pool.query('DELETE FROM password_resets WHERE email = $1', [email.trim().toLowerCase()]);
+    await pool.query('DELETE FROM password_resets WHERE email = $1', [emailNormalizado]);
 
     res.status(200).json({ message: 'Contraseña actualizada correctamente.' });
 

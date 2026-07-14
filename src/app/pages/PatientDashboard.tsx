@@ -226,7 +226,8 @@ export default function PatientDashboard() {
                 className="flex items-center gap-2 sm:gap-4 text-right hover:bg-blue-50 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
               >
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none mb-1 truncate">{patientName}</p>
+                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none truncate">{patientName}</p>
+                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none mb-1 truncate">ID: {patientId}</p>
                   <p className="text-[8px] sm:text-[10px] font-black text-blue-900/60 uppercase tracking-wider truncate">{patientRole}</p>
                   <p className="text-xs sm:text-sm text-slate-600 font-black flex items-center justify-end gap-0.5 leading-tight mt-0.5 whitespace-nowrap">
                     <LogOut className="w-2.5 h-2.5 shrink-0" /> cerrar sesión

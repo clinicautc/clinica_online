@@ -381,7 +381,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                   className={`${accentBtn} text-white font-black`}
                                   onClick={() => {
                                     if (history.appointment_id) {
-                                      navigate(`/forms/${history.tipo}/${history.appointment_id}`);
+                                      navigate(`/forms/${history.tipo}/${history.appointment_id}/documento`);
                                     } else {
                                       toast.error("No se puede abrir: Este historial no está vinculado a ninguna cita.");
                                     }
@@ -555,7 +555,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                       className={`${accentBtn} text-white font-black`}
                                       onClick={() => {
                                         if (evol.appointment_id) {
-                                          navigate(`/forms/seguimiento/${evol.appointment_id}`);
+                                          navigate(`/forms/seguimiento/${evol.appointment_id}/documento`);
                                         } else {
                                           toast.error("Este registro no está vinculado a ninguna cita.");
                                         }

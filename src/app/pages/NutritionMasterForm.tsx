@@ -28,7 +28,7 @@
     const navigate = useNavigate();
 
     const {
-      updateGlobalData, isSaving, yaGuardado, historialId, formData,
+      appointmentId, updateGlobalData, isSaving, yaGuardado, historialId, formData,
     } = useNutritionHistoriaData({});
 
     // Este componente ahora solo se monta cuando ya existe un historial
@@ -54,6 +54,9 @@
         .p1-paper input[type="text"], .p1-paper textarea {
           word-break: break-word;
           overflow-wrap: break-word;
+        }
+        .p1-paper input, .p1-paper textarea, .p1-paper tr, .p1-paper td, .p1-paper th {
+          border-color: #2c5697;
         }
         .p1-paper textarea.cell-ta {
           width: 100%;
@@ -81,79 +84,77 @@
         }
       `}</style>
       {/* Solo lectura: las 4 páginas se muestran apiladas (no hay wizard de
-          pasos que navegar, no aplica a un documento ya finalizado) con un
-          único botón "Volver", fuera del fieldset deshabilitado. */}
-      <button
-        onClick={() => navigate(-1)}
-        className="fixed top-4 right-4 bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-        </svg>
-        Volver
-      </button>
+          pasos que navegar, no aplica a un documento ya finalizado). Botones
+          "Volver" / "Imprimir" / "Editar", fuera del fieldset deshabilitado. */}
+      <div className="fixed top-4 right-4 z-50 flex gap-2 print:hidden">
+        <button
+          onClick={() => navigate(-1)}
+          className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Volver
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+          </svg>
+          Imprimir
+        </button>
+        {appointmentId && (
+          <button
+            onClick={() => navigate(`/forms/nutricion/${appointmentId}`)}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+            </svg>
+            Editar
+          </button>
+        )}
+      </div>
 
       {/* fieldset disabled bloquea todos los controles descendientes
           (páginas 1-4) sin tener que tocar cada input individualmente;
           display:contents lo hace invisible en el layout calibrado en mm. */}
       <fieldset disabled={isReadOnly} className="contents">
-      <div className="p1-outer bg-zinc-600 min-h-screen flex flex-col items-center px-2 sm:px-6 md:px-12 lg:px-24 xl:px-[220px] pt-5 pb-24 font-sans print:bg-white print:p-0 relative">
+      <div className="p1-outer bg-zinc-600 min-h-screen flex flex-col items-center gap-8 px-2 pt-20 pb-24 font-sans sm:px-6 md:px-12 lg:px-24 xl:px-[220px] print:bg-white print:p-0 relative">
 
-        {/* --- LAS 4 PÁGINAS SE MUESTRAN SIEMPRE, APILADAS --- */}
-        <NutritionPage2Component
-          accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={() => {}}
-          onNext={() => {}}
-          isReadOnly={isReadOnly}
-        />
-
-        <NutritionPage3Component
-          accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={() => {}}
-          onNext={() => {}}
-          isReadOnly={isReadOnly}
-        />
-
-        <NutritionPage4Component
-          accumulatedData={formData}
-          onUpdate={updateGlobalData}
-          onBack={() => {}}
-          onNext={() => {}}
-          isReadOnly={isReadOnly}
-          historialId={historialId}
-          onGuardarDirecto={undefined}
-          isYaGuardado={yaGuardado}
-          isSaving={isSaving}
-          onFinalizarDirecto={undefined}
-        />
 {/* --- PÁGINA 1 --- */}
-        <div className="block">
+        <div className="block w-full">
 
           {/* CONTENEDOR HOJA A4 (DISEÑO UNIFORME SIN SUPERPOSICIONES) */}
-          <div className="p1-paper bg-white w-full px-[8mm] pt-[6mm] pb-[6mm] relative shadow-2xl flex flex-col justify-between overflow-hidden text-[#2c5392] border-[3.5px] border-[#2c5392] rounded-[25px] print:shadow-none print:m-0">
+          <div className="p1-paper relative flex min-h-[297mm] w-full flex-col justify-between overflow-hidden rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl print:m-0 print:shadow-none">
             
             {/* ENCABEZADO */}
-            <header className="flex justify-between items-start mb-1 shrink-0">
-              <div className="leading-none shrink-0">
-                <h1 className="text-[32px] font-black tracking-tighter mb-0">utc</h1>
-                <p className="text-[7.5px] font-bold leading-tight uppercase">Universidad<br />Tres Culturas</p>
+            <svg className="pointer-events-none absolute right-0 top-0 z-0 h-[160px] w-[450px]" viewBox="0 0 450 160" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M 150 0 Q 220 80 320 60 T 450 100 L 450 0 Z" fill="#4a7ab5" opacity="0.3" />
+              <path d="M 220 0 Q 280 100 360 80 T 450 130 L 450 0 Z" fill="#2c5697" opacity="0.6" />
+              <path d="M 280 0 Q 340 120 400 100 T 450 160 L 450 0 Z" fill="#1d4d96" opacity="0.9" />
+            </svg>
+            <header className="relative z-10 mt-2 mb-1 flex items-center justify-between shrink-0">
+              <div className="flex h-[80px] w-[100px] shrink-0 flex-col items-center justify-center rounded-md border border-dashed border-[#2c5697] bg-white leading-none text-[#2c5697] shadow-sm">
+                <h1 className="mb-0 text-[28px] font-black tracking-tighter">utc</h1>
+                <p className="text-center text-[7px] font-bold leading-tight uppercase">Universidad<br />Tres Culturas</p>
               </div>
-              <div className="text-center flex-grow mt-1">
-                <div className="bg-[#2c5392] text-white px-10 py-1.5 rounded-full text-[22px] font-bold inline-block mb-1">
+              <div className="flex flex-grow flex-col items-center justify-center px-4 text-center">
+                <div className="mb-1 flex w-full max-w-[550px] items-center justify-center rounded-[20px] bg-[#2c5697] py-1.5 text-[24px] font-extrabold uppercase tracking-wide text-white shadow-md">
                   Historia Clínica Nutricional
                 </div>
-                <p className="text-[8px] font-bold">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</p>
+                <p className="text-[9.5px] font-bold text-[#2c5697]">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</p>
               </div>
-              <div className="flex items-end gap-1 text-[9.5px] font-bold mt-3 border-b-2 border-[#2c5392] pb-0.5">
+              <div className="flex items-end gap-1 text-[10px] font-bold text-[#2c5697] mt-3 border-b border-[#2c5697] pb-0.5">
                 <span>Fecha</span>
                 <input
                   type="text"
                   id="fecha"
                   value={formData.pagina_1.fecha || ''}
                   onChange={(e) => handleInputChange(e, 'fecha')}
-                  className="w-24 outline-none px-1 h-3.5 bg-transparent text-center font-bold text-[#333]"
+                  className="w-24 outline-none px-1 h-4 bg-transparent text-center font-bold text-[#333]"
                 />
               </div>
             </header>
@@ -259,7 +260,7 @@
             </SectionBox>
 
             {/* MOTIVOS Y QX */}
-            <div className="grid grid-cols-2 gap-2 shrink-0">
+            <div className="grid grid-cols-2 gap-4 shrink-0">
               <SectionBox title="Motivos de consulta" paddingX="px-2" marginTop="mt-2">
                 <LineTextarea
                   id="motivos"
@@ -281,7 +282,7 @@
             </div>
 
             {/* ANTECEDENTES GRID */}
-            <div className="grid grid-cols-[1.7fr_1fr] gap-2 shrink-0">
+            <div className="grid grid-cols-[1.6fr_1fr] gap-4 shrink-0">
               <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-2">
                 <div className="w-full h-full overflow-hidden rounded-b-md">
                   <table className="w-full border-collapse text-[8.5px] font-bold table-fixed mt-0">
@@ -349,7 +350,7 @@
               </SectionBox>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 shrink-0">
+            <div className="grid grid-cols-3 gap-4 shrink-0">
               <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-2">
                 <table className="w-full text-[8.5px] font-bold table-fixed border-collapse mt-0 h-full">
                   <thead><tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50"><th className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[60%] py-1">Enfermedades</th><th className="py-1">Freq./Cant.</th></tr></thead>
@@ -485,7 +486,7 @@
               </SectionBox>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 shrink-0">
+            <div className="grid grid-cols-2 gap-4 shrink-0">
               <SectionBox title="Ejercicio" marginTop="mt-2">
                 <div className="flex flex-col gap-1 w-full h-full justify-center">
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full mb-1">
@@ -582,6 +583,36 @@
             </footer>
           </div>
         </div>
+
+        {/* --- PÁGINAS 2, 3 Y 4 --- */}
+        <NutritionPage2Document
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+        />
+
+        <NutritionPage3Document
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+        />
+
+        <NutritionPage4Document
+          accumulatedData={formData}
+          onUpdate={updateGlobalData}
+          onBack={() => {}}
+          onNext={() => {}}
+          isReadOnly={isReadOnly}
+          historialId={historialId}
+          onGuardarDirecto={undefined}
+          isYaGuardado={yaGuardado}
+          isSaving={isSaving}
+          onFinalizarDirecto={undefined}
+        />
       </div>
       </fieldset>
       </>
@@ -596,12 +627,12 @@
     className?: string,
     paddingX?: string,
     marginTop?: string
-  }> = ({ title, children, className = "", paddingX = "px-2", marginTop = "mt-2" }) => (
-    <section className={`relative border-[1.5px] border-[#2c5392] rounded-lg ${marginTop} pt-[10px] pb-1.5 ${paddingX} w-full flex flex-col bg-white ${className}`}>
-      <div className="absolute -top-[8.5px] left-4 bg-[#2c5392] text-white px-3 py-[1px] rounded-full text-[9px] font-bold z-10 whitespace-nowrap shadow-sm leading-none flex items-center justify-center">
+  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3" }) => (
+    <section className={`overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] ${marginTop} flex w-full flex-col bg-white ${className}`}>
+      <div className="flex min-h-6 items-center bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
         {title}
       </div>
-      <div className="flex-1 flex flex-col w-full h-full justify-start">
+      <div className={`flex flex-1 flex-col justify-start py-2 ${paddingX} w-full h-full`}>
         {children}
       </div>
     </section>
@@ -2366,4 +2397,305 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
       </div>
     );
   }
+  /*
+   * Las tres páginas siguientes son la versión documental de la maqueta UTC.
+   * Los campos conservan los identificadores ya persistidos por el formulario
+   * de captura; este bloque solo reorganiza su presentación para impresión.
+   */
+  const DocumentSection: React.FC<{
+    title: React.ReactNode;
+    children: React.ReactNode;
+    className?: string;
+    contentClassName?: string;
+  }> = ({ title, children, className = '', contentClassName = 'p-2' }) => (
+    <section className={`overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] bg-white ${className}`}>
+      <div className="flex min-h-6 items-center bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+        {title}
+      </div>
+      <div className={contentClassName}>{children}</div>
+    </section>
+  );
+
+  const DocumentCheckbox: React.FC<{
+    label?: string;
+    checked: boolean;
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    className?: string;
+  }> = ({ label, checked, onChange, className = '' }) => (
+    <label className={`flex shrink-0 items-center gap-1 text-[9px] font-bold text-[#2c5697] ${className}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-3 w-3 appearance-none border border-[#2c5697] checked:bg-[#2c5697]"
+      />
+      {label && <span>{label}</span>}
+    </label>
+  );
+
+  function NutritionPage2Document({ accumulatedData, onUpdate }: PageProps) {
+    const p2 = accumulatedData.pagina_2 || {};
+    const set = (name: string, value: string | boolean) => onUpdate('pagina_2', { [name]: value });
+    const frecuencia = [
+      'Verduras', 'Fruta²', 'Cereal s/g', 'Pan dulce nat', 'Pan dulce UP', 'Galletas', 'Leguminosas', 'Carne de res',
+      'Carne de cerdo', 'Carne de pollo', 'Pavo', 'Pescados', 'Mariscos', 'Huevo', 'Prod. anim UP', 'Quesos bcos',
+      'Quesos amr', 'Embutidos', 'Leche s/sab', 'Yogurt s/sab', 'Leche UP', 'Yogurt UP', 'Oleaginosas', 'Aceites',
+      'Mantequilla', 'Margarina', 'Refresco', 'Agua sab UP', 'Jugos nat', 'Jugos UP', 'Helado', 'Nieve', 'Gelatinas',
+      'Aguas frutas', 'Té', 'Café', 'Agua natural', 'Papas fritas', 'Garnachas com', 'Garnachas fri',
+    ];
+    const antropometria = [
+      ['Talla (m)', 'talla', false], ['Peso (kg)', 'peso', false], ['IMC (kg/m²)', 'imc', true],
+      ['Peso Ideal/FAO (kg)', 'peso_fao', false], ['Circ. Muñeca (cm)', 'muneca', true], ['Diámetro codo (cm)', 'codo', true],
+      ['Circ. Brazo (cm)', 'brazo', true], ['Circ. Abd (cm)', 'abd', true], ['Circ. Cintura (cm)', 'cintura', false],
+      ['Circ. Cadera (cm)', 'cadera', false], ['ICC', 'icc', true], ['PCB (mm)', 'pcb', true], ['PCT (mm)', 'pct', true],
+      ['PCSe (mm)', 'pcse', true], ['PCSi (mm)', 'pcsi', true], ['% Grasa SIRI', 'grasa_siri', true],
+      ['% Grasa InBody', 'grasa_inb', true], ['IMG InBody', 'img_inb', true], ['MLG (kg)', 'mlg', false],
+      ['IMLG (kg/m²)', 'imlg', true], ['cAMB (cm²)', 'camb', true], ['MMT InBody', 'mmt_inb', true],
+      ['IMEA InBody', 'imea_inb', true], ['ACT (L)', 'act', false], ['Grasa Visc (L)', 'grasa_visc', true],
+    ] as const;
+    const signos = ['T. Arterial', 'F. Resp (rpm)', 'F. Card (lpm)', 'Temp (°C)', 'SO₂'];
+    const inputClass = 'h-full w-full min-w-0 border-0 bg-transparent px-1 text-[8.5px] text-[#333] outline-none';
+    const tableHead = 'border-b border-r border-[#2c5697] bg-[#f2f5f9] px-1 py-1 text-center text-[8.5px] font-bold text-[#2c5697] last:border-r-0';
+    const cell = 'h-[15px] border-b border-r border-[#2c5697] p-0 last:border-r-0';
+
+    return (
+      <div className="w-full">
+        <div className="page p1-paper flex min-h-[297mm] w-full flex-col rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl">
+          <DocumentSection title="Aspectos dietéticos">
+            <div className="space-y-1 text-[9px] font-bold">
+              {[
+                ['Alergias alimentarias:', 'alergias'], ['Intolerancias alimentarias:', 'intolerancias'], ['Alimentos de preferencia:', 'preferencias'],
+              ].map(([label, key]) => (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span className="w-[145px] shrink-0">{label}</span>
+                  <DocumentCheckbox label="No" checked={!!p2[`${key}_no`]} onChange={e => set(`${key}_no`, e.target.checked)} />
+                  <DocumentCheckbox label="Sí" checked={!!p2[`${key}_si`]} onChange={e => set(`${key}_si`, e.target.checked)} />
+                  <span className="ml-2">Cuál</span>
+                  <input value={p2[`${key}_txt`] || ''} onChange={e => set(`${key}_txt`, e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" />
+                </div>
+              ))}
+              <div className="flex items-center gap-1.5">
+                <span className="shrink-0">Alimentos que no le agradan o no acostumbre</span>
+                <input value={p2.desagrados || ''} onChange={e => set('desagrados', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span>Comidas al día</span><input value={p2.comidas_dia || ''} onChange={e => set('comidas_dia', e.target.value)} className="h-4 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />
+                <span>Fuertes</span><input value={p2.comidas_fuertes || ''} onChange={e => set('comidas_fuertes', e.target.value)} className="h-4 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />
+                <span>Colaciones</span><input value={p2.comidas_col || ''} onChange={e => set('comidas_col', e.target.value)} className="h-4 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />
+                <span className="ml-2 shrink-0">¿Quién prepara sus alimentos?</span><input value={p2.quien_prepara || ''} onChange={e => set('quien_prepara', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" />
+              </div>
+              {[
+                ['Ha modificado su alimentación en los últimos 6 meses', 'modifico_alim', 'Cómo (↓ ↑)'], ['Indicación de dieta especial/recomendada previamente', 'dieta_previa', 'Cuál'],
+                ['Su alimentación dependiendo de su estado de ánimo', 'alim_animo', 'Cómo (↓ ↑)'], ['Uso de laxantes', 'laxantes', 'Cuál'], ['Uso de medicamentos para bajar de peso', 'meds_peso', 'Cuál'],
+              ].map(([label, key, followup]) => (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span className="w-[245px] shrink-0">{label}</span>
+                  <DocumentCheckbox label="No" checked={!!p2[`${key}_no`]} onChange={e => set(`${key}_no`, e.target.checked)} />
+                  <DocumentCheckbox label="Sí" checked={!!p2[`${key}_si`]} onChange={e => set(`${key}_si`, e.target.checked)} />
+                  <span className="ml-2 shrink-0">{followup}</span>
+                  <input value={p2[`${key}_txt`] || ''} onChange={e => set(`${key}_txt`, e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" />
+                </div>
+              ))}
+            </div>
+          </DocumentSection>
+
+          <DocumentSection title="Frecuencia de consumo" className="mt-3">
+            <div className="grid grid-cols-4 gap-x-5 gap-y-0.5">
+              {frecuencia.map(item => (
+                <div key={item} className="flex items-end text-[7.5px] font-bold">
+                  <span className="shrink-0 whitespace-nowrap">{item}</span>
+                  <input value={p2[`freq_${item}`] || ''} onChange={e => set(`freq_${item}`, e.target.value)} className="mx-1 h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[8px] text-[#333] outline-none" />
+                  <span className="shrink-0">/7 días</span>
+                </div>
+              ))}
+            </div>
+          </DocumentSection>
+
+          <div className="mt-3 grid flex-1 grid-cols-[1.1fr_1fr] gap-3">
+            <div className="flex flex-col gap-3">
+              <DocumentSection title="Antropometría" contentClassName="p-0">
+                <table className="w-full border-collapse table-fixed">
+                  <thead><tr><th className={`${tableHead} text-left`}>Antropometría</th><th className={`${tableHead} w-[20%]`}>VO</th><th className={`${tableHead} w-[45%]`}>Interpretación</th></tr></thead>
+                  <tbody>{antropometria.map(([label, key, interpretation]) => <tr key={key}>
+                    <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
+                    <td className={cell}><input type="number" value={p2[`antrop_${key}_vo`] || ''} onChange={e => set(`antrop_${key}_vo`, e.target.value)} className={inputClass} /></td>
+                    <td className={`${cell} ${!interpretation ? 'bg-[#f2f5f9]' : ''}`}>{interpretation && <input value={p2[`antrop_${key}_int`] || ''} onChange={e => set(`antrop_${key}_int`, e.target.value)} className={inputClass} />}</td>
+                  </tr>)}</tbody>
+                </table>
+              </DocumentSection>
+              <DocumentSection title="Interpretación antropométrica" className="mt-auto" contentClassName="p-1">
+                <textarea value={p2.int_antrop || ''} onChange={e => set('int_antrop', e.target.value)} className="h-9 w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" />
+              </DocumentSection>
+              <DocumentSection title="Signos Vitales" contentClassName="p-0">
+                <table className="w-full border-collapse table-fixed"><tbody>{signos.map(label => <tr key={label}>
+                  <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
+                  <td className={`${cell} w-[20%]`}><input value={p2[`sv_${label}_vo`] || ''} onChange={e => set(`sv_${label}_vo`, e.target.value)} className={inputClass} /></td>
+                  <td className={`${cell} w-[45%]`}><input value={p2[`sv_${label}_int`] || ''} onChange={e => set(`sv_${label}_int`, e.target.value)} className={inputClass} /></td>
+                </tr>)}</tbody></table>
+              </DocumentSection>
+            </div>
+            <div className="flex flex-col gap-3">
+              <DocumentSection title="Parámetros bioquímicos" contentClassName="p-0">
+                <table className="w-full border-collapse table-fixed"><thead><tr><th className={`${tableHead} text-left`}>Parámetro</th><th className={`${tableHead} w-[20%]`}>VO</th><th className={`${tableHead} w-[45%]`}>Interpretación</th></tr></thead>
+                  <tbody>{Array.from({ length: 28 }, (_, i) => <tr key={i}>
+                    <td className={cell}><input value={p2[`bq_${i}_nom`] || ''} onChange={e => set(`bq_${i}_nom`, e.target.value)} className={`${inputClass} font-bold text-[#2c5697]`} /></td>
+                    <td className={cell}><input value={p2[`bq_${i}_vo`] || ''} onChange={e => set(`bq_${i}_vo`, e.target.value)} className={inputClass} /></td>
+                    <td className={cell}><input value={p2[`bq_${i}_int`] || ''} onChange={e => set(`bq_${i}_int`, e.target.value)} className={inputClass} /></td>
+                  </tr>)}</tbody>
+                </table>
+              </DocumentSection>
+              <DocumentSection title="Interpretación bioquímica" contentClassName="p-1">
+                <textarea value={p2.int_bioq || ''} onChange={e => set('int_bioq', e.target.value)} className="h-9 w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" />
+              </DocumentSection>
+              <DocumentSection title="Solicitud de análisis" className="mt-auto">
+                <div className="grid grid-cols-2 gap-2">{['Química Sanguínea', 'EGO', 'Biometría hemática'].map(label => <DocumentCheckbox key={label} label={label} checked={!!p2[`sol_${label}`]} onChange={e => set(`sol_${label}`, e.target.checked)} />)}
+                  <div className="flex items-end gap-1"><DocumentCheckbox label="Otro:" checked={!!p2.sol_otro} onChange={e => set('sol_otro', e.target.checked)} /><input value={p2.sol_otro_txt || ''} onChange={e => set('sol_otro_txt', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-[8px] text-[#333] outline-none" /></div>
+                </div>
+              </DocumentSection>
+            </div>
+          </div>
+          <DocumentFooter page="2" />
+        </div>
+      </div>
+    );
+  }
+
+  const DocumentFooter: React.FC<{ page: string }> = ({ page }) => (
+    <footer className="mt-3 flex items-end justify-between border-t-2 border-[#2c5697] pt-1 text-[8px] font-bold italic text-[#555]">
+      <span>ESA: Explorado y sin alteraciones; N/A: No aplica; PN: Preguntado y negado; ✔: Adecuado.</span>
+      <span className="text-sm not-italic font-black text-[#2c5697]">{page}</span>
+    </footer>
+  );
+
+  function NutritionPage3Document({ accumulatedData, onUpdate }: PageProps) {
+    const p3 = accumulatedData.pagina_3 || {};
+    const set = (name: string, value: string | boolean) => onUpdate('pagina_3', { [name]: value });
+    const hallazgos = ['Hallazgos grales', 'Adiposidad', 'Músculo', 'Cardiovascular', 'Respiratorio', 'Digestivo', 'Edema', 'Extremidades', 'Ojos', 'Pelo', 'Cabeza', 'Manos y uñas', 'Boca / Lengua', 'Cuello / Piel', 'Dientes', 'Garganta'];
+    const grupos = ['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA ___', 'Lácteo ___', 'Aceites s/p', 'Aceites c/p', 'Azúcares'];
+    const evaluacion = [
+      ['¿Incluye todos los nutrimentos esenciales (HC, proteínas, lípidos, vitaminas, minerales y agua)?', 'Completa'], ['¿Los nutrimentos están en proporciones apropiadas entre sí?', 'Equilibrada'],
+      ['¿Los alimentos están libres de microorganismos patógenos, toxinas o contaminantes?', 'Inocua'], ['¿No se consumen en cantidades excesivas ni contienen excesos de sodio, azúcares o grasas trans?', 'Equilibrada'],
+      ['¿Cubre los requerimientos energéticos y nutrimentales según edad, sexo, actividad física y estado fisiológico?', 'Suficiente'], ['¿Incluye diferentes alimentos dentro de cada grupo alimenticio a lo largo del día o semana?', 'Variada'],
+      ['¿Evita la monotonía alimentaria?', 'Variada'], ['¿Es acorde a los gustos, cultura, hábitos y disponibilidad económica?', 'Adecuada'], ['¿Está ajustada a su disponibilidad económica?', 'Adecuada'],
+    ];
+    const key = (label: string) => label.replace(/\s+/g, '_').replace(/\//g, '_').toLowerCase();
+    const cell = 'h-[17px] border-b border-r border-[#2c5697] p-0 last:border-r-0';
+    const input = 'h-full w-full min-w-0 border-0 bg-transparent px-1 text-center text-[8px] text-[#333] outline-none';
+
+    return (
+      <div className="w-full"><div className="page p1-paper flex min-h-[297mm] w-full flex-col rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl">
+        <div className="grid grid-cols-[2.1fr_1fr] gap-3">
+          <div>
+            <DocumentSection title="Matriz IMG/IMLG" contentClassName="p-0">
+              <table className="w-full border-collapse text-center text-[7.5px]"><thead><tr className="bg-[#f2f5f9] font-bold text-[#2c5697]">
+                <th className="border-b border-r border-[#2c5697] p-1">IMLG (kgMG/est²)</th><th className="border-b border-r border-[#2c5697] p-1">IMG disminuido<br />(≤4 H / &lt;7 M)</th><th className="border-b border-r border-[#2c5697] p-1">IMG adecuado<br />(5-9 H / 7-11 M)</th><th className="border-b border-r border-[#2c5697] p-1">IMG adecuado<br />(5-8 H / 7-11 M)</th><th className="border-b border-[#2c5697] p-1">IMG elevado<br />(≥9 H / ≥12 M)</th>
+              </tr></thead><tbody className="text-[#333]">
+                {[
+                  ['IMLG Bajo (&lt;17 H / &lt;15 M)', 'Caquexia', 'Desnutrición proteico-energética', 'Desnutrición proteico-energética', 'Obesidad preclínica / clínica'],
+                  ['IMLG Normal (17-23 H / 15-21 M)', 'Bajo en grasa', 'Normalidad', 'Normalidad', 'Obesidad preclínica / clínica'],
+                  ['IMLG Alto (23-25 H / 21-23 M)', 'Atletas', 'Físicamente activa', 'Físicamente activa', 'Sano metabólicamente / obesidad'],
+                ].map(row => <tr key={row[0]}>{row.map((value, i) => <td key={i} className={`border-b border-r border-[#2c5697] p-1 last:border-r-0 ${i === 0 ? 'bg-[#f2f5f9] font-bold text-[#2c5697]' : ''}`}>{value}</td>)}</tr>)}
+                <tr><td className="border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (25-28 H / 23-25 M)</td><td colSpan={4} className="border-[#2c5697] p-1 font-bold">Sospecha de uso de esteroides / Obesidad mórbida</td></tr>
+                <tr><td className="border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (&gt;28 H / &gt;25 M)</td><td colSpan={4} className="border-[#2c5697] p-1 font-bold">Diagnóstico de uso de esteroides / Obesidad mórbida</td></tr>
+              </tbody></table>
+            </DocumentSection>
+            <div className="mt-2 flex items-center text-[9px] font-bold"><span>Diagnóstico Matriz IMG/IMLG:</span><input value={p3.diag_matriz_imlo_img || ''} onChange={e => set('diag_matriz_imlo_img', e.target.value)} className="ml-2 h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" /></div>
+          </div>
+          <DocumentSection title="Hallazgos físicos" contentClassName="p-0">
+            <table className="w-full border-collapse text-[7.5px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th colSpan={2} className="border-b border-r border-[#2c5697] py-1 text-left">Hallazgos físicos orientados a Nut</th><th className="border-b border-[#2c5697] py-1">DEN</th></tr></thead><tbody>
+              {hallazgos.map(label => { const k = key(label); return <tr key={label}><td className="h-[13px] w-[43%] border-b border-[#2c5697] pl-1 font-bold">{label}</td><td className="border-b border-r border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_desc`] || ''} onChange={e => set(`hallazgo_${k}_desc`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-[7px] text-[#333] outline-none" /></td><td className="border-b border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_den`] || ''} onChange={e => set(`hallazgo_${k}_den`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-center text-[7px] text-[#333] outline-none" /></td></tr>; })}
+            </tbody></table>
+          </DocumentSection>
+        </div>
+
+        <div className="mt-3 grid min-h-[190px] grid-cols-[3fr_1.1fr] gap-3">
+          <DocumentSection title="Recordatorio de 24 horas" contentClassName="p-0">
+            <div className="flex items-center gap-2 border-b border-[#2c5697] p-2 text-[9px] font-bold"><span>Fecha</span><input value={p3.rec_fecha || ''} onChange={e => set('rec_fecha', e.target.value)} className="h-4 w-28 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /><span className="ml-5">Hora</span><input value={p3.rec_hora || ''} onChange={e => set('rec_hora', e.target.value)} className="h-4 w-20 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div>
+            <div className="flex border-b border-[#2c5697] bg-[#f2f5f9] text-center text-[8px] font-bold"><div className="w-[20%] border-r border-[#2c5697] py-1">Hora</div><div className="w-[80%] py-1">Contenido (platillo: cantidad y alimento)</div></div>
+            <div>{[1, 2, 3, 4, 5].map(i => <div key={i} className="flex h-[22px] border-b border-[#2c5697] last:border-b-0"><input value={p3[`rec_hora_${i}`] || ''} onChange={e => set(`rec_hora_${i}`, e.target.value)} className="w-[20%] border-0 border-r border-[#2c5697] bg-transparent text-center text-[8px] text-[#333] outline-none" /><textarea value={p3[`rec_contenido_${i}`] || ''} onChange={e => set(`rec_contenido_${i}`, e.target.value)} className="h-full w-[80%] resize-none border-0 bg-transparent px-2 text-[8px] text-[#333] outline-none" /></div>)}</div>
+          </DocumentSection>
+          <DocumentSection title="Alimentos olvidados" contentClassName="p-2">
+            <div className="grid grid-cols-1 gap-0.5 text-[8px] font-bold">{['Agua', 'Café / Té', 'Leche', 'Azúcar / Endulzante', 'Jugos / Refresco', 'Agua de sabor', 'Sal', 'Chile / Salsas', 'Caramelos / Chicle', 'Galletas / Pastel', 'Aguacate', 'Gelatina', 'Nieve / Helado', 'Oleaginosas', 'Chocolates', 'Papas / Palomitas', 'Frutas', 'TORTILLAS', 'Aceite / Crema', 'Mantequilla'].map(item => <span key={item}>• {item}</span>)}</div>
+          </DocumentSection>
+        </div>
+
+        <div className="mt-3 grid grid-cols-[1.6fr_1fr] gap-3">
+          <DocumentSection title="Consumo de porciones" contentClassName="p-0">
+            <table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th className="border-b border-r border-[#2c5697] py-1 text-left">Grupo alimentario</th>{['Porciones', 'Energía', 'Proteína', 'Lípidos', 'HCO'].map(h => <th key={h} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{h}</th>)}</tr></thead><tbody>
+              {grupos.map(label => { const k = label.replace(/\s+/g, '_').replace(/___/g, '').toLowerCase(); return <tr key={label}><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>{label}</td>{['porciones', 'energia', 'proteina', 'lipidos', 'hco'].map(col => <td key={col} className={cell}><input type="number" value={p3[`porcion_${k}_${col}`] || ''} onChange={e => set(`porcion_${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}
+              <tr className="bg-[#f2f5f9]"><td className={`${cell} pr-2 text-right font-bold text-[#2c5697]`}>Total</td>{['porciones', 'energia', 'proteina', 'lipidos', 'hco'].map(col => <td key={col} className={cell}><input type="number" value={p3[`porcion_total_${col}`] || ''} onChange={e => set(`porcion_total_${col}`, e.target.value)} className={`${input} font-bold`} /></td>)}</tr>
+            </tbody></table>
+          </DocumentSection>
+          <div className="flex flex-col gap-3">
+            <DocumentSection title="Distribución nutrimental actual" contentClassName="p-0">
+              <table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th className="border-b border-r border-[#2c5697] py-1 text-left">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(h => <th key={h} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{h}</th>)}</tr></thead><tbody>
+                {['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>{macro}</td>{['pct', 'kcal', 'g', 'gkg'].map(col => <td key={col} className={cell}><input type="number" value={p3[`dn_${k}_${col}`] || ''} onChange={e => set(`dn_${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}
+                <tr className="bg-[#f2f5f9]"><td className={`${cell} font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold text-[#2c5697]`}>100%</td><td className={cell}><input value={p3.dn_total_kcal || ''} onChange={e => set('dn_total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p3.dn_total_g || ''} onChange={e => set('dn_total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPA/d</td></tr>
+              </tbody></table>
+            </DocumentSection>
+            <DocumentSection title="Interpretación % IAN" contentClassName="p-0">
+              <table className="w-full border-collapse text-[8px]"><tbody>{['Energía', 'Proteína', 'HCO', 'Lípidos'].map(item => { const k = item.toLowerCase().replace('í', 'i').replace('é', 'e'); return <tr key={item}><td className={`${cell} w-[40%] pl-2 font-bold text-[#2c5697]`}>{item}</td><td className={`${cell} px-1 text-center font-bold text-[#2c5697]`}>Dieta <input value={p3[`ian_${k}_dieta`] || ''} onChange={e => set(`ian_${k}_dieta`, e.target.value)} className="w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /></td><td className={cell}><input value={p3[`ian_${k}_pct`] || ''} onChange={e => set(`ian_${k}_pct`, e.target.value)} className="h-full w-9 bg-transparent text-center text-[#333] outline-none" />%</td></tr>; })}</tbody></table>
+            </DocumentSection>
+          </div>
+        </div>
+
+        <DocumentSection title="Evaluación Cualitativa" className="mt-3">
+          <div className="space-y-1">{evaluacion.map(([text, result], index) => <div key={text} className="flex items-center gap-2 text-[8px]"><DocumentCheckbox label="No" checked={!!p3[`evalcual_${index}_no`]} onChange={e => set(`evalcual_${index}_no`, e.target.checked)} /><DocumentCheckbox label="Sí" checked={!!p3[`evalcual_${index}_si`]} onChange={e => set(`evalcual_${index}_si`, e.target.checked)} /><span>{text} → <b>{result}</b></span></div>)}</div>
+        </DocumentSection>
+        <DocumentFooter page="3" />
+      </div></div>
+    );
+  }
+
+  function NutritionPage4Document({ accumulatedData, onUpdate }: PageProps) {
+    const p4 = accumulatedData.pagina_4 || {};
+    const set = (name: string, value: string | boolean) => onUpdate('pagina_4', { [name]: value });
+    const groups = ['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA', 'Lácteo', 'Aceites s/p', 'Aceites c/p', 'Azúcares'];
+    const cols = ['des', 'cm', 'com', 'cv', 'cena', 'rac', 'kcal', 'prot', 'lip', 'hco'];
+    const colLabels = ['DES', 'CM', 'COM', 'CV', 'CENA', 'RAC', 'ENERGÍA', 'PROT.', 'LÍPIDOS', 'HCO'];
+    const groupKey = (group: string) => group.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_');
+    const cell = 'h-[16px] border-b border-r border-[#2c5697] p-0 last:border-r-0';
+    const input = 'h-full w-full min-w-0 border-0 bg-transparent px-1 text-center text-[8px] text-[#333] outline-none';
+
+    return (
+      <div className="w-full"><div className="page p1-paper flex min-h-[297mm] w-full flex-col rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl">
+        <div className="grid overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] grid-cols-4">
+          {['Diagnósticos Nutricios', 'Objetivo general', 'Educación Nutricia', 'Consejería Nutricia'].map((title, i) => <div key={title} className={`bg-[#2c5697] py-1.5 text-center text-[10px] font-bold uppercase text-white ${i < 3 ? 'border-r border-white' : ''}`}>{title}</div>)}
+          <div className="min-h-[200px] border-r border-[#2c5697] p-2"><textarea value={p4.diag || ''} onChange={e => set('diag', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div>
+          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697] p-2"><textarea value={p4.objetivo || ''} onChange={e => set('objetivo', e.target.value)} className="h-[84px] w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /><ul className="mt-auto list-none p-0 text-[7.5px] leading-tight"><li className="mb-1 font-bold">En formato SMART:</li><li>• <b>Specific:</b> Definición del fenómeno</li><li>• <b>Measurable:</b> Selección del indicador</li><li>• <b>Achievable:</b> Evaluación de factibilidad</li><li>• <b>Relevant:</b> Relación con el problema clínico</li><li>• <b>Time-bound:</b> Dinámica temporal</li></ul></div>
+          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697]"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Contenido (E-1.<input value={p4.edu_cont_num || ''} onChange={e => set('edu_cont_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_contenido || ''} onChange={e => set('edu_contenido', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Aplicación (E-2.<input value={p4.edu_app_num || ''} onChange={e => set('edu_app_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_aplicacion || ''} onChange={e => set('edu_aplicacion', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div></div>
+          <div className="flex min-h-[200px] flex-col"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Bases/Teórico (C-1.<input value={p4.cons_bases_num || ''} onChange={e => set('cons_bases_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_bases || ''} onChange={e => set('cons_bases', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Estrategias (C-2.<input value={p4.cons_est_num || ''} onChange={e => set('cons_est_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_estrategias || ''} onChange={e => set('cons_estrategias', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div></div>
+        </div>
+
+        <DocumentSection title="Intervención" className="mt-3">
+          <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-3">
+            <div className="flex min-h-[135px] flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Indicación de Alimentos/Nutrimentos</div><div className="flex flex-1 flex-col gap-1 p-2">{['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'].map(name => <textarea key={name} value={p4[name] || ''} onChange={e => set(name, e.target.value)} className="min-h-5 flex-1 resize-none border-0 border-b border-[#2c5697] bg-transparent text-[8px] text-[#333] outline-none last:border-b-0" />)}</div></div>
+            <div className="overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Requerimiento calórico</div><div className="space-y-2 p-2 text-[8.5px] font-bold"><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_pred} onChange={e => set('req_ec_pred', e.target.checked)} /><div className="flex-1">Ecuación predictiva<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Nombre:<input value={p4.req_ec_pred_nombre || ''} onChange={e => set('req_ec_pred_nombre', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div></div></div><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_rapida} onChange={e => set('req_ec_rapida', e.target.checked)} /><div className="flex-1">Ecuación rápida<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Peso:<input value={p4.req_ec_rapida_peso || ''} onChange={e => set('req_ec_rapida_peso', e.target.value)} className="h-3 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kg</div><div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Const. kcal:<input value={p4.req_ec_rapida_kcal_kg || ''} onChange={e => set('req_ec_rapida_kcal_kg', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kcal/kg/d</div></div></div><div className="flex items-end gap-1 pt-1 text-[10px]">Total<input value={p4.req_total_kcal || ''} onChange={e => set('req_total_kcal', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />kcal</div></div></div>
+            <div className="overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Cuadro dietosintético</div><table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9]"><th className="border-b border-r border-[#2c5697] py-1">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(label => <th key={label} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{label}</th>)}</tr></thead><tbody>{['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>{macro}</td>{['porc', 'kcal', 'g', 'g_kg'].map(col => <td key={col} className={cell}><input value={p4[`${k}_${col}`] || ''} onChange={e => set(`${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}<tr className="bg-[#f2f5f9]"><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold`}>100%</td><td className={cell}><input value={p4.total_kcal || ''} onChange={e => set('total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p4.total_g || ''} onChange={e => set('total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPt/d</td></tr></tbody></table></div>
+          </div>
+        </DocumentSection>
+
+        <DocumentSection title="Cálculo de porciones" className="mt-3" contentClassName="p-0">
+          <table className="w-full border-collapse text-center text-[7px]"><thead><tr className="bg-[#f2f5f9]"><th className="border-b border-r border-[#2c5697] py-1 text-left pl-2">Grupo alimentario</th>{colLabels.map(label => <th key={label} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{label}</th>)}</tr></thead><tbody>
+            {groups.map(group => { const k = groupKey(group); return <tr key={group}><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>{group}</td>{cols.map(col => <td key={col} className={cell}><input value={p4[`calc_${k}_${col}`] || ''} onChange={e => set(`calc_${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}
+            <tr className="bg-[#f2f5f9]"><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>Total</td><td colSpan={6} className="border-b border-r border-[#2c5697]" />{['kcal', 'prot', 'lip', 'hco'].map(col => <td key={col} className={cell}><input value={p4[`calc_total_${col}`] || ''} onChange={e => set(`calc_total_${col}`, e.target.value)} className={input} /></td>)}</tr>
+            <tr className="bg-[#f2f5f9]"><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>% Adecuación</td><td colSpan={6} className="border-b border-r border-[#2c5697]" />{['kcal', 'prot', 'lip', 'hco'].map(col => <td key={col} className={cell}><input value={p4[`calc_adec_${col}`] || ''} onChange={e => set(`calc_adec_${col}`, e.target.value)} className={input} /></td>)}</tr>
+          </tbody></table>
+        </DocumentSection>
+
+        <DocumentSection title="Menú del día" className="mt-3" contentClassName="p-0"><table className="w-full border-collapse"><thead><tr className="bg-[#f2f5f9] text-center text-[9px] font-bold">{[['desayuno', 'Desayuno'], ['cm', 'CM'], ['comida', 'Comida'], ['cv', 'CV'], ['cena', 'Cena']].map(([key, label], i) => <th key={key} className={`border-b border-[#2c5697] py-1 ${i < 4 ? 'border-r' : ''}`}>{label}</th>)}</tr></thead><tbody><tr>{['desayuno', 'cm', 'comida', 'cv', 'cena'].map((meal, i) => <td key={meal} className={`h-[100px] p-0 align-top ${i < 4 ? 'border-r border-[#2c5697]' : ''}`}><textarea value={p4[`menu_${meal}`] || ''} onChange={e => set(`menu_${meal}`, e.target.value)} className="h-full w-full resize-none border-0 bg-transparent p-1 text-[8px] text-[#333] outline-none" /></td>)}</tr></tbody></table></DocumentSection>
+
+        <div className="mt-auto flex justify-around pt-6 text-center text-[9px] font-bold"><div className="w-[35%] border-t border-[#2c5697] pt-1"><input value={p4.firma_alumno || ''} onChange={e => set('firma_alumno', e.target.value)} className="mb-1 w-full border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" />Nombre, matrícula y firma del alumno</div><div className="w-[35%] border-t border-[#2c5697] pt-1"><input value={p4.firma_docente || ''} onChange={e => set('firma_docente', e.target.value)} className="mb-1 w-full border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" />Nombre, cédula y firma del docente responsable</div></div>
+        <DocumentFooter page="4" />
+      </div></div>
+    );
+  }
+
+  // Conservan la implementación histórica dentro del archivo para no alterar
+  // su lógica ni sus referencias de datos; la vista documental usa la maqueta
+  // nueva declarada arriba.
+  void NutritionPage2Component;
+  void NutritionPage3Component;
+  void NutritionPage4Component;
+
   export default NutritionMasterForm;

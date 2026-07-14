@@ -481,6 +481,7 @@ const handleSaveProfile = async () => {
                         <div className="p-2.5 sm:p-3.5 rounded-full bg-blue-100 text-blue-900 shrink-0"><Activity className="w-5 h-5 sm:w-6 sm:h-6"/></div>
                         <div className="min-w-0">
                           <p className="font-bold text-blue-900 text-base sm:text-xl truncate">{apt.paciente_nombre}</p>
+                          <p className="text-slate-400 font-mono text-sm sm:text-base">ID: {apt.paciente_id}</p>
                           <div className="flex flex-wrap gap-2 sm:gap-3.5 mt-1">
                             <p className="text-base text-gray-500 font-semibold bg-gray-50 px-2.5 py-1 rounded">
                               <Calendar className="w-3.5 h-3.5 inline mr-1 text-blue-900"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}

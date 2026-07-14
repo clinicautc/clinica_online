@@ -112,7 +112,7 @@ export const authAPI = {
     return result;
   },
 
-  async resetPassword(data: { email: string; newPassword: string }) {
+  async resetPassword(data: { email: string; code: string; newPassword: string }) {
 
     const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
       method: 'POST',

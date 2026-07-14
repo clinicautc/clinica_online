@@ -35,17 +35,33 @@ interface PageProps {
  */
 const PhysiotherapyMasterForm = () => {
   const navigate = useNavigate();
-  const { formData } = usePhysiotherapyValoracionData({});
+  const { appointmentId, formData } = usePhysiotherapyValoracionData({});
 
   return (
     <div className="min-h-screen bg-zinc-600">
-      <button
-        onClick={() => navigate(-1)}
-        className="fixed top-4 right-4 bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl z-50 transition-colors print:hidden flex items-center gap-2 text-sm"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver
-      </button>
+      <div className="fixed top-4 right-4 z-50 flex gap-2 print:hidden">
+        <button
+          onClick={() => navigate(-1)}
+          className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+        >
+          Imprimir
+        </button>
+        {appointmentId && (
+          <button
+            onClick={() => navigate(`/forms/fisioterapia/${appointmentId}`)}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          >
+            Editar
+          </button>
+        )}
+      </div>
 
       <fieldset disabled className="contents">
         <PhysiotherapyPage1Component

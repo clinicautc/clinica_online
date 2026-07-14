@@ -25,6 +25,9 @@ import CambiarPasswordInicial from './pages/CambiarPasswordInicial';
 // --- CORRECCIÓN DE IMPORTACIONES (Sincronizadas con archivos físicos) ---
 import NutritionMasterFormRouteResolver from './pages/NutritionMasterFormRouteResolver';
 import PhysiotherapyMasterFormRouteResolver from './pages/PhysiotherapyMasterFormRouteResolver';
+import NutritionMasterForm from './pages/NutritionMasterForm';
+import PhysiotherapyMasterForm from './pages/PhysiotherapyMasterForm';
+import HojaEvolutiva from './pages/HojaEvolutiva';
 
 import StatisticsPage from './pages/StatisticsPage';
 import ManagePersonnelPage from './pages/ManagePersonnelPage';
@@ -34,7 +37,7 @@ import MedicalHistoryViewer from './components/MedicalHistoryViewer';
 
 // --Nueva pagina de Notas Evolutivas
 // --- NUEVA IMPORTACIÓN: HOJA EVOLUTIVA ---
-import HojaEvolutiva from './pages/HojaEvolutiva';
+import EvolucionSeguimientoCaptura from './pages/captura/EvolucionSeguimientoCaptura';
 import ConsultaWorkspace from './pages/ConsultaWorkspace';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
@@ -162,10 +165,28 @@ const routeDefinitions = [
     )
   },
   {
+    // Vista documental de solo lectura, idéntica al PDF — a donde manda "Ver Expediente".
+    path: '/forms/nutricion/:appointmentId/documento',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <NutritionMasterForm />
+      </ProtectedRoute>
+    )
+  },
+  {
     path: '/forms/fisioterapia/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <PhysiotherapyMasterFormRouteResolver />
+      </ProtectedRoute>
+    )
+  },
+  {
+    // Vista documental de solo lectura, idéntica al PDF — a donde manda "Ver Expediente".
+    path: '/forms/fisioterapia/:appointmentId/documento',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <PhysiotherapyMasterForm />
       </ProtectedRoute>
     )
   },
@@ -222,12 +243,21 @@ const routeDefinitions = [
     path: '/hoja-evolutiva/:appointmentId',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
-        <HojaEvolutiva />
+        <EvolucionSeguimientoCaptura />
       </ProtectedRoute>
     )
   },
   {
     path: '/forms/seguimiento/:appointmentId',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <EvolucionSeguimientoCaptura />
+      </ProtectedRoute>
+    )
+  },
+  {
+    // Vista documental de solo lectura, idéntica al PDF — a donde manda "Ver Expediente".
+    path: '/forms/seguimiento/:appointmentId/documento',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <HojaEvolutiva />

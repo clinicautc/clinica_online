@@ -311,6 +311,7 @@ setCurrentStep('password');
                 try {
               await authAPI.resetPassword({
                 email,
+                code: verificationCode,
                 newPassword
                });
 

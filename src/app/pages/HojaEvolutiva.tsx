@@ -12,9 +12,11 @@ import { useHojaEvolutivaData } from '../hooks/formClinico/useHojaEvolutivaData'
  */
 const HojaEvolutiva = () => {
   const navigate = useNavigate();
-  const { formData, isLoading } = useHojaEvolutivaData({});
+  const { appointmentId, formData, isLoading } = useHojaEvolutivaData({});
 
   const handleVolver = () => navigate(-1);
+  const handleImprimir = () => window.print();
+  const handleEditar = () => navigate(`/forms/seguimiento/${appointmentId}`);
 
   // Los inputs se dejan readOnly (ver más abajo) — estos manejadores nunca se
   // disparan por interacción del usuario; se conservan sin efecto para no
@@ -39,9 +41,9 @@ const HojaEvolutiva = () => {
     <div className="hoja-evolutiva-wrapper">
       
       {/* ========================================================= */}
-      {/* BOTONERA FLOTANTE — solo lectura, únicamente "Volver" */}
+      {/* BOTONERA FLOTANTE — solo lectura: Volver / Imprimir / Editar */}
       {/* ========================================================= */}
-      <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 50, display: 'flex', gap: '10px' }}>
+      <div className="print:hidden" style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 50, display: 'flex', gap: '10px' }}>
         <button
           onClick={handleVolver}
           style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -49,6 +51,20 @@ const HojaEvolutiva = () => {
           <ArrowLeft className="w-4 h-4" />
           Volver
         </button>
+        <button
+          onClick={handleImprimir}
+          style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#1e3a8a', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+        >
+          Imprimir
+        </button>
+        {appointmentId && (
+          <button
+            onClick={handleEditar}
+            style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#f97316', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+          >
+            Editar
+          </button>
+        )}
       </div>
 
       {/* LOADER PRINCIPAL */}

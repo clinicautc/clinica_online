@@ -8,14 +8,12 @@
  * exactamente los mismos nombres de campo y la misma fuente de datos
  * (useNutritionHistoriaData) — ver docs/RESPONSIVE_DESIGN_STRATEGY.md sección 9.
  *
- * Nota de alcance: varios grupos de checkboxes/inputs del documento original
- * (Página 1 "Ejercicio"/"Antecedentes gineco-obstétricos": checkboxes
- * No/Sí decorativos; Página 3 "Distribución nutrimental actual",
- * "Interpretación % IAN", "Evaluación Cualitativa") nunca tuvieron
- * `name`/`value`/`onChange` en el original — son un bug preexistente, no
- * introducido aquí. Se replican tal cual (deshabilitados, sin persistir)
- * para no ampliar el alcance de esta fase corrigiendo comportamiento no
- * relacionado con responsive design.
+ * Nota de alcance: los checkboxes decorativos "Realiza ejercicio No/Sí/
+ * Aeróbico/Anaeróbico", "Embarazo No/Sí" y "Remplazo hormonal No/Sí" de la
+ * Página 1 nunca tuvieron `name`/`value`/`onChange` en el documento original
+ * (bug preexistente, no introducido aquí) y se omiten aquí también — los
+ * campos de texto reales de esas mismas secciones (G/P/C/A/FUM/SDG, ejercicio
+ * cuál/frecuencia/intensidad/etc.) sí persisten normalmente.
  * ============================================================================
  */
 import { forwardRef } from 'react';
@@ -36,14 +34,14 @@ import type { FormClinicoHandle, FormClinicoCallbacks } from '../../lib/types/fo
 const ENFERMEDADES_HEREDO = [
   'Diabetes Mellitus', 'Obesidad o sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales',
   'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas',
-  'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales',
+  'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enfermedades Gastrointestinales',
 ];
 const COLS_HEREDO = ['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'];
 
 const ENFERMEDADES_PERSONALES = [
   'Diabetes Mellitus', 'Obesidad o Sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales',
   'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas',
-  'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales',
+  'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enfermedades Gastrointestinales',
 ];
 
 const SINTOMAS = [
@@ -54,36 +52,36 @@ const SINTOMAS = [
 const NO_PATOLOGICOS = ['Hábito tabáquico', 'Consumo de alcohol', 'Consumo de drogas'];
 
 const ALIMENTOS_FRECUENCIA = [
-  'Verduras', 'Fruta²', 'Cereal s/g', 'Pan dulce nat', 'Pan dulce UP', 'Galletas', 'Leguminosas',
+  'Verduras', 'Frutas', 'Cereal sin grasa', 'Pan dulce natural', 'Pan dulce UP', 'Galletas', 'Leguminosas',
   'Carne de res', 'Carne de cerdo', 'Carne de pollo', 'Pavo', 'Pescados', 'Mariscos', 'Huevo',
-  'Prod. anim UP', 'Quesos bcos', 'Quesos amr', 'Embutidos', 'Leche s/sab', 'Yogurt s/sab',
+  'Prod. animal UP', 'Quesos blancos', 'Quesos amarillos', 'Embutidos', 'Leche sin sabor', 'Yogurt sin sabor',
   'Leche UP', 'Yogurt UP', 'Oleaginosas', 'Aceites', 'Mantequilla', 'Margarina', 'Refresco',
-  'Agua sab UP', 'Jugos nat', 'Jugos UP', 'Helado', 'Nieve', 'Gelatinas', 'Aguas frutas', 'Té',
-  'Café', 'Agua natural', 'Papas fritas', 'Garnachas com', 'Garnachas fri',
+  'Agua de sabor UP', 'Jugos naturales', 'Jugos UP', 'Helado', 'Nieve', 'Gelatinas', 'Aguas de frutas', 'Té',
+  'Café', 'Agua natural', 'Papas fritas', 'Garnachas a comal', 'Garnachas fritas',
 ];
 
 const ANTROPOMETRIA: Array<{ label: string; n: string; d: boolean }> = [
   { label: 'Talla (m)', n: 'talla', d: false }, { label: 'Peso (kg)', n: 'peso', d: false },
-  { label: 'IMC (kg/m²)', n: 'imc', d: true }, { label: 'Peso Ideal FAO (kg)', n: 'peso_fao', d: false },
-  { label: 'Circ. Muñeca (cm)', n: 'muneca', d: true }, { label: 'Diámetro codo (cm)', n: 'codo', d: true },
-  { label: 'Circ. Brazo (cm)', n: 'brazo', d: true }, { label: 'Circ. Abd (cm)', n: 'abd', d: true },
+  { label: 'IMC (kg/m²)', n: 'imc', d: true }, { label: 'Peso ideal/PAO (kg)', n: 'peso_fao', d: false },
+  { label: 'Circ. Muñeca (cm)', n: 'muneca', d: true }, { label: 'Diámetro de codo (cm)', n: 'codo', d: true },
+  { label: 'Circ. Brazo (cm)', n: 'brazo', d: true }, { label: 'Circ. Abdominal (cm)', n: 'abd', d: true },
   { label: 'Circ. Cintura (cm)', n: 'cintura', d: false }, { label: 'Circ. Cadera (cm)', n: 'cadera', d: false },
   { label: 'ICC', n: 'icc', d: true }, { label: 'PCB (mm)', n: 'pcb', d: true },
   { label: 'PCT (mm)', n: 'pct', d: true }, { label: 'PCSe (mm)', n: 'pcse', d: true },
-  { label: 'PCSi (mm)', n: 'pcsi', d: true }, { label: '% Grasa SIRI', n: 'grasa_siri', d: true },
-  { label: '% Grasa InBody', n: 'grasa_inb', d: true }, { label: 'IMG InBody', n: 'img_inb', d: true },
-  { label: 'MLG (kg)', n: 'mlg', d: false }, { label: 'IMLG (kg/m²)', n: 'imlg', d: true },
-  { label: 'cAMB (cm²)', n: 'camb', d: true }, { label: 'MMT InBody', n: 'mmt_inb', d: true },
-  { label: 'IMEA InBody', n: 'imea_inb', d: true }, { label: 'ACT (L)', n: 'act', d: false },
-  { label: 'Grasa Visc (L)', n: 'grasa_visc', d: true },
+  { label: 'PCSi (mm)', n: 'pcsi', d: true }, { label: '% Grasa, Siri (%/kg)', n: 'grasa_siri', d: true },
+  { label: '% Grasa, InBody (%/kg)', n: 'grasa_inb', d: true }, { label: 'IMG, con InBody (kgMG/m²)', n: 'img_inb', d: true },
+  { label: 'MLG (kg)', n: 'mlg', d: false }, { label: 'IMLG, con (kgMLG/m²)', n: 'imlg', d: true },
+  { label: 'cAMB (cm²)', n: 'camb', d: true }, { label: 'MMT, InBody (%/kg)', n: 'mmt_inb', d: true },
+  { label: 'IMEA, con InBody (kgMM/m²)', n: 'imea_inb', d: true }, { label: 'ACT (L)', n: 'act', d: false },
+  { label: 'Grasa visceral (L)', n: 'grasa_visc', d: true },
 ];
 
-const SIGNOS_VITALES = ['T. Arterial', 'F. Resp (rpm)', 'F. Card (lpm)', 'Temp (°C)', 'SO₂'];
+const SIGNOS_VITALES = ['Tensión arterial (mmHg)', 'Frecuencia respiratoria (rpm)', 'Frecuencia cardiaca (lpm)', 'Temperatura (°C)', 'SO₂'];
 
 const HALLAZGOS_FISICOS = [
-  'Hallazgos grales', 'Adiposidad', 'Músculo', 'Cardiovascular', 'Respiratorio', 'Digestivo',
-  'Edema', 'Extremidades', 'Ojos', 'Pelo', 'Cabeza', 'Manos y uñas', 'Boca / Lengua',
-  'Cuello / Piel', 'Dientes', 'Garganta',
+  'Hallazgos generales', 'Adiposidad', 'Huesos', 'Sistema cardiovascular-respiratorio', 'Sistema digestivo',
+  'Edema', 'Extremidades', 'Ojos', 'Pelo', 'Cabeza', 'Manos y uñas', 'Boca', 'Músculos', 'Cuello',
+  'Piel', 'Dientes', 'Garganta y deglución', 'Lengua',
 ];
 const hallazgoKey = (h: string) => h.replace(/\s+/g, '_').replace(/\//g, '_').toLowerCase();
 
@@ -93,6 +91,70 @@ const grupoKeyP3 = (g: string) => g.replace(/\s+/g, '_').replace(/___/g, '').toL
 const GRUPOS_CALC_P4 = ['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA', 'Lácteo', 'Aceites s/p', 'Aceites c/p', 'Azúcares'];
 const grupoKeyP4 = (g: string) => g.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_');
 const CALC_COLS = ['des', 'cm', 'com', 'cv', 'cena', 'rac', 'kcal', 'prot', 'lip', 'hco'];
+const CALC_COLS_LABELS: Record<string, string> = {
+  des: 'DES', cm: 'CM', com: 'COM', cv: 'CV', cena: 'CENA', rac: 'RACIONES',
+  kcal: 'ENERGÍA', prot: 'PROTEÍNA', lip: 'LÍPIDOS', hco: 'HCO',
+};
+
+const distribKey = (v: string) => v.toLowerCase().replace('í', 'i').replace('é', 'e');
+
+const ALIMENTOS_OLVIDADOS = [
+  'Agua', 'Café', 'Té', 'Leche', 'Azúcar en agua, café o té', 'Jugos', 'Agua de sabor', 'Refresco',
+  'SAL', 'Chile piquín', 'Caramelos', 'Chicle', 'Galletas', 'Pastel', 'Aguacate', 'Gelatina',
+  'Nieve o helado', 'Oleaginosas (Cacahuates, nueces, pistaches)', 'Chocolates', 'Papas', 'Palomitas',
+  'Frutas', 'TORTILLAS', 'Aceite', 'Mantequilla', 'Crema', 'Salsa verde o roja',
+];
+
+const MATRIZ_IMG_IMLG_COLS = [
+  'IMG Dimsinuido (<5 H / <7 M)', 'IMG Adecuado (5–9 H / 7–11 M)', 'IMG Adecuado (5–9 H / 7–11 M)', 'IMG Elevado (>9 H / >11 M)',
+];
+
+const MATRIZ_IMG_IMLG_ROWS: Array<{ label: string; cells: string[] }> = [
+  {
+    label: 'IMLG Bajo (<17 H / <15 M)',
+    cells: [
+      'Caquexia',
+      'Desnutrición proteico-energética / Riesgo de sarcopenia por baja masa muscular',
+      'Desnutrición proteico-energética / Riesgo de sarcopenia por baja masa muscular',
+      'Obesidad preclínica (si no hay Dx previos) / Obesidad clínica (hay Dx previos)',
+    ],
+  },
+  {
+    label: 'IMLG Normal (17–23 H / 15–21 M)',
+    cells: [
+      'Bajo en grasa',
+      'Normalidad',
+      'Normalidad',
+      'Obesidad preclínica (si no hay Dx previos) / Obesidad clínica (hay Dx previos)',
+    ],
+  },
+  {
+    label: 'IMLG Alto (23–25 H / 21–23 M)',
+    cells: [
+      'Atletas de alto rendimiento',
+      'Persona físicamente activa',
+      'Persona físicamente activa',
+      'Sano, metabólicamente funcional (sin Dx previos) / Obesidad clínica (hay Dx previos)',
+    ],
+  },
+];
+
+const MATRIZ_IMG_IMLG_MUY_ALTO: Array<{ label: string; texto: string }> = [
+  { label: 'IMLG Muy Alto (25–28 H / 23–25 M)', texto: 'Sospecha de uso de esteroides / Obesidad mórbida' },
+  { label: 'IMLG Muy Alto (>28 H / >25 M)', texto: 'Diagnóstico de uso de esteroides / Obesidad mórbida' },
+];
+
+const EVALUACION_CUALITATIVA = [
+  { text: '¿Incluye todos los nutrimentos esenciales (HC, proteínas, lípidos, vitaminas, minerales y agua)?', res: 'Completa' },
+  { text: '¿Los nutrimentos están en proporciones apropiadas entre sí?', res: 'Equilibrada' },
+  { text: '¿Los alimentos están libres de microorganismos patógenos, toxinas o contaminantes?', res: 'Inocua' },
+  { text: '¿No se consumen en cantidades excesivas ni contienen excesos de sodio, azúcares o grasas trans?', res: 'Equilibrada' },
+  { text: '¿Cubre los requerimientos energéticos y nutrimentales del individuo según edad, sexo, actividad física y estado fisiológico?', res: 'Suficiente' },
+  { text: '¿Incluye diferentes alimentos dentro de cada grupo alimenticio a lo largo del día o la semana?', res: 'Variada' },
+  { text: '¿Evita la monotonía alimentaria?', res: 'Variada' },
+  { text: '¿Es acorde a los gustos, cultura, hábitos y disponibilidad económica del individuo?', res: 'Adecuada' },
+  { text: '¿Está ajustada a su disponibilidad económica?', res: 'Adecuada' },
+];
 
 const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<FormClinicoCallbacks>>((props, ref) => {
   const navigate = useNavigate();
@@ -306,7 +368,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
         <TabsContent value="p2" className="space-y-4 mt-4">
           <FormSectionCard title="Aspectos dietéticos">
             <div className="space-y-2">
-              {['alergias', 'intolerancias', 'preferencias', 'modifico_alim', 'dieta_previa', 'alim_animo', 'laxantes', 'meds_peso'].map(name => (
+              {['alergias', 'intolerancias', 'preferencias'].map(name => (
                 <div key={name} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_2fr] gap-2 items-center">
                   <span className="text-sm capitalize">{name.replace(/_/g, ' ')}</span>
                   <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_no`]} onChange={onChange2} name={`${name}_no`} /> No</label>
@@ -314,13 +376,24 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   <Input placeholder="¿Cuál?" name={`${name}_txt`} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
                 </div>
               ))}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                <Input placeholder="Alimentos que no le agradan" {...field2('desagrados')} />
-                <Input placeholder="¿Quién prepara sus alimentos?" {...field2('quien_prepara')} />
-                <Input placeholder="Comidas al día" {...field2('comidas_dia')} />
-                <Input placeholder="Comidas fuertes" {...field2('comidas_fuertes')} />
-                <Input placeholder="Colaciones" {...field2('comidas_col')} />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600">Alimentos que no le agradan o no acostumbre</label>
+                <Input {...field2('desagrados')} />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <Input placeholder="Comidas al día" {...field2('comidas_dia')} />
+                <Input placeholder="Fuertes" {...field2('comidas_fuertes')} />
+                <Input placeholder="Colaciones" {...field2('comidas_col')} />
+                <Input placeholder="¿Quién prepara sus alimentos en su casa?" {...field2('quien_prepara')} />
+              </div>
+              {['modifico_alim', 'dieta_previa', 'alim_animo', 'laxantes', 'meds_peso'].map(name => (
+                <div key={name} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_2fr] gap-2 items-center">
+                  <span className="text-sm capitalize">{name.replace(/_/g, ' ')}</span>
+                  <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_no`]} onChange={onChange2} name={`${name}_no`} /> No</label>
+                  <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_si`]} onChange={onChange2} name={`${name}_si`} /> Sí</label>
+                  <Input placeholder="Cómo/Cuál" name={`${name}_txt`} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
+                </div>
+              ))}
             </div>
           </FormSectionCard>
 
@@ -365,19 +438,52 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
 
         {/* ================= PÁGINA 3 ================= */}
         <TabsContent value="p3" className="space-y-4 mt-4">
-          <FormSectionCard title="Diagnóstico Matriz IMLO/IMG">
+          <FormSectionCard
+            title="Matriz IMG/IMLG"
+            description="Referencia para determinar el diagnóstico — Franssen FM, et al. J Am Med Dir Assoc. 2014;15(6):448-53. Kyle UG, et al. Clin Nutr. 2004;23(6):1226-43."
+          >
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-normal">IMLG (kgMG/est²)</TableHead>
+                    {MATRIZ_IMG_IMLG_COLS.map((c, i) => (
+                      <TableHead key={i} className="whitespace-normal text-xs">{c}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {MATRIZ_IMG_IMLG_ROWS.map(row => (
+                    <TableRow key={row.label}>
+                      <TableCell className="font-medium whitespace-normal text-xs">{row.label}</TableCell>
+                      {row.cells.map((c, i) => (
+                        <TableCell key={i} className="whitespace-normal text-xs">{c}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                  {MATRIZ_IMG_IMLG_MUY_ALTO.map(row => (
+                    <TableRow key={row.label}>
+                      <TableCell className="font-medium whitespace-normal text-xs">{row.label}</TableCell>
+                      <TableCell colSpan={4} className="whitespace-normal text-xs font-medium text-center">{row.texto}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </FormSectionCard>
+
+          <FormSectionCard title="Diagnóstico Matriz IMG/IMLG">
             <Textarea {...field3('diag_matriz_imlo_img')} className="min-h-16" />
           </FormSectionCard>
 
-          <FormSectionCard title="Hallazgos físicos">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormSectionCard title="Hallazgos físicos orientados a Nut" description="DEN: Deficiencia o exceso en nutrimento.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {HALLAZGOS_FISICOS.map(h => {
                 const key = hallazgoKey(h);
                 return (
-                  <div key={h} className="space-y-1 border border-slate-100 rounded-lg p-2">
+                  <div key={h} className="grid grid-cols-[1fr_auto] gap-2 items-center border border-slate-100 rounded-lg p-2">
                     <p className="text-xs font-bold text-slate-700">{h}</p>
-                    <Textarea placeholder="Descripción" value={(p3[`hallazgo_${key}_desc`] as string) || ''} onChange={e => set3({ [`hallazgo_${key}_desc`]: e.target.value })} className="min-h-10 text-xs" />
-                    <Textarea placeholder="Denominación" value={(p3[`hallazgo_${key}_den`] as string) || ''} onChange={e => set3({ [`hallazgo_${key}_den`]: e.target.value })} className="min-h-10 text-xs" />
+                    <Input placeholder="DEN" className="w-24 h-8 text-xs" value={(p3[`hallazgo_${key}_den`] as string) || ''} onChange={e => set3({ [`hallazgo_${key}_den`]: e.target.value })} />
                   </div>
                 );
               })}
@@ -385,17 +491,27 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
           </FormSectionCard>
 
           <FormSectionCard title="Recordatorio de 24 horas">
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <Input placeholder="Fecha" {...field3('rec_fecha')} />
-              <Input placeholder="Hora" {...field3('rec_hora')} />
-            </div>
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="grid grid-cols-[auto_1fr] gap-2">
-                  <Input placeholder="Hora" className="w-24" value={(p3[`rec_hora_${i}`] as string) || ''} onChange={e => set3({ [`rec_hora_${i}`]: e.target.value })} />
-                  <Textarea placeholder="Contenido" value={(p3[`rec_contenido_${i}`] as string) || ''} onChange={e => set3({ [`rec_contenido_${i}`]: e.target.value })} className="min-h-10" />
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+              <div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <Input placeholder="Fecha" {...field3('rec_fecha')} />
+                  <Input placeholder="Hora" {...field3('rec_hora')} />
                 </div>
-              ))}
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="grid grid-cols-[auto_1fr] gap-2">
+                      <Input placeholder="Hora" className="w-24" value={(p3[`rec_hora_${i}`] as string) || ''} onChange={e => set3({ [`rec_hora_${i}`]: e.target.value })} />
+                      <Textarea placeholder="Contenido (platillo: cantidad y alimento)" value={(p3[`rec_contenido_${i}`] as string) || ''} onChange={e => set3({ [`rec_contenido_${i}`]: e.target.value })} className="min-h-10" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="border border-slate-100 rounded-lg p-3">
+                <p className="text-xs font-bold text-slate-700 mb-2">Alimentos olvidados</p>
+                <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                  {ALIMENTOS_OLVIDADOS.map(a => <li key={a}>{a}</li>)}
+                </ul>
+              </div>
             </div>
           </FormSectionCard>
 
@@ -446,17 +562,90 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
             </div>
           </FormSectionCard>
 
-          <FormSectionCard
-            title="Distribución nutrimental actual / Interpretación % IAN / Evaluación Cualitativa"
-            description="Estos campos nunca tuvieron persistencia real en el documento original (bug preexistente) — se muestran deshabilitados para no aparentar una función que nunca existió."
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-50">
-              <Input disabled placeholder="Proteína % / Kcal / g / g·kg" />
-              <Input disabled placeholder="HCO % / Kcal / g / g·kg" />
-              <Input disabled placeholder="Lípidos % / Kcal / g / g·kg" />
-              <Input disabled placeholder="Interpretación % IAN — Dieta" />
-              <Input disabled placeholder="Interpretación % IAN — %" />
-              <label className="flex items-center gap-2 text-sm text-slate-400"><input type="checkbox" disabled />Evaluación cualitativa (No/Sí)</label>
+          <FormSectionCard title="Distribución nutrimental actual">
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Macronutrimento</TableHead><TableHead>%</TableHead><TableHead>Kcal</TableHead><TableHead>Gramos</TableHead><TableHead>g/kg</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['Proteína', 'HCO', 'Lípidos'].map(macro => {
+                    const mk = distribKey(macro);
+                    return (
+                      <TableRow key={macro}>
+                        <TableCell className="font-medium">{macro}</TableCell>
+                        {['pct', 'kcal', 'g', 'gkg'].map(col => (
+                          <TableCell key={col}><Input type="number" className="h-8 text-xs w-20" value={(p3[`dn_${mk}_${col}`] as string) || ''} onChange={e => set3({ [`dn_${mk}_${col}`]: e.target.value })} /></TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow>
+                    <TableCell className="font-bold">Totales</TableCell>
+                    <TableCell className="text-xs text-slate-500">100%</TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-20" value={(p3.dn_total_kcal as string) || ''} onChange={e => set3({ dn_total_kcal: e.target.value })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-20" value={(p3.dn_total_g as string) || ''} onChange={e => set3({ dn_total_g: e.target.value })} /></TableCell>
+                    <TableCell className="text-[10px] text-slate-500">kcal/kgPA/d</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <div className="block sm:hidden space-y-3">
+              {['Proteína', 'HCO', 'Lípidos'].map(macro => {
+                const mk = distribKey(macro);
+                return (
+                  <div key={macro} className="border border-slate-200 rounded-lg p-2.5">
+                    <p className="text-xs font-bold mb-2">{macro}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[['pct', '%'], ['kcal', 'Kcal'], ['g', 'Gramos'], ['gkg', 'g/kg']].map(([col, label]) => (
+                        <div key={col}>
+                          <label className="text-[10px] text-slate-500">{label}</label>
+                          <Input type="number" className="h-8 text-xs" value={(p3[`dn_${mk}_${col}`] as string) || ''} onChange={e => set3({ [`dn_${mk}_${col}`]: e.target.value })} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="border border-slate-200 rounded-lg p-2.5">
+                <p className="text-xs font-bold mb-2">Totales (100%) — kcal/kgPA/d</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[10px] text-slate-500">Kcal</label><Input type="number" className="h-8 text-xs" value={(p3.dn_total_kcal as string) || ''} onChange={e => set3({ dn_total_kcal: e.target.value })} /></div>
+                  <div><label className="text-[10px] text-slate-500">Gramos</label><Input type="number" className="h-8 text-xs" value={(p3.dn_total_g as string) || ''} onChange={e => set3({ dn_total_g: e.target.value })} /></div>
+                </div>
+              </div>
+            </div>
+          </FormSectionCard>
+
+          <FormSectionCard title="Interpretación de la ingestión actual">
+            <div className="space-y-2">
+              <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-2 text-xs font-bold text-slate-500">
+                <span></span><span>Dieta</span><span>% IAN</span>
+              </div>
+              {['Energía', 'Proteína', 'HCO', 'Lípidos'].map(item => {
+                const ik = distribKey(item);
+                return (
+                  <div key={item} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
+                    <span className="text-sm font-medium">{item}</span>
+                    <Input placeholder="Dieta" className="w-full sm:w-32 h-8 text-xs" value={(p3[`ian_${ik}_dieta`] as string) || ''} onChange={e => set3({ [`ian_${ik}_dieta`]: e.target.value })} />
+                    <Input type="number" placeholder="% IAN" className="w-full sm:w-20 h-8 text-xs" value={(p3[`ian_${ik}_pct`] as string) || ''} onChange={e => set3({ [`ian_${ik}_pct`]: e.target.value })} />
+                  </div>
+                );
+              })}
+            </div>
+          </FormSectionCard>
+
+          <FormSectionCard title="Evaluación Cualitativa">
+            <div className="space-y-2">
+              {EVALUACION_CUALITATIVA.map((item, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm border-b border-slate-100 pb-2 last:border-0">
+                  <div className="flex gap-3 shrink-0">
+                    <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p3[`evalcual_${idx}_no`]} onChange={e => set3({ [`evalcual_${idx}_no`]: e.target.checked })} /> No</label>
+                    <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p3[`evalcual_${idx}_si`]} onChange={e => set3({ [`evalcual_${idx}_si`]: e.target.checked })} /> Sí</label>
+                  </div>
+                  <span className="flex-1">{item.text} <span className="text-slate-500">&rarr; <b>{item.res}</b></span></span>
+                </div>
+              ))}
             </div>
           </FormSectionCard>
         </TabsContent>
@@ -490,11 +679,11 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 <p className="text-xs font-bold text-blue-900 mb-2">Requerimiento calórico</p>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!p4.req_ec_pred} onChange={e => set4({ req_ec_pred: e.target.checked })} />Ecuación predictiva</label>
-                  <Input placeholder="Nombre" {...field4('req_ec_pred_nombre')} className="text-xs h-8" />
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!p4.req_ec_rapida} onChange={e => set4({ req_ec_rapida: e.target.checked })} />Fórmula rápida</label>
-                  <Input placeholder="Peso" {...field4('req_ec_rapida_peso')} className="text-xs h-8" />
-                  <Input placeholder="Kcal/kg" {...field4('req_ec_rapida_kcal_kg')} className="text-xs h-8" />
-                  <Input placeholder="Total Kcal" {...field4('req_total_kcal')} className="text-xs h-8" />
+                  <Input placeholder="Nombre de ecuación" {...field4('req_ec_pred_nombre')} className="text-xs h-8" />
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!p4.req_ec_rapida} onChange={e => set4({ req_ec_rapida: e.target.checked })} />Ecuación rápida</label>
+                  <Input placeholder="Peso a usar (kg)" {...field4('req_ec_rapida_peso')} className="text-xs h-8" />
+                  <Input placeholder="Constante de kcal (kcal/kg/d)" {...field4('req_ec_rapida_kcal_kg')} className="text-xs h-8" />
+                  <Input placeholder="Total (kcal)" {...field4('req_total_kcal')} className="text-xs h-8" />
                 </div>
               </div>
               <div>
@@ -511,9 +700,11 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                       </div>
                     );
                   })}
-                  <div className="grid grid-cols-2 gap-1 pt-1">
-                    <Input placeholder="Total kcal" className="h-8 text-xs" {...field4('total_kcal')} />
-                    <Input placeholder="Total g" className="h-8 text-xs" {...field4('total_g')} />
+                  <div className="grid grid-cols-4 gap-1 pt-1 items-center">
+                    <span className="text-[10px] text-slate-500">100%</span>
+                    <Input placeholder="Kcal" className="h-8 text-xs" {...field4('total_kcal')} />
+                    <Input placeholder="Gramos" className="h-8 text-xs" {...field4('total_g')} />
+                    <span className="text-[9px] text-slate-500">kcal/kgPI/d</span>
                   </div>
                 </div>
               </div>
@@ -524,7 +715,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
             <div className="hidden lg:block">
               <Table>
                 <TableHeader>
-                  <TableRow><TableHead>Grupo</TableHead>{CALC_COLS.map(c => <TableHead key={c} className="uppercase text-[10px]">{c}</TableHead>)}</TableRow>
+                  <TableRow><TableHead>Grupo</TableHead>{CALC_COLS.map(c => <TableHead key={c} className="text-[10px]">{CALC_COLS_LABELS[c]}</TableHead>)}</TableRow>
                 </TableHeader>
                 <TableBody>
                   {GRUPOS_CALC_P4.map(g => {
@@ -558,7 +749,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                     <div className="grid grid-cols-3 gap-2">
                       {CALC_COLS.map(col => (
                         <div key={col}>
-                          <label className="text-[10px] text-slate-500 uppercase">{col}</label>
+                          <label className="text-[10px] text-slate-500">{CALC_COLS_LABELS[col]}</label>
                           <Input className="h-8 text-xs" value={(p4[`calc_${gk}_${col}`] as string) || ''} onChange={e => set4({ [`calc_${gk}_${col}`]: e.target.value })} />
                         </div>
                       ))}
@@ -596,8 +787,8 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
 
           <FormSectionCard title="Firmas">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Firma alumno</label><Input {...field4('firma_alumno')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Firma docente</label><Input {...field4('firma_docente')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, matrícula y firma del alumno</label><Input {...field4('firma_alumno')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, cédula y firma del docente responsable</label><Input {...field4('firma_docente')} /></div>
             </div>
           </FormSectionCard>
         </TabsContent>
