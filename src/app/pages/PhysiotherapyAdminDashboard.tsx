@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, usuariosAPI, notasAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { esCitaBloqueada, getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
+import { formatExpediente } from '../lib/formatExpediente';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -533,7 +534,7 @@ export default function PhysiotherapyAdminDashboard() {
                             </div>
                             <div className="min-w-0">
                               <p className="font-black text-blue-950 uppercase text-sm sm:text-base truncate">{apt.paciente_nombre}</p>
-                              <p className="text-slate-400 font-mono normal-case text-xs sm:text-sm">ID: {apt.paciente_id}</p>
+                              <p className="text-slate-400 font-mono normal-case text-xs sm:text-sm">Expediente: {formatExpediente(apt.paciente_id)}</p>
                               <div className="flex flex-wrap gap-2 sm:gap-3.5 items-center mt-1">
                                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
                                   <Calendar className="w-3.5 h-3.5"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}

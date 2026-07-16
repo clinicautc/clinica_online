@@ -4,5 +4,8 @@
   "version": "1.0.0",
   "devDependencies": {
     "playwright": "1.49"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^3.11.174"
   }
 }

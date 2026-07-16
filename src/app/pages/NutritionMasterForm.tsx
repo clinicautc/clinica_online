@@ -7,8 +7,11 @@
   import React, { useState } from 'react';
   import { useNavigate } from 'react-router';
   import { useNutritionHistoriaData } from '../hooks/formClinico/useNutritionHistoriaData';
+  import { usePrintFitScale } from '../hooks/usePrintFitScale';
+  import { formatExpediente } from '../lib/formatExpediente';
   // IMPORTACIÓN DE LA IMAGEN
   import bristolImg from './bristol.jpg';
+  import logoUtc from './logo_historiales.jpg';
 
   // --- INTERFAZ PARA LAS PROPS DE TODAS LAS PÁGINAS ---
   interface PageProps {
@@ -21,7 +24,7 @@
     onGuardarDirecto?: () => void;
     isYaGuardado?: boolean;
     isSaving?: boolean;
-    onFinalizarDirecto?: () => void;
+    onFinalizarDirecto?: () => void | Promise<void>;
   }
 
   const NutritionMasterForm = () => {
@@ -41,19 +44,38 @@
     // se conservan sin efecto para no tener que tocar cada referencia.
     const handleInputChange = (..._args: any[]) => {};
 
+    // Regla de impresión única para todos los documentos clínicos del sistema
+    // (ver src/app/hooks/usePrintFitScale.ts para la explicación completa del
+    // mecanismo). Validado originalmente en HojaEvolutiva.tsx y reutilizado
+    // tal cual aquí y en PhysiotherapyMasterForm.tsx.
+    usePrintFitScale(['.p1-paper']);
+
     return (
       <>
       <style>{`
-        @page { size: A4 portrait; margin: 0; }
+        @page { size: 215.9mm 279.4mm; margin: 0; }
         @media print {
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
-          .p1-outer { background: white !important; padding: 0 !important; }
-          .p1-paper { transform: scale(0.87); transform-origin: top center; box-shadow: none !important; }
+          .p1-outer { background: white !important; padding: 0 !important; margin: 0 !important; gap: 0 !important; }
+          .p1-paper {
+            box-shadow: none !important;
+            /* Escala calculada en tiempo real (ver useEffect de escala de
+               impresión, más abajo en este componente) — NUNCA un valor
+               fijo. Si la hoja cabe al 100%, --print-scale vale 1 y no pasa
+               nada; solo se reduce si el contenido real excede el alto
+               físico de la hoja. */
+            zoom: var(--print-scale, 1);
+          }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
-        .p1-paper input[type="text"], .p1-paper textarea {
+        /* Tamaño de hoja y escala igual a la vista de Seguimiento Nutricional
+           (HojaEvolutiva.tsx): ancho/alto fijos en mm, sin escalado responsive,
+           para que se vea como una hoja física real en pantalla. */
+        .p1-paper { width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; margin: 0 auto !important; border-radius: 0 !important; }
+        .p1-paper input:not([type="checkbox"]), .p1-paper textarea {
           word-break: break-word;
           overflow-wrap: break-word;
+          padding-bottom: 2px;
         }
         .p1-paper input, .p1-paper textarea, .p1-paper tr, .p1-paper td, .p1-paper th {
           border-color: #2c5697;
@@ -81,6 +103,16 @@
         @media print {
           .p1-paper textarea { overflow: visible !important; height: auto !important; }
           .p1-paper tr, .p1-paper td { break-inside: avoid; }
+        }
+        /* Cada una de las 4 hojas (.p1-paper) ocupa su propia página impresa,
+           en el mismo orden en que se muestran en pantalla (1, 2, 3, 4). Las
+           4 son hijas directas de .p1-outer, una por página — se excluye la
+           última (:last-child) para no dejar una hoja en blanco al final. */
+        @media print {
+          .p1-outer > div:not(:last-child) .p1-paper {
+            break-after: page;
+            page-break-after: always;
+          }
         }
       `}</style>
       {/* Solo lectura: las 4 páginas se muestran apiladas (no hay wizard de
@@ -128,7 +160,7 @@
         <div className="block w-full">
 
           {/* CONTENEDOR HOJA A4 (DISEÑO UNIFORME SIN SUPERPOSICIONES) */}
-          <div className="p1-paper relative flex min-h-[297mm] w-full flex-col justify-between overflow-hidden rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl print:m-0 print:shadow-none">
+          <div className="p1-paper relative flex min-h-[297mm] print:min-h-[270mm] w-full flex-col justify-between overflow-hidden rounded-[15px] bg-white px-[10mm] pb-[6mm] pt-[6mm] text-[#2c5697] shadow-2xl print:m-0 print:shadow-none">
             
             {/* ENCABEZADO */}
             <svg className="pointer-events-none absolute right-0 top-0 z-0 h-[160px] w-[450px]" viewBox="0 0 450 160" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -137,9 +169,8 @@
               <path d="M 280 0 Q 340 120 400 100 T 450 160 L 450 0 Z" fill="#1d4d96" opacity="0.9" />
             </svg>
             <header className="relative z-10 mt-2 mb-1 flex items-center justify-between shrink-0">
-              <div className="flex h-[80px] w-[100px] shrink-0 flex-col items-center justify-center rounded-md border border-dashed border-[#2c5697] bg-white leading-none text-[#2c5697] shadow-sm">
-                <h1 className="mb-0 text-[28px] font-black tracking-tighter">utc</h1>
-                <p className="text-center text-[7px] font-bold leading-tight uppercase">Universidad<br />Tres Culturas</p>
+              <div className="flex h-[80px] w-[100px] shrink-0 items-center justify-center bg-white">
+                <img src={logoUtc} alt="Universidad Tres Culturas" className="h-full w-full object-contain" />
               </div>
               <div className="flex flex-grow flex-col items-center justify-center px-4 text-center">
                 <div className="mb-1 flex w-full max-w-[550px] items-center justify-center rounded-[20px] bg-[#2c5697] py-1.5 text-[24px] font-extrabold uppercase tracking-wide text-white shadow-md">
@@ -147,20 +178,27 @@
                 </div>
                 <p className="text-[9.5px] font-bold text-[#2c5697]">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</p>
               </div>
-              <div className="flex items-end gap-1 text-[10px] font-bold text-[#2c5697] mt-3 border-b border-[#2c5697] pb-0.5">
+            </header>
+
+            {/* FECHA — fuera del recuadro de Datos personales, solo unos px arriba */}
+            <div className="relative z-10 flex justify-end mt-2 mb-0.5 pr-[95px]">
+              <div className="flex items-end gap-1 text-[10px] font-bold text-[#2c5697] whitespace-nowrap">
                 <span>Fecha</span>
                 <input
                   type="text"
                   id="fecha"
                   value={formData.pagina_1.fecha || ''}
                   onChange={(e) => handleInputChange(e, 'fecha')}
-                  className="w-24 outline-none px-1 h-4 bg-transparent text-center font-bold text-[#333]"
+                  className="w-28 border-b border-[#2c5697] outline-none px-1 h-4 bg-transparent text-center text-[10px] font-bold text-[#333]"
                 />
               </div>
-            </header>
+            </div>
 
             {/* DATOS PERSONALES */}
-            <SectionBox title="Datos personales" marginTop="mt-2">
+            <SectionBox
+              title="Datos personales"
+              marginTop="mt-0"
+            >
               <div className="flex items-end gap-1 mb-1 text-[9.5px] font-bold w-full">
                 <span className="shrink-0">Nombre completo</span>
       <input
@@ -168,15 +206,15 @@
     value={formData.pagina_1?.nombre || ''}
     onChange={(e) => handleInputChange(e, 'nombre')}
     disabled={isReadOnly}
-    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
+    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[9.5px] text-[#333]"
   />
                 <span className="shrink-0 ml-2">Expediente</span>
                 <input
                   type="text"
                   id="expediente"
-                  value={formData.pagina_1.expediente || ''}
+                  value={formatExpediente(formData.pagina_1.paciente_id)}
                   onChange={(e) => handleInputChange(e, 'expediente')}
-                  className="border-b-[1.5px] border-[#2c5392] w-24 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
+                  className="border-b-[1.5px] border-[#2c5392] w-24 outline-none px-1 h-3.5 bg-transparent text-center text-[9.5px] text-[#333]"
                 />
               </div>
 
@@ -188,7 +226,7 @@
                     id="edad"
                     value={formData.pagina_1.edad || ''}
                     onChange={(e) => handleInputChange(e, 'edad')}
-                    className="border-b-[1.5px] border-[#2c5392] w-10 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
+                    className="border-b-[1.5px] border-[#2c5392] w-10 outline-none px-1 h-3.5 bg-transparent text-center text-[9.5px] text-[#333]"
                   />
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 ml-1">
@@ -224,7 +262,7 @@
                     id="ocupacion"
                     value={formData.pagina_1.ocupacion || ''}
                     onChange={(e) => handleInputChange(e, 'ocupacion')}
-                    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
+                    className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[9.5px] text-[#333]"
                   />
                 </div>
                 <div className="flex items-end gap-1 shrink-0">
@@ -234,7 +272,7 @@
                     id="fn"
                     value={formData.pagina_1.fn || ''}
                     onChange={(e) => handleInputChange(e, 'fn')}
-                    className="border-b-[1.5px] border-[#2c5392] w-20 outline-none px-1 h-3.5 bg-transparent text-center text-[#333]"
+                    className="border-b-[1.5px] border-[#2c5392] w-20 outline-none px-1 h-3.5 bg-transparent text-center text-[9.5px] text-[#333]"
                   />
                 </div>
               </div>
@@ -246,7 +284,7 @@
                   id="telefono"
                   value={formData.pagina_1.telefono || ''}
                   onChange={(e) => handleInputChange(e, 'telefono')}
-                  className="border-b-[1.5px] border-[#2c5392] w-48 outline-none px-1 h-3.5 bg-transparent text-[#333]"
+                  className="border-b-[1.5px] border-[#2c5392] w-48 outline-none px-1 h-3.5 bg-transparent text-[9.5px] text-[#333]"
                 />
                 <span className="shrink-0 ml-2">Dirección</span>
                 <input
@@ -254,7 +292,7 @@
                   id="direccion"
                   value={formData.pagina_1.direccion || ''}
                   onChange={(e) => handleInputChange(e, 'direccion')}
-                  className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[#333]"
+                  className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none px-1 h-3.5 bg-transparent text-[9.5px] text-[#333]"
                 />
               </div>
             </SectionBox>
@@ -282,7 +320,7 @@
             </div>
 
             {/* ANTECEDENTES GRID */}
-            <div className="grid grid-cols-[1.6fr_1fr] gap-4 shrink-0">
+            <div className="grid grid-cols-[1.6fr_1fr] items-start gap-4 shrink-0">
               <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-2">
                 <div className="w-full h-full overflow-hidden rounded-b-md">
                   <table className="w-full border-collapse text-[8.5px] font-bold table-fixed mt-0">
@@ -309,24 +347,38 @@
                           ))}
                         </tr>
                       ))}
-                      <tr>
-                        <td colSpan={7} className="text-left px-2 py-1 text-[8.5px]">
-                          Otras: <input
-                            type="text"
-                            id="otrasHeredo"
-                            value={formData.pagina_1.otrasHeredo || ''}
-                            onChange={(e) => handleInputChange(e, 'otrasHeredo')}
-                            className="border-b-[1.5px] border-[#2c5392] w-[80%] outline-none h-3.5 bg-transparent ml-1 text-[#333]"
-                          />
+                      <tr className="border-b-[1.5px] border-[#2c5392] h-[13.5px]">
+                        <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] whitespace-nowrap overflow-hidden text-ellipsis">
+                          <div className="flex items-center gap-1">
+                            <span className="shrink-0">Otras:</span>
+                            <input
+                              type="text"
+                              id="otrasHeredo"
+                              value={formData.pagina_1.otrasHeredo || ''}
+                              onChange={(e) => handleInputChange(e, 'otrasHeredo')}
+                              className="w-full min-w-0 outline-none h-3.5 bg-transparent text-[8.5px] text-[#333]"
+                            />
+                          </div>
                         </td>
+                        {[...Array(6)].map((_, i) => (
+                          <td key={i} className="border-r-[1.5px] border-[#2c5392] last:border-r-0">
+                            <input
+                              type="checkbox"
+                              checked={formData.pagina_1[`heredo-otras-${i}`] || false}
+                              onChange={(e) => updateGlobalData('pagina_1', {[`heredo-otras-${i}`]: e.target.checked})}
+                              disabled={isReadOnly}
+                              className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
+                            />
+                          </td>
+                        ))}
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-2">
-                <div className="flex flex-col justify-between h-full text-[9px] font-bold px-1 py-1">
+              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-2" pill={false}>
+                <div className="flex flex-col gap-1.5 text-[9px] font-bold px-1 py-1">
                   {['Diabetes Mellitus', 'Obesidad o Sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map(item => (
                     <CustomCheckbox
                       key={item}
@@ -336,14 +388,19 @@
                       textSize="text-[9px]"
                     />
                   ))}
-                  <div className="flex items-end gap-1 mt-auto pt-2">
-                    <span className="whitespace-nowrap">Otras:</span>
+                  <div className="flex items-center gap-1">
+                    <CustomCheckbox
+                      label="Otras:"
+                      checked={formData.pagina_1.otrasPersCheck || false}
+                      onChange={(e:any) => updateGlobalData('pagina_1', { otrasPersCheck: e.target.checked })}
+                      textSize="text-[9px]"
+                    />
                     <input
                       type="text"
                       id="otrasPers"
                       value={formData.pagina_1.otrasPers || ''}
                       onChange={(e) => handleInputChange(e, 'otrasPers')}
-                      className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-3.5 bg-transparent text-[#333]"
+                      className="flex-grow border-b-[1.5px] border-[#2c5392] outline-none h-3.5 bg-transparent text-[9px] text-[#333]"
                     />
                   </div>
                 </div>
@@ -351,7 +408,7 @@
             </div>
 
             <div className="grid grid-cols-3 gap-4 shrink-0">
-              <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-2">
+              <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-2" pill={false}>
                 <table className="w-full text-[8.5px] font-bold table-fixed border-collapse mt-0 h-full">
                   <thead><tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50"><th className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[60%] py-1">Enfermedades</th><th className="py-1">Freq./Cant.</th></tr></thead>
                   <tbody>
@@ -380,7 +437,7 @@
                 </table>
               </SectionBox>
 
-              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-2">
+              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-2" pill={false}>
                 <div className="flex flex-col items-center justify-center w-full h-full py-1">
                   <img
                     src={bristolImg}
@@ -392,20 +449,25 @@
                   />
                   <div className="flex justify-between w-full px-5">
                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                      <input
+                      <label
                         key={num}
-                        type="radio"
-                        name="bristol_scale"
-                        checked={formData.pagina_1.bristol === num}
-                        onChange={() => updateGlobalData('pagina_1', {bristol: num})}
-                        className="appearance-none w-3.5 h-3.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer"
-                      />
+                        className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border-[1.5px] border-[#2c5392] text-[9px] font-bold text-[#2c5392] has-[:checked]:bg-[#2c5392] has-[:checked]:text-white"
+                      >
+                        <input
+                          type="radio"
+                          name="bristol_scale"
+                          checked={formData.pagina_1.bristol === num}
+                          onChange={() => updateGlobalData('pagina_1', {bristol: num})}
+                          className="sr-only"
+                        />
+                        {num}
+                      </label>
                     ))}
                   </div>
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-2" className="pb-0">
+              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-2" className="pb-0" pill={false}>
                 <table className="w-full text-[8.5px] font-bold border-collapse table-fixed mt-0 h-full">
                   <thead>
                     <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
@@ -448,7 +510,7 @@
                 </table>
               </SectionBox>
 
-              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-2">
+              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-2" pill={false}>
                 <div className="flex flex-col justify-between h-full border-t-[1.5px] border-[#2c5392]">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="border-b-[1.5px] border-[#2c5392] last:border-b-0 flex-1 flex items-center">
@@ -463,8 +525,8 @@
               </SectionBox>
 
               <SectionBox title={
-                <div className="flex gap-8 px-2 text-[9px]"><span>Medicamentos</span> <span>Dosis</span></div>
-              } paddingX="px-1.5" marginTop="mt-2">
+                <div className="flex w-full gap-2 px-2 text-[9px]"><span className="flex-1 text-center">Medicamentos</span><span className="flex-1 text-center">Dosis</span></div>
+              } paddingX="px-1.5" marginTop="mt-2" pill={false}>
                 <div className="flex flex-col justify-between h-full py-0.5">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="flex justify-between items-center w-full gap-2">
@@ -491,11 +553,11 @@
                 <div className="flex flex-col gap-1 w-full h-full justify-center">
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full mb-1">
                     <span className="shrink-0">Realiza ejercicio</span>
-                    <CustomCheckbox label="No" />
-                    <CustomCheckbox label="Sí" />
+                    <CustomCheckbox label="No" checked={formData.pagina_1.ejercicio_realiza_no || false} onChange={(e:any) => updateGlobalData('pagina_1', {ejercicio_realiza_no: e.target.checked})} />
+                    <CustomCheckbox label="Sí" checked={formData.pagina_1.ejercicio_realiza_si || false} onChange={(e:any) => updateGlobalData('pagina_1', {ejercicio_realiza_si: e.target.checked})} />
                     <div className="flex gap-2 ml-auto">
-                      <CustomCheckbox label="Aeróbico" />
-                      <CustomCheckbox label="Anaeróbico" />
+                      <CustomCheckbox label="Aeróbico" checked={formData.pagina_1.ejercicio_aerobico || false} onChange={(e:any) => updateGlobalData('pagina_1', {ejercicio_aerobico: e.target.checked})} />
+                      <CustomCheckbox label="Anaeróbico" checked={formData.pagina_1.ejercicio_anaerobico || false} onChange={(e:any) => updateGlobalData('pagina_1', {ejercicio_anaerobico: e.target.checked})} />
                     </div>
                   </div>
                   <FilaInput
@@ -553,20 +615,20 @@
                   </div>
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full">
                     <span className="shrink-0">Embarazo</span>
-                    <CustomCheckbox label="No" />
-                    <CustomCheckbox label="Sí" />
+                    <CustomCheckbox label="No" checked={formData.pagina_1.embarazo_no || false} onChange={(e:any) => updateGlobalData('pagina_1', {embarazo_no: e.target.checked})} />
+                    <CustomCheckbox label="Sí" checked={formData.pagina_1.embarazo_si || false} onChange={(e:any) => updateGlobalData('pagina_1', {embarazo_si: e.target.checked})} />
                     <span className="ml-auto">SDG</span><input type="text" value={formData.pagina_1.sdg || ''} onChange={(e) => updateGlobalData('pagina_1', {sdg: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-12 outline-none text-center h-[13px] text-[#333]" />
                   </div>
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full">
                     <span className="whitespace-nowrap shrink-0">Remplazo hormonal</span>
-                    <CustomCheckbox label="No" />
-                    <CustomCheckbox label="Sí" />
+                    <CustomCheckbox label="No" checked={formData.pagina_1.hormo_no || false} onChange={(e:any) => updateGlobalData('pagina_1', {hormo_no: e.target.checked})} />
+                    <CustomCheckbox label="Sí" checked={formData.pagina_1.hormo_si || false} onChange={(e:any) => updateGlobalData('pagina_1', {hormo_si: e.target.checked})} />
                     <input type="text" value={formData.pagina_1.hormo || ''} onChange={(e) => updateGlobalData('pagina_1', {hormo: e.target.value})} className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-[13px] text-[#333]" />
                   </div>
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full">
                     <span className="whitespace-nowrap shrink-0">Anticonceptivos</span>
-                    <CustomCheckbox label="No" />
-                    <CustomCheckbox label="Sí" />
+                    <CustomCheckbox label="No" checked={formData.pagina_1.anti_no || false} onChange={(e:any) => updateGlobalData('pagina_1', {anti_no: e.target.checked})} />
+                    <CustomCheckbox label="Sí" checked={formData.pagina_1.anti_si || false} onChange={(e:any) => updateGlobalData('pagina_1', {anti_si: e.target.checked})} />
                     <input type="text" value={formData.pagina_1.anti || ''} onChange={(e) => updateGlobalData('pagina_1', {anti: e.target.value})} className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none h-[13px] text-[#333]" />
                   </div>
                 </div>
@@ -622,17 +684,30 @@
   /* --- COMPONENTES AUXILIARES --- */
 
   const SectionBox: React.FC<{
-    title: React.ReactNode,
+    title?: React.ReactNode,
     children: React.ReactNode,
     className?: string,
     paddingX?: string,
-    marginTop?: string
-  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3" }) => (
-    <section className={`overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] ${marginTop} flex w-full flex-col bg-white ${className}`}>
-      <div className="flex min-h-6 items-center bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
-        {title}
-      </div>
-      <div className={`flex flex-1 flex-col justify-start py-2 ${paddingX} w-full h-full`}>
+    marginTop?: string,
+    /** false = encabezado completo (barra azul de ancho total, estilo original); true (default) = píldora tipo legend. */
+    pill?: boolean,
+  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3", pill = true }) => (
+    <section
+      className={`relative rounded-[10px] border-[2px] border-[#2c5697] ${marginTop} flex w-full flex-col bg-white ${className}`}
+      style={title && pill ? { paddingTop: '11px' } : undefined}
+    >
+      {title && (
+        pill ? (
+          <span className="absolute -top-[11px] left-3 inline-block rounded-full bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+            {title}
+          </span>
+        ) : (
+          <div className="flex min-h-6 items-center rounded-t-[8px] bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+            {title}
+          </div>
+        )
+      )}
+      <div className={`flex flex-1 flex-col justify-start overflow-hidden rounded-[8px] py-1 ${paddingX} w-full h-full`}>
         {children}
       </div>
     </section>
@@ -669,7 +744,7 @@
         type="text"
         value={value}
         onChange={(e) => onChange(e, id)}
-        className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none text-[#333] px-1 h-[13px] bg-transparent"
+        className="border-b-[1.5px] border-[#2c5392] flex-grow outline-none text-[9px] text-[#333] px-1 h-[13px] bg-transparent"
       />
     </div>
   );
@@ -2403,16 +2478,37 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
    * de captura; este bloque solo reorganiza su presentación para impresión.
    */
   const DocumentSection: React.FC<{
-    title: React.ReactNode;
+    title?: React.ReactNode;
     children: React.ReactNode;
     className?: string;
     contentClassName?: string;
-  }> = ({ title, children, className = '', contentClassName = 'p-2' }) => (
-    <section className={`overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] bg-white ${className}`}>
-      <div className="flex min-h-6 items-center bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
-        {title}
-      </div>
-      <div className={contentClassName}>{children}</div>
+    /** false = encabezado completo (barra azul de ancho total, estilo original); true (default) = píldora tipo legend. */
+    pill?: boolean;
+    /** Solo aplica cuando pill=false: centra el texto del encabezado completo en vez de alinearlo a la izquierda. */
+    centerTitle?: boolean;
+    /** Espacio reservado arriba para la píldora del título (por defecto 11px,
+        pensado para un título de una sola línea). Si el título es largo y
+        envuelve a 2 líneas (p. ej. "Hallazgos físicos Orientados a Nut...DEN"),
+        subir este valor evita que la píldora se superponga a la fila de la
+        tabla justo debajo — es una corrección de espacio, no de diseño. */
+    titlePaddingTop?: string;
+  }> = ({ title, children, className = '', contentClassName = 'p-2', pill = true, centerTitle = false, titlePaddingTop = '11px' }) => (
+    <section
+      className={`relative rounded-[10px] border-[2px] border-[#2c5697] bg-white ${className}`}
+      style={title && pill ? { paddingTop: titlePaddingTop } : undefined}
+    >
+      {title && (
+        pill ? (
+          <span className="absolute -top-[11px] left-3 inline-block rounded-full bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+            {title}
+          </span>
+        ) : (
+          <div className={`flex min-h-6 items-center rounded-t-[8px] bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white ${centerTitle ? 'justify-center' : ''}`}>
+            {title}
+          </div>
+        )
+      )}
+      <div className={`${contentClassName} overflow-hidden rounded-[8px]`}>{children}</div>
     </section>
   );
 
@@ -2455,7 +2551,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
     ] as const;
     const signos = ['T. Arterial', 'F. Resp (rpm)', 'F. Card (lpm)', 'Temp (°C)', 'SO₂'];
     const inputClass = 'h-full w-full min-w-0 border-0 bg-transparent px-1 text-[8.5px] text-[#333] outline-none';
-    const tableHead = 'border-b border-r border-[#2c5697] bg-[#f2f5f9] px-1 py-1 text-center text-[8.5px] font-bold text-[#2c5697] last:border-r-0';
+    const pillHead = 'border-b border-r border-[#2c5697] bg-[#2c5697] px-1 py-1 text-center text-[8.5px] font-bold text-white last:border-r-0';
     const cell = 'h-[15px] border-b border-r border-[#2c5697] p-0 last:border-r-0';
 
     return (
@@ -2513,30 +2609,33 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
 
           <div className="mt-3 grid flex-1 grid-cols-[1.1fr_1fr] gap-3">
             <div className="flex flex-col gap-3">
-              <DocumentSection title="Antropometría" contentClassName="p-0">
+              <DocumentSection contentClassName="p-0">
                 <table className="w-full border-collapse table-fixed">
-                  <thead><tr><th className={`${tableHead} text-left`}>Antropometría</th><th className={`${tableHead} w-[20%]`}>VO</th><th className={`${tableHead} w-[45%]`}>Interpretación</th></tr></thead>
+                  <thead><tr><th className={`${pillHead} text-left`}>Antropometría</th><th className={`${pillHead} w-[20%]`}>VO</th><th className={`${pillHead} w-[45%]`}>Interpretación</th></tr></thead>
                   <tbody>{antropometria.map(([label, key, interpretation]) => <tr key={key}>
                     <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
                     <td className={cell}><input type="number" value={p2[`antrop_${key}_vo`] || ''} onChange={e => set(`antrop_${key}_vo`, e.target.value)} className={inputClass} /></td>
-                    <td className={`${cell} ${!interpretation ? 'bg-[#f2f5f9]' : ''}`}>{interpretation && <input value={p2[`antrop_${key}_int`] || ''} onChange={e => set(`antrop_${key}_int`, e.target.value)} className={inputClass} />}</td>
+                    <td className={`${cell} ${!interpretation ? 'bg-[#2c5697]' : ''}`}>{interpretation && <input value={p2[`antrop_${key}_int`] || ''} onChange={e => set(`antrop_${key}_int`, e.target.value)} className={inputClass} />}</td>
                   </tr>)}</tbody>
                 </table>
               </DocumentSection>
               <DocumentSection title="Interpretación antropométrica" className="mt-auto" contentClassName="p-1">
                 <textarea value={p2.int_antrop || ''} onChange={e => set('int_antrop', e.target.value)} className="h-9 w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" />
               </DocumentSection>
-              <DocumentSection title="Signos Vitales" contentClassName="p-0">
-                <table className="w-full border-collapse table-fixed"><tbody>{signos.map(label => <tr key={label}>
-                  <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
-                  <td className={`${cell} w-[20%]`}><input value={p2[`sv_${label}_vo`] || ''} onChange={e => set(`sv_${label}_vo`, e.target.value)} className={inputClass} /></td>
-                  <td className={`${cell} w-[45%]`}><input value={p2[`sv_${label}_int`] || ''} onChange={e => set(`sv_${label}_int`, e.target.value)} className={inputClass} /></td>
-                </tr>)}</tbody></table>
+              <DocumentSection contentClassName="p-0">
+                <table className="w-full border-collapse table-fixed">
+                  <thead><tr><th className={`${pillHead} text-left`}>Signos Vitales</th><th className={`${pillHead} w-[20%]`}>VO</th><th className={`${pillHead} w-[45%]`}>Interpretación</th></tr></thead>
+                  <tbody>{signos.map(label => <tr key={label}>
+                    <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
+                    <td className={`${cell} w-[20%]`}><input value={p2[`sv_${label}_vo`] || ''} onChange={e => set(`sv_${label}_vo`, e.target.value)} className={inputClass} /></td>
+                    <td className={`${cell} w-[45%]`}><input value={p2[`sv_${label}_int`] || ''} onChange={e => set(`sv_${label}_int`, e.target.value)} className={inputClass} /></td>
+                  </tr>)}</tbody>
+                </table>
               </DocumentSection>
             </div>
             <div className="flex flex-col gap-3">
-              <DocumentSection title="Parámetros bioquímicos" contentClassName="p-0">
-                <table className="w-full border-collapse table-fixed"><thead><tr><th className={`${tableHead} text-left`}>Parámetro</th><th className={`${tableHead} w-[20%]`}>VO</th><th className={`${tableHead} w-[45%]`}>Interpretación</th></tr></thead>
+              <DocumentSection contentClassName="p-0">
+                <table className="w-full border-collapse table-fixed"><thead><tr><th className={`${pillHead} text-left`}>Parámetros bioquímicos</th><th className={`${pillHead} w-[20%]`}>VO</th><th className={`${pillHead} w-[45%]`}>Interpretación</th></tr></thead>
                   <tbody>{Array.from({ length: 28 }, (_, i) => <tr key={i}>
                     <td className={cell}><input value={p2[`bq_${i}_nom`] || ''} onChange={e => set(`bq_${i}_nom`, e.target.value)} className={`${inputClass} font-bold text-[#2c5697]`} /></td>
                     <td className={cell}><input value={p2[`bq_${i}_vo`] || ''} onChange={e => set(`bq_${i}_vo`, e.target.value)} className={inputClass} /></td>
@@ -2601,25 +2700,32 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
             </DocumentSection>
             <div className="mt-2 flex items-center text-[9px] font-bold"><span>Diagnóstico Matriz IMG/IMLG:</span><input value={p3.diag_matriz_imlo_img || ''} onChange={e => set('diag_matriz_imlo_img', e.target.value)} className="ml-2 h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" /></div>
           </div>
-          <DocumentSection title="Hallazgos físicos" contentClassName="p-0">
-            <table className="w-full border-collapse text-[7.5px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th colSpan={2} className="border-b border-r border-[#2c5697] py-1 text-left">Hallazgos físicos orientados a Nut</th><th className="border-b border-[#2c5697] py-1">DEN</th></tr></thead><tbody>
+          <DocumentSection title="Hallazgos físicos Orientados a Nut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DEN" contentClassName="p-0" titlePaddingTop="32px">
+            <table className="w-full border-collapse text-[7.5px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th colSpan={2} className="border-b border-r border-[#2c5697] py-1 text-left">Hallazgos físicos </th><th className="border-b border-[#2c5697] py-1">DEN</th></tr></thead><tbody>
               {hallazgos.map(label => { const k = key(label); return <tr key={label}><td className="h-[13px] w-[43%] border-b border-[#2c5697] pl-1 font-bold">{label}</td><td className="border-b border-r border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_desc`] || ''} onChange={e => set(`hallazgo_${k}_desc`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-[7px] text-[#333] outline-none" /></td><td className="border-b border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_den`] || ''} onChange={e => set(`hallazgo_${k}_den`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-center text-[7px] text-[#333] outline-none" /></td></tr>; })}
             </tbody></table>
           </DocumentSection>
         </div>
 
-        <div className="mt-3 grid min-h-[190px] grid-cols-[3fr_1.1fr] gap-3">
-          <DocumentSection title="Recordatorio de 24 horas" contentClassName="p-0">
-            <div className="flex items-center gap-2 border-b border-[#2c5697] p-2 text-[9px] font-bold"><span>Fecha</span><input value={p3.rec_fecha || ''} onChange={e => set('rec_fecha', e.target.value)} className="h-4 w-28 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /><span className="ml-5">Hora</span><input value={p3.rec_hora || ''} onChange={e => set('rec_hora', e.target.value)} className="h-4 w-20 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div>
-            <div className="flex border-b border-[#2c5697] bg-[#f2f5f9] text-center text-[8px] font-bold"><div className="w-[20%] border-r border-[#2c5697] py-1">Hora</div><div className="w-[80%] py-1">Contenido (platillo: cantidad y alimento)</div></div>
-            <div>{[1, 2, 3, 4, 5].map(i => <div key={i} className="flex h-[22px] border-b border-[#2c5697] last:border-b-0"><input value={p3[`rec_hora_${i}`] || ''} onChange={e => set(`rec_hora_${i}`, e.target.value)} className="w-[20%] border-0 border-r border-[#2c5697] bg-transparent text-center text-[8px] text-[#333] outline-none" /><textarea value={p3[`rec_contenido_${i}`] || ''} onChange={e => set(`rec_contenido_${i}`, e.target.value)} className="h-full w-[80%] resize-none border-0 bg-transparent px-2 text-[8px] text-[#333] outline-none" /></div>)}</div>
-          </DocumentSection>
-          <DocumentSection title="Alimentos olvidados" contentClassName="p-2">
-            <div className="grid grid-cols-1 gap-0.5 text-[8px] font-bold">{['Agua', 'Café / Té', 'Leche', 'Azúcar / Endulzante', 'Jugos / Refresco', 'Agua de sabor', 'Sal', 'Chile / Salsas', 'Caramelos / Chicle', 'Galletas / Pastel', 'Aguacate', 'Gelatina', 'Nieve / Helado', 'Oleaginosas', 'Chocolates', 'Papas / Palomitas', 'Frutas', 'TORTILLAS', 'Aceite / Crema', 'Mantequilla'].map(item => <span key={item}>• {item}</span>)}</div>
-          </DocumentSection>
-        </div>
+        <DocumentSection title="Recordatorio de 24 horas" className="mt-3" contentClassName="p-0">
+          <div className="grid min-h-[190px] grid-cols-[3fr_1.1fr]">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 p-2 text-[9px] font-bold shrink-0"><span>Fecha</span><input value={p3.rec_fecha || ''} onChange={e => set('rec_fecha', e.target.value)} className="h-4 w-28 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div>
+              <div className="flex border-b-2 border-[#2c5697] bg-[#f2f5f9] text-center text-[8px] font-bold shrink-0"><div className="w-[20%] py-1">Hora</div><div className="w-[80%] py-1">Contenido (platillo: cantidad y alimento)</div></div>
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-[20%] border-l-2 border-[#2c5697]" />
+                {[1, 2, 3, 4, 5].map(i => <div key={i} className="flex h-[22px]"><input value={p3[`rec_hora_${i}`] || ''} onChange={e => set(`rec_hora_${i}`, e.target.value)} className="w-[20%] border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" /><textarea value={p3[`rec_contenido_${i}`] || ''} onChange={e => set(`rec_contenido_${i}`, e.target.value)} className="h-full w-[80%] resize-none border-0 bg-transparent px-2 text-[8px] text-[#333] outline-none" /></div>)}
+              </div>
+            </div>
+            <div className="relative p-2">
+              <div className="pointer-events-none absolute -top-3 -bottom-px left-0 border-l-2 border-[#2c5697]" />
+              <div className="mb-1 text-[10px] font-bold">Alimentos olvidados</div>
+              <div className="grid grid-cols-1 gap-0.5 text-[8px] font-bold">{['Agua', 'Café / Té', 'Leche', 'Azúcar / Endulzante', 'Jugos / Refresco', 'Agua de sabor', 'Sal', 'Chile / Salsas', 'Caramelos / Chicle', 'Galletas / Pastel', 'Aguacate', 'Gelatina', 'Nieve / Helado', 'Oleaginosas', 'Chocolates', 'Papas / Palomitas', 'Frutas', 'TORTILLAS', 'Aceite / Crema', 'Mantequilla'].map(item => <span key={item}>• {item}</span>)}</div>
+            </div>
+          </div>
+        </DocumentSection>
 
-        <div className="mt-3 grid grid-cols-[1.6fr_1fr] gap-3">
+        <div className="mt-3 grid grid-cols-[1.6fr_1fr] items-start gap-3">
           <DocumentSection title="Consumo de porciones" contentClassName="p-0">
             <table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th className="border-b border-r border-[#2c5697] py-1 text-left">Grupo alimentario</th>{['Porciones', 'Energía', 'Proteína', 'Lípidos', 'HCO'].map(h => <th key={h} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{h}</th>)}</tr></thead><tbody>
               {grupos.map(label => { const k = label.replace(/\s+/g, '_').replace(/___/g, '').toLowerCase(); return <tr key={label}><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>{label}</td>{['porciones', 'energia', 'proteina', 'lipidos', 'hco'].map(col => <td key={col} className={cell}><input type="number" value={p3[`porcion_${k}_${col}`] || ''} onChange={e => set(`porcion_${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}
@@ -2627,13 +2733,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
             </tbody></table>
           </DocumentSection>
           <div className="flex flex-col gap-3">
-            <DocumentSection title="Distribución nutrimental actual" contentClassName="p-0">
+            <DocumentSection title="Distribución nutrimental actual" contentClassName="p-0" pill={false}>
               <table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th className="border-b border-r border-[#2c5697] py-1 text-left">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(h => <th key={h} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{h}</th>)}</tr></thead><tbody>
                 {['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-2 text-left font-bold text-[#2c5697]`}>{macro}</td>{['pct', 'kcal', 'g', 'gkg'].map(col => <td key={col} className={cell}><input type="number" value={p3[`dn_${k}_${col}`] || ''} onChange={e => set(`dn_${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}
                 <tr className="bg-[#f2f5f9]"><td className={`${cell} font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold text-[#2c5697]`}>100%</td><td className={cell}><input value={p3.dn_total_kcal || ''} onChange={e => set('dn_total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p3.dn_total_g || ''} onChange={e => set('dn_total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPA/d</td></tr>
               </tbody></table>
             </DocumentSection>
-            <DocumentSection title="Interpretación % IAN" contentClassName="p-0">
+            <DocumentSection title="Interpretación % IAN" contentClassName="p-0" pill={false}>
               <table className="w-full border-collapse text-[8px]"><tbody>{['Energía', 'Proteína', 'HCO', 'Lípidos'].map(item => { const k = item.toLowerCase().replace('í', 'i').replace('é', 'e'); return <tr key={item}><td className={`${cell} w-[40%] pl-2 font-bold text-[#2c5697]`}>{item}</td><td className={`${cell} px-1 text-center font-bold text-[#2c5697]`}>Dieta <input value={p3[`ian_${k}_dieta`] || ''} onChange={e => set(`ian_${k}_dieta`, e.target.value)} className="w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /></td><td className={cell}><input value={p3[`ian_${k}_pct`] || ''} onChange={e => set(`ian_${k}_pct`, e.target.value)} className="h-full w-9 bg-transparent text-center text-[#333] outline-none" />%</td></tr>; })}</tbody></table>
             </DocumentSection>
           </div>
@@ -2667,11 +2773,11 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
           <div className="flex min-h-[200px] flex-col"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Bases/Teórico (C-1.<input value={p4.cons_bases_num || ''} onChange={e => set('cons_bases_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_bases || ''} onChange={e => set('cons_bases', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Estrategias (C-2.<input value={p4.cons_est_num || ''} onChange={e => set('cons_est_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_estrategias || ''} onChange={e => set('cons_estrategias', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div></div>
         </div>
 
-        <DocumentSection title="Intervención" className="mt-3">
+        <DocumentSection title="Intervención" className="mt-3" pill={false} centerTitle>
           <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-3">
             <div className="flex min-h-[135px] flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Indicación de Alimentos/Nutrimentos</div><div className="flex flex-1 flex-col gap-1 p-2">{['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'].map(name => <textarea key={name} value={p4[name] || ''} onChange={e => set(name, e.target.value)} className="min-h-5 flex-1 resize-none border-0 border-b border-[#2c5697] bg-transparent text-[8px] text-[#333] outline-none last:border-b-0" />)}</div></div>
             <div className="overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Requerimiento calórico</div><div className="space-y-2 p-2 text-[8.5px] font-bold"><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_pred} onChange={e => set('req_ec_pred', e.target.checked)} /><div className="flex-1">Ecuación predictiva<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Nombre:<input value={p4.req_ec_pred_nombre || ''} onChange={e => set('req_ec_pred_nombre', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div></div></div><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_rapida} onChange={e => set('req_ec_rapida', e.target.checked)} /><div className="flex-1">Ecuación rápida<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Peso:<input value={p4.req_ec_rapida_peso || ''} onChange={e => set('req_ec_rapida_peso', e.target.value)} className="h-3 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kg</div><div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Const. kcal:<input value={p4.req_ec_rapida_kcal_kg || ''} onChange={e => set('req_ec_rapida_kcal_kg', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kcal/kg/d</div></div></div><div className="flex items-end gap-1 pt-1 text-[10px]">Total<input value={p4.req_total_kcal || ''} onChange={e => set('req_total_kcal', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />kcal</div></div></div>
-            <div className="overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Cuadro dietosintético</div><table className="w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9]"><th className="border-b border-r border-[#2c5697] py-1">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(label => <th key={label} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{label}</th>)}</tr></thead><tbody>{['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>{macro}</td>{['porc', 'kcal', 'g', 'g_kg'].map(col => <td key={col} className={cell}><input value={p4[`${k}_${col}`] || ''} onChange={e => set(`${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}<tr className="bg-[#f2f5f9]"><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold`}>100%</td><td className={cell}><input value={p4.total_kcal || ''} onChange={e => set('total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p4.total_g || ''} onChange={e => set('total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPt/d</td></tr></tbody></table></div>
+            <div className="flex h-full flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Cuadro dietosintético</div><table className="h-full w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9]"><th className="border-b border-r border-[#2c5697] py-1">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(label => <th key={label} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{label}</th>)}</tr></thead><tbody>{['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>{macro}</td>{['porc', 'kcal', 'g', 'g_kg'].map(col => <td key={col} className={cell}><input value={p4[`${k}_${col}`] || ''} onChange={e => set(`${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}<tr className="bg-[#f2f5f9]"><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold`}>100%</td><td className={cell}><input value={p4.total_kcal || ''} onChange={e => set('total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p4.total_g || ''} onChange={e => set('total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPt/d</td></tr></tbody></table></div>
           </div>
         </DocumentSection>
 

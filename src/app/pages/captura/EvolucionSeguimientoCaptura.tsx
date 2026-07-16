@@ -22,6 +22,7 @@ import EducacionConsejeriaSection from './EducacionConsejeriaSection';
 import { useHojaEvolutivaData } from '../../hooks/formClinico/useHojaEvolutivaData';
 import { useFormClinicoController } from '../../hooks/formClinico/useFormClinicoController';
 import { useFormFieldMasks } from '../../hooks/formClinico/useFormFieldMasks';
+import { formatExpediente } from '../../lib/formatExpediente';
 import type { FormClinicoHandle, FormClinicoCallbacks } from '../../lib/types/formClinico';
 
 const ALIMENTOS: string[] = [
@@ -142,7 +143,10 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
       onBack: props.onBack,
       canSave,
       triggerSave: doSave,
-      restoreDraft: (draft) => setFormData((draft as typeof formData) ?? {}),
+      restoreDraft: (draft) => setFormData({
+        ...((draft as typeof formData) ?? {}),
+        ...(props.pacienteId != null ? { paciente_id: String(props.pacienteId) } : {}),
+      }),
       onGuardarSinFinalizar: () => setYaGuardado(true),
     },
     ref
@@ -165,7 +169,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-600">Expediente</label>
-            <Input type="text" name="paciente_expediente" value={(formData.paciente_expediente as string) || ''} onChange={handleInputChange} />
+            <Input type="text" value={formatExpediente(props.pacienteId ?? (typeof formData.paciente_id === 'string' ? formData.paciente_id : undefined))} readOnly tabIndex={-1} />
           </div>
         </div>
       </FormSectionCard>
@@ -208,7 +212,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
         <TabsContent value="p4" className="space-y-4 mt-4">
           <FormSectionCard title="Diagnóstico Matriz IMG/IMLG e Interpretación antropométrica">
             <SimpleFieldTable
-              numRows={4}
+              numRows={6}
               columns={[
                 { label: 'Fecha', name: row => `diag_fecha_${row}`, type: 'date' },
                 { label: 'Diagnóstico Matriz IMG/IMLG', name: row => `diag_matriz_${row}`, type: 'textarea' },
@@ -233,7 +237,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
           </FormSectionCard>
           <FormSectionCard title="Interpretación bioquímica">
             <SimpleFieldTable
-              numRows={5}
+              numRows={6}
               columns={[
                 { label: 'Fecha', name: row => `int_bioq_fecha_${row}`, type: 'date' },
                 { label: 'Interpretación', name: row => `int_bioq_desc_${row}`, type: 'textarea' },
@@ -260,7 +264,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
             <EducacionConsejeriaSection formData={formData} onChange={handleInputChange} onDateChange={handleDateInput} />
           </FormSectionCard>
           <FormSectionCard title="Firmas">
-            <MatrixTable numCols={5} fechaName={col => `firma_fecha_col${col}`} rows={rowsFirmas} {...matrixProps} />
+            <MatrixTable numCols={6} fechaName={col => `firma_fecha_col${col}`} rows={rowsFirmas} {...matrixProps} />
           </FormSectionCard>
         </TabsContent>
       </Tabs>

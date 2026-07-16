@@ -2,6 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useHojaEvolutivaData } from '../hooks/formClinico/useHojaEvolutivaData';
+import { usePrintFitScale } from '../hooks/usePrintFitScale';
+import { formatExpediente } from '../lib/formatExpediente';
+import logoUtc from './logo_historiales.jpg';
 
 /**
  * Representación documental de la Hoja Evolutiva — hoja impresa en mm, solo
@@ -26,6 +29,12 @@ const HojaEvolutiva = () => {
   const handleNumberInput = () => {};
   const handleDaysInput = () => {};
 
+  // Regla de impresión única para todos los documentos clínicos del sistema
+  // (ver src/app/hooks/usePrintFitScale.ts para la explicación completa del
+  // mecanismo). Validado en este componente y reutilizado tal cual en
+  // NutritionMasterForm.tsx y PhysiotherapyMasterForm.tsx.
+  usePrintFitScale(['.page', '.page2', '.page3', '.page4', '.page5', '.page6']);
+
   // Lista dinámica para la página 2
   const alimentos: string[] = [
     "Verduras", "Frutas", "Cereal sin grasa", "Pan dulce natural", "Pan dulce UP", "Galletas", 
@@ -43,7 +52,7 @@ const HojaEvolutiva = () => {
       {/* ========================================================= */}
       {/* BOTONERA FLOTANTE — solo lectura: Volver / Imprimir / Editar */}
       {/* ========================================================= */}
-      <div className="print:hidden" style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 50, display: 'flex', gap: '10px' }}>
+      <div className="flex print:hidden" style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 50, gap: '10px' }}>
         <button
           onClick={handleVolver}
           style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -127,9 +136,9 @@ const HojaEvolutiva = () => {
           .datos-box { border: var(--borde-grueso); border-radius: 10px; padding: 18px 15px 8px 15px; display: flex; justify-content: space-between; gap: 15px; }
           .input-group { display: flex; align-items: flex-end; color: var(--azul-utc); font-size: 10px; font-weight: bold; width: 100%; }
           .input-group span { white-space: nowrap; margin-right: 5px; }
-          .input-group input { border: none; border-bottom: 1px solid var(--azul-utc); flex-grow: 1; font-family: inherit; font-size: 11px; background: transparent; outline: none; color: #000; }
+          .datos-box .input-group input[type="text"] { border: none !important; border-bottom: 1px solid var(--azul-utc) !important; flex-grow: 1; font-family: inherit; font-size: 11px; background: transparent; outline: none; color: #000; text-align: left; }
           .section-row { display: flex; margin-bottom: 10px; align-items: stretch; position: relative; }
-          .tab-vertical { background-color: var(--azul-utc); color: white; width: 25px; border-radius: 8px 0 0 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; z-index: 1; border: var(--borde-grueso); border-right: none; }
+          .tab-vertical { background-color: var(--azul-utc); color: white; width: 25px; border-radius: 25px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; z-index: 1; align-self: center; height: auto; min-height: 60px; padding: 10px 0; }
           .tab-vertical span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
           .table-wrap { flex-grow: 1; border: var(--borde-grueso); border-radius: 0 8px 8px 0; overflow: hidden; background-color: white; }
           .page table, .page2 table, .page3 table, .page4 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -141,7 +150,7 @@ const HojaEvolutiva = () => {
           .th-fecha { color: var(--azul-utc); font-size: 11px; font-weight: bold; text-align: center; padding: 4px; }
           .td-label { color: var(--azul-utc); font-size: 8px; font-weight: bold; text-align: left; padding: 3px 6px; line-height: 1.2; }
           .hoja-evolutiva-wrapper input[type="text"], .hoja-evolutiva-wrapper input[type="number"], .hoja-evolutiva-wrapper textarea { width: 100%; height: 100%; min-height: 16px; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 10px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; box-sizing: border-box; display: block; }
-          .hoja-evolutiva-wrapper textarea { text-align: left; min-height: 35px; padding: 4px; }
+          .hoja-evolutiva-wrapper textarea { text-align: left; min-height: 20px; padding: 3px; }
           .hoja-evolutiva-wrapper input:focus, .hoja-evolutiva-wrapper textarea:focus { background-color: var(--azul-claro) !important; }
           .page-content { flex-grow: 1; }
           .footer { margin-top: auto; display: flex; justify-content: space-between; font-size: 7px; color: var(--azul-utc); font-weight: bold; padding-top: 5px; }
@@ -153,8 +162,11 @@ const HojaEvolutiva = () => {
           .page2 .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 280px; font-weight: 900; color: rgba(155, 179, 214, 0.12); z-index: 0; pointer-events: none; letter-spacing: -10px; font-family: 'Arial Black', Impact, sans-serif; }
           .page2 .content { position: relative; z-index: 1; flex-grow: 1; }
           .page2 .section { position: relative; margin-left: 28px; margin-bottom: 25px; }
-          .page2 .v-tab { position: absolute; left: -28px; top: 25px; bottom: -1px; width: 28px; background-color: #2b5696; color: white; border-radius: 8px 0 0 8px; display: flex; align-items: center; justify-content: center; box-shadow: 1px 0 0 #2b5696; }
+          .page2 .v-tab { position: absolute; left: -28px; top: 20px; width: 28px; height: auto; min-height: 60px; padding: 10px 0; background-color: #2b5696; color: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; }
           .page2 .v-tab span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: bold; letter-spacing: 0.5px; white-space: nowrap; }
+          .page3 .section { position: relative; margin-left: 28px; margin-bottom: 15px; }
+          .page3 .v-tab { position: absolute; left: -28px; top: 20px; width: 28px; height: auto; min-height: 60px; padding: 10px 0; background-color: #2b5696; color: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; }
+          .page3 .v-tab span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: bold; letter-spacing: 0.5px; white-space: nowrap; }
           .page2 .table-wrap { border: 2px solid #2b5696; border-radius: 8px; background-color: transparent; position: relative; }
           .page2 .table-mask { border-radius: 6px; overflow: hidden; }
           .page2 td { border: 1px solid #9bb3d6; height: 18px; padding: 2px 8px; font-size: 11px; vertical-align: middle; color: #2b5696; }
@@ -234,19 +246,21 @@ const HojaEvolutiva = () => {
               background-color: var(--azul-utc);
               color: white;
               width: 28px;
-              border-radius: 8px 0 0 8px;
+              border-radius: 28px;
               display: flex;
               align-items: center;
               justify-content: center;
-              border: var(--borde-grueso);
-              border-right: none;
               flex-shrink: 0;
+              align-self: center;
+              height: auto;
+              min-height: 60px;
+              padding: 10px 0;
           }
           .page4 .tab-vertical span {
               writing-mode: vertical-rl;
               transform: rotate(180deg);
               font-weight: bold;
-              font-size: 13px;
+              font-size: 12px;
               letter-spacing: 0.5px;
           }
           .page4 .table-main {
@@ -265,7 +279,7 @@ const HojaEvolutiva = () => {
           }
           .page4 th, .page4 td {
               border: var(--borde-fino);
-              padding: 2px;
+              padding: 1px;
               vertical-align: middle;
           }
           .page4 tr:first-child th, .page4 tr:first-child td { border-top: none; }
@@ -309,15 +323,16 @@ const HojaEvolutiva = () => {
               border: none !important;
               background-color: transparent !important;
               font-family: inherit;
-              font-size: 11px;
+              font-size: 9px;
               color: #000;
               text-align: center;
               outline: none;
               resize: none;
-              padding: 2px;
+              padding: 1px;
               display: block;
+              line-height: 1.15;
           }
-          .page4 textarea { text-align: left; padding: 4px; }
+          .page4 textarea { text-align: left; padding: 2px; }
           .page4 input:focus, .page4 textarea:focus { background-color: var(--azul-claro) !important; }
           
           .page4 .footer {
@@ -331,10 +346,18 @@ const HojaEvolutiva = () => {
           .page4 .footer-right { font-size: 7px; color: var(--azul-utc); font-weight: bold; text-align: right; line-height: 1.2; }
           
           /* Alturas Flexibles Proporcionales */
-          .page4 .tabla-t1 { flex: 0 0 16%; }
+          .page4 .tabla-t1 { flex: 0 0 20%; }
           .page4 .tabla-t2 { flex: 0 0 18%; }
           .page4 .tabla-t3 { flex: 1; }
-          .page4 .tabla-t4 { flex: 0 0 20%; }
+          .page4 .tabla-t4 { flex: 0 0 19%; }
+          .page4 .tabla-t1 input, .page4 .tabla-t1 textarea,
+          .page4 .tabla-t4 input, .page4 .tabla-t4 textarea {
+              font-size: 8px;
+              padding: 0px;
+              line-height: 1.05;
+          }
+          .page4 .tabla-t1 textarea, .page4 .tabla-t4 textarea { padding: 1px; }
+          .page4 .tabla-t1 thead tr, .page4 .tabla-t4 thead tr { height: 18px !important; }
 
 
             /* ==========================================================
@@ -369,7 +392,7 @@ const HojaEvolutiva = () => {
           .page5 .section-row { display: flex; flex: 1; align-items: stretch; }
           .page5 .section-col { display: flex; flex-direction: column; flex: 1.2; position: relative; }
           
-          .page5 .tab-vertical { background-color: var(--azul-utc); color: white; width: 28px; border-radius: 8px 0 0 8px; display: flex; align-items: center; justify-content: center; border: var(--borde-grueso); border-right: none; flex-shrink: 0; }
+          .page5 .tab-vertical { background-color: var(--azul-utc); color: white; width: 28px; border-radius: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; align-self: center; height: auto; min-height: 60px; padding: 10px 0; }
           .page5 .tab-vertical span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; font-size: 12px; letter-spacing: 0.5px; }
           .page5 .tab-horizontal { position: absolute; top: -13px; left: 15px; background-color: var(--azul-utc); color: white; font-size: 13px; font-weight: bold; padding: 4px 20px; border-radius: 12px 12px 0 0; z-index: 2; border: var(--borde-grueso); border-bottom: none; }
           
@@ -429,16 +452,15 @@ const HojaEvolutiva = () => {
               pointer-events: none;
               letter-spacing: -25px;
           }
-          .page6 .page-content { flex: 1; display: flex; flex-direction: column; gap: 15px; z-index: 1; }
+          .page6 .page-content { flex: 1; display: flex; flex-direction: column; gap: 11px; z-index: 1; }
           .page6 .section-row { display: flex; align-items: stretch; position: relative; background: white; }
           .page6 .section-col { display: flex; flex-direction: column; position: relative; }
           
-          .page6 .tab-vertical { background-color: var(--azul-utc); color: white; width: 28px; border-radius: 8px 0 0 8px; display: flex; align-items: center; justify-content: center; border: var(--borde-grueso); border-right: none; flex-shrink: 0; }
-          .page6 .tab-vertical span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; font-size: 13px; letter-spacing: 0.5px; }
+          .page6 .tab-vertical { background-color: var(--azul-utc); color: white; width: 28px; border-radius: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; align-self: center; height: auto; min-height: 60px; padding: 10px 0; }
+          .page6 .tab-vertical span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; font-size: 12px; letter-spacing: 0.5px; }
           .page6 .tab-horizontal { position: absolute; top: -14px; left: 15px; background-color: var(--azul-utc); color: white; font-size: 12px; font-weight: bold; padding: 4px 20px; border-radius: 12px 12px 0 0; z-index: 2; border: var(--borde-grueso); border-bottom: none; }
           
           .page6 .table-wrap { flex: 1; border: var(--borde-grueso); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-          .page6 .table-wrap-right { border-radius: 0 8px 8px 0; }
           .page6 table { width: 100%; border-collapse: collapse; table-layout: fixed; flex: 1; display: table; height: 100%; }
           .page6 th, .page6 td { border: var(--borde-fino); padding: 0; vertical-align: middle; text-align: center; }
           
@@ -447,9 +469,9 @@ const HojaEvolutiva = () => {
           .page6 tr td:first-child, .page6 tr th:first-child { border-left: none; }
           .page6 tr td:last-child, .page6 tr th:last-child { border-right: none; }
           
-          .page6 .header-azul { background-color: var(--azul-utc) !important; color: white !important; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; }
-          .page6 .th-fecha { color: var(--azul-utc); font-size: 11px; font-weight: bold; }
-          .page6 .td-label { color: var(--azul-utc); font-size: 9.5px; font-weight: normal; text-align: left; padding-left: 8px; }
+          .page6 .header-azul { background-color: var(--azul-utc) !important; color: white !important; font-size: 10px; font-weight: bold; text-align: center; padding: 3px; }
+          .page6 .th-fecha { color: var(--azul-utc); font-size: 10px; font-weight: bold; }
+          .page6 .td-label { color: var(--azul-utc); font-size: 9px; font-weight: normal; text-align: left; padding-left: 8px; }
           .page6 .subtitulo-p6 { font-size: 10px; font-weight: bold; color: var(--azul-utc); padding-left: 8px !important; background-color: transparent !important; text-align: left; }
           
           .page6 .cell-flex-col { display: flex; flex-direction: column; height: 100%; width: 100%; }
@@ -458,11 +480,11 @@ const HojaEvolutiva = () => {
           .page6 .text-mini { font-size: 8px; color: var(--azul-utc); text-align: left; padding: 2px 4px 0 4px; }
           .page6 .estado-label { color: var(--azul-utc); font-size: 10px; text-align: left; padding-left: 6px; }
           
-          .page6 input, .page6 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 10px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; display: block; }
-          .page6 textarea { text-align: left; padding: 2px 4px; }
+          .page6 input, .page6 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 8px; color: #000; text-align: center; outline: none; resize: none; padding: 0px; display: block; line-height: 1.1; }
+          .page6 textarea { text-align: left; padding: 1px 3px; }
           .page6 input:focus, .page6 textarea:focus { background-color: var(--azul-claro) !important; }
           
-          .page6 .footer { display: flex; justify-content: flex-start; align-items: center; margin-top: 10px; z-index: 1; }
+          .page6 .footer { display: flex; justify-content: flex-end; align-items: center; margin-top: 10px; z-index: 1; }
           .page6 .footer-num { font-size: 16px; font-weight: bold; color: var(--azul-utc); }
           
           .page6 .flex-t1 { flex: 0 0 42%; }
@@ -474,18 +496,37 @@ const HojaEvolutiva = () => {
           /* ==========================================================
              REGLAS DE IMPRESIÓN
              ========================================================== */
+        @page { size: 215.9mm 279.4mm; margin: 0; }
         @media print {
               .hoja-evolutiva-wrapper { background: none; padding: 0; }
-              .hoja-evolutiva-wrapper .page, 
-              .hoja-evolutiva-wrapper .page2, 
-              .hoja-evolutiva-wrapper .page3, 
-              .hoja-evolutiva-wrapper .page4, 
-              .hoja-evolutiva-wrapper .page5, 
-              .hoja-evolutiva-wrapper .page6 { 
-                  box-shadow: none; margin: 0; page-break-after: always; height: 279.4mm; width: 215.9mm; 
+              .hoja-evolutiva-wrapper .page,
+              .hoja-evolutiva-wrapper .page2,
+              .hoja-evolutiva-wrapper .page3,
+              .hoja-evolutiva-wrapper .page4,
+              .hoja-evolutiva-wrapper .page5 {
+                  page-break-after: always;
+              }
+              .hoja-evolutiva-wrapper .page,
+              .hoja-evolutiva-wrapper .page2,
+              .hoja-evolutiva-wrapper .page3,
+              .hoja-evolutiva-wrapper .page4,
+              .hoja-evolutiva-wrapper .page5,
+              .hoja-evolutiva-wrapper .page6 {
+                  box-shadow: none; margin: 0 auto; min-height: 279.4mm; width: var(--print-width, 215.9mm);
+                  /* Escala calculada en tiempo real (ver useEffect de escala de
+                     impresión, más abajo en este componente) — NUNCA un valor
+                     fijo. Si la hoja cabe al 100%, --print-scale vale 1 y no
+                     pasa nada; solo se reduce si el contenido real excede el
+                     alto físico de la hoja. */
+                  zoom: var(--print-scale, 1);
               }
               input:focus, textarea:focus { background-color: transparent !important; }
-              .header-azul, .page3 .t2-header, .page4 .tab-vertical { background-color: #2b5a9e !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .header-azul, .page3 .t2-header, .page4 .tab-vertical { background-color: #2b5a9e !important; color: white !important; }
+              /* Forzar TODOS los colores/fondos a imprimirse — antes solo estaba
+                 puesto en 3 selectores, así que el resto (píldoras, encabezados
+                 de página 2/5/6, marcas de agua) se veía sin color si el usuario
+                 no activaba manualmente "Gráficos de fondo" en el diálogo. */
+              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
         `}
       </style>
@@ -499,8 +540,7 @@ const HojaEvolutiva = () => {
         
         <div className="header">
           <div className="logo">
-            <h1>utc</h1>
-            <p>Universidad<br/>Tres Culturas</p>
+            <img src={logoUtc} alt="Universidad Tres Culturas" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
           </div>
           <div className="header-title">
             <div className="pill-title">Seguimiento Nutricional</div><br/>
@@ -518,7 +558,7 @@ const HojaEvolutiva = () => {
               </div>
               <div className="input-group" style={{ flex: 1 }}>
                 <span>Expediente</span>
-                <input type="text" name="paciente_expediente" value={(formData.paciente_expediente as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                <input type="text" value={formatExpediente(typeof formData.paciente_id === 'string' ? formData.paciente_id : undefined)} readOnly tabIndex={-1} />
               </div>
             </div>
           </div>
@@ -656,7 +696,6 @@ const HojaEvolutiva = () => {
       {/* PÁGINA 2 */}
       {/* ========================================================================= */}
       <div className="page2">
-        <div className="watermark">inco</div>
         <div className="content">
           
           {/* Frecuencia de consumo */}
@@ -806,8 +845,8 @@ const HojaEvolutiva = () => {
                   <thead>
                     <tr>
                       <td className="t2-first-cell">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Talla: <input type="text" name="antro_talla" value={(formData.antro_talla as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} style={{ width: '40px', borderBottom: '1px solid #2b5696' }} /> m</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', whiteSpace: 'nowrap', gap: '6px' }}>
+                          <span style={{ whiteSpace: 'nowrap' }}>Talla: <input type="text" name="antro_talla" value={(formData.antro_talla as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} style={{ width: '30px', display: 'inline-block', borderBottom: '1px solid #2b5696' }} /> m</span>
                           <span>fecha</span>
                         </div>
                       </td>
@@ -880,7 +919,7 @@ const HojaEvolutiva = () => {
                 </tr>
               </thead>
               <tbody>
-                {[1, 2, 3, 4].map(row => (
+                {[1, 2, 3, 4, 5, 6].map(row => (
                   <tr key={row}>
                     <td><input type="text" name={`diag_fecha_${row}`} value={(formData[`diag_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
                     <td><textarea name={`diag_matriz_${row}`} value={(formData[`diag_matriz_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
@@ -973,7 +1012,7 @@ const HojaEvolutiva = () => {
                 </tr>
               </thead>
               <tbody>
-                {[1, 2, 3, 4, 5].map(row => (
+                {[1, 2, 3, 4, 5, 6].map(row => (
                   <tr key={row}>
                     <td><input type="text" name={`int_bioq_fecha_${row}`} value={(formData[`int_bioq_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
                     <td><textarea name={`int_bioq_desc_${row}`} value={(formData[`int_bioq_desc_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
@@ -1074,7 +1113,7 @@ const HojaEvolutiva = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {[1, 2, 3, 4, 5].map((diagGroup, idx, arr) => {
+                  {[1, 2, 3, 4, 5, 6].map((diagGroup, idx, arr) => {
                     const isLast = idx === arr.length - 1;
                     return (
                       <React.Fragment key={diagGroup}>
@@ -1240,26 +1279,26 @@ const HojaEvolutiva = () => {
           {/* SECCIÓN 3: Firmas */}
           <div className="section-row flex-t3">
             <div className="tab-vertical"><span>Firmas</span></div>
-            <div className="table-wrap table-wrap-right">
+            <div className="table-wrap">
               <table>
                 <colgroup>
-                  <col style={{ width: '35%' }} />
-                  {[1, 2, 3, 4, 5].map(i => <col key={i} style={{ width: '13%' }} />)}
+                  <col style={{ width: '30%' }} />
+                  {[1, 2, 3, 4, 5, 6].map(i => <col key={i} style={{ width: '11.66%' }} />)}
                 </colgroup>
                 <tbody>
                   <tr>
                     <td className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_fecha_col${col}`} value={(formData[`firma_fecha_col${col}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} /></td>)}
+                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_fecha_col${col}`} value={(formData[`firma_fecha_col${col}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} /></td>)}
                   </tr>
                   {["PLN.", "Matrícula", "Firma", "LN.", "Céd. Prof."].map((label, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{label}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
                   <tr>
                     <td className="td-label" style={{ borderBottom: 'none !important' }}>Firma</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 6 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                   </tr>
                 </tbody>
               </table>
@@ -1267,7 +1306,7 @@ const HojaEvolutiva = () => {
           </div>
 
         </div>
-        
+
         <div className="footer">
           <div className="footer-num">6</div>
         </div>

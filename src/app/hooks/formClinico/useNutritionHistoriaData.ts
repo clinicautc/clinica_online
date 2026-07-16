@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiFetch, historialesAPI } from '../../lib/api';
+import { apiFetch, historialesAPI, citasAPI, usuariosAPI } from '../../lib/api';
 import type { FormClinicoCallbacks } from '../../lib/types/formClinico';
+
+function formatFechaHoy(): string {
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2, '0');
+  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${hoy.getFullYear()}`;
+}
 
 export interface NutritionFormData {
   pagina_1: Record<string, any>;
@@ -80,6 +87,55 @@ export function useNutritionHistoriaData(props: Partial<FormClinicoCallbacks>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId]);
 
+  // Autocompletado al iniciar consulta: fecha del día, nombre/teléfono del
+  // paciente y folio (F/N) con el número de consulta — usando datos que ya
+  // existen en citas/usuarios, sin crear columnas nuevas. Solo llena campos
+  // que sigan vacíos, para no pisar un borrador o expediente ya guardado.
+  useEffect(() => {
+    if (!appointmentId) return;
+
+    const autocompletarDatosConsulta = async () => {
+      try {
+        const cita = await citasAPI.getById(appointmentId);
+
+        let telefonoPaciente = '';
+        if (cita?.paciente_id) {
+          try {
+            const paciente = await usuariosAPI.getById(cita.paciente_id);
+            telefonoPaciente = paciente?.telefono || '';
+          } catch {
+            // Paciente sin teléfono registrado, o fetch fallido: se deja vacío.
+          }
+        }
+
+        // numero_consulta cuenta las citas YA completadas con id <= la actual.
+        // Mientras esta consulta sigue en curso (no "completada" todavía) no se
+        // cuenta a sí misma, así que su folio real es ese conteo + 1; una vez
+        // finalizada, el conteo ya la incluye y no hay que sumarle nada.
+        let folioConsulta = '';
+        if (cita?.numero_consulta != null) {
+          const yaCompletada = cita.estado === 'completada';
+          folioConsulta = String(yaCompletada ? cita.numero_consulta : cita.numero_consulta + 1);
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          pagina_1: {
+            ...prev.pagina_1,
+            fecha: prev.pagina_1.fecha || formatFechaHoy(),
+            nombre: prev.pagina_1.nombre || cita?.paciente_nombre || '',
+            telefono: prev.pagina_1.telefono || telefonoPaciente,
+            fn: prev.pagina_1.fn || folioConsulta,
+          },
+        }));
+      } catch (error) {
+        console.error('Error al autocompletar datos de la consulta:', error);
+      }
+    };
+
+    autocompletarDatosConsulta();
+  }, [appointmentId]);
+
   const doSave = async () => {
     try {
       setIsSaving(true);
@@ -96,11 +152,19 @@ export function useNutritionHistoriaData(props: Partial<FormClinicoCallbacks>) {
         return;
       }
 
+      // El expediente es una representación del ID del paciente; nunca se
+      // persiste como dato independiente dentro del historial clínico.
+      const datosParaGuardar: NutritionFormData = {
+        ...formData,
+        pagina_1: { ...formData.pagina_1, paciente_id: pId },
+      };
+      delete datosParaGuardar.pagina_1.expediente;
+
       const payload = {
         paciente_id: pId,
         paciente_nombre: pNombre,
         tipo: 'nutricion',
-        datos: formData,
+        datos: datosParaGuardar,
         creado_por: user?.id || 1,
         creado_por_nombre: user?.nombre || 'Practicante Nutrición',
         appointment_id: aId,

@@ -53,8 +53,8 @@ export function useHojaEvolutivaData(props: Partial<FormClinicoCallbacks>) {
           setFormData((prev) => ({
             ...prev,
             ...(data.cuadro_evolucion || {}),
-            paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || '',
-            paciente_expediente: data.cuadro_evolucion?.paciente_expediente || data.numero_expediente || ''
+            paciente_id: String(props.pacienteId ?? data.paciente_id ?? data.cuadro_evolucion?.paciente_id ?? ''),
+            paciente_nombre: data.cuadro_evolucion?.paciente_nombre || data.nombre_completo || ''
           }));
           toast.success("Datos de evolución cargados correctamente");
         }
@@ -72,17 +72,18 @@ export function useHojaEvolutivaData(props: Partial<FormClinicoCallbacks>) {
     setIsSaving(true);
     try {
       const aId = appointmentId ? parseInt(appointmentId as string, 10) : null;
+      const pId = props.pacienteId ?? (typeof formData.paciente_id === 'string' ? formData.paciente_id : null);
+      const { paciente_expediente: _expedienteAnterior, ...cuadroEvolucion } = formData;
 
       // Siempre guardamos en notas_evolutivas — nunca en historiales_nutricion
       const payload = {
-        paciente_id: props.pacienteId ?? null,
+        paciente_id: pId,
         practicante_id: user?.id,
         appointment_id: aId,
         nombre_completo: props.pacienteNombre || (formData.paciente_nombre as string) || 'Sin nombre',
-        numero_expediente: (formData.paciente_expediente as string) || 'S/N',
         edad: null,
         fecha_elaboracion: new Date().toISOString(),
-        cuadro_evolucion: formData,
+        cuadro_evolucion: cuadroEvolucion,
         area: props.formKey === 'seguimiento_nutricion' ? 'nutricion' : (user?.area || 'fisioterapia')
       };
       if (notaId) {

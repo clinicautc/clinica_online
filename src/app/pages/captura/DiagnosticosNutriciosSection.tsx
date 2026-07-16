@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 
 const NUM_COLS = 6;
-const GRUPOS = [1, 2, 3, 4, 5];
+const GRUPOS = [1, 2, 3, 4, 5, 6];
 const ESTADOS: Array<{ key: 'nuevo' | 'cont' | 'res'; label: string }> = [
   { key: 'nuevo', label: 'Nuevo' },
   { key: 'cont', label: 'Continuo' },

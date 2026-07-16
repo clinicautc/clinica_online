@@ -3,10 +3,13 @@ const { asignarPracticante } = require('../services/asignacionService');
 const notificationService = require('../services/notificationService');
 const { getTipoConsulta, getDocumentosRequeridos } = require('../services/consultaConfig');
 
-// Compara solo la parte de fecha (yyyy-MM-dd), ignorando hora/zona horaria.
+// Compara solo la parte de fecha (yyyy-MM-dd) en zona horaria de México —
+// debe usar la misma zona que esCitaDeHoy/getFechaMexico; comparar contra la
+// fecha UTC cruda marca como "pasada" una cita de HOY en México durante las
+// primeras horas del día en UTC (madrugada en México sigue siendo el día anterior en UTC).
 function esFechaPasada(fecha) {
-  const fechaStr = new Date(fecha).toISOString().split('T')[0];
-  const hoyStr = new Date().toISOString().split('T')[0];
+  const fechaStr = new Date(fecha).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const hoyStr = getFechaMexico();
   return fechaStr < hoyStr;
 }
 

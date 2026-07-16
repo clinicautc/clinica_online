@@ -4,7 +4,7 @@ import { Textarea } from '../../components/ui/textarea';
 
 export interface VoInterpRow {
   /** Label estático, o `{ fieldName }` si la etiqueta misma es un campo editable (ej. parámetros bioquímicos). */
-  label: React.ReactNode | { fieldName: string };
+  label: React.ReactNode | { fieldName: string; maxLength?: number };
   voName: string;
   voType?: 'text' | 'number';
   /** Si se omite, la fila no tiene columna de interpretación (celda decorativa en el documento impreso). */
@@ -16,6 +16,9 @@ interface VoInterpretacionTableProps {
   formData: Record<string, any>;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   disabled?: boolean;
+  /** Límites de caracteres acordes al espacio real de la celda en el documento impreso. */
+  voMaxLength?: number;
+  intMaxLength?: number;
 }
 
 /**
@@ -24,7 +27,7 @@ interface VoInterpretacionTableProps {
  * por fila. Ya viene con `disabled={isReadOnly}` cableado en el original —
  * se preserva vía la prop `disabled`.
  */
-export default function VoInterpretacionTable({ rows, formData, onChange, disabled }: VoInterpretacionTableProps) {
+export default function VoInterpretacionTable({ rows, formData, onChange, disabled, voMaxLength, intMaxLength }: VoInterpretacionTableProps) {
   const val = (name: string) => (formData[name] as string) || '';
   const hasAnyInterp = rows.some(r => r.intName);
 
@@ -36,6 +39,7 @@ export default function VoInterpretacionTable({ rows, formData, onChange, disabl
           value={val(label.fieldName)}
           onChange={onChange}
           disabled={disabled}
+          maxLength={label.maxLength}
           className="min-h-8 text-xs"
           placeholder="Parámetro"
         />
@@ -66,13 +70,14 @@ export default function VoInterpretacionTable({ rows, formData, onChange, disabl
                   value={val(row.voName)}
                   onChange={onChange}
                   disabled={disabled}
+                  maxLength={voMaxLength}
                   className="h-8 text-xs px-2"
                 />
               </TableCell>
               {hasAnyInterp && (
                 <TableCell>
                   {row.intName ? (
-                    <Textarea name={row.intName} value={val(row.intName)} onChange={onChange} disabled={disabled} className="min-h-8 text-xs" />
+                    <Textarea name={row.intName} value={val(row.intName)} onChange={onChange} disabled={disabled} maxLength={intMaxLength} className="min-h-8 text-xs" />
                   ) : (
                     <div className="h-8 bg-slate-100 rounded" />
                   )}
@@ -86,7 +91,7 @@ export default function VoInterpretacionTable({ rows, formData, onChange, disabl
   );
 }
 
-export function VoInterpretacionMobile({ rows, formData, onChange, disabled }: VoInterpretacionTableProps) {
+export function VoInterpretacionMobile({ rows, formData, onChange, disabled, voMaxLength, intMaxLength }: VoInterpretacionTableProps) {
   const val = (name: string) => (formData[name] as string) || '';
   return (
     <div className="block sm:hidden space-y-3">
@@ -94,7 +99,7 @@ export function VoInterpretacionMobile({ rows, formData, onChange, disabled }: V
         <div key={i} className="border border-slate-200 rounded-lg p-2.5 space-y-2">
           <div className="text-xs font-bold text-slate-700">
             {typeof row.label === 'object' && row.label !== null && 'fieldName' in row.label ? (
-              <Textarea name={row.label.fieldName} value={val(row.label.fieldName)} onChange={onChange} disabled={disabled} className="min-h-8 text-xs" placeholder="Parámetro" />
+              <Textarea name={row.label.fieldName} value={val(row.label.fieldName)} onChange={onChange} disabled={disabled} maxLength={row.label.maxLength} className="min-h-8 text-xs" placeholder="Parámetro" />
             ) : row.label}
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -107,13 +112,14 @@ export function VoInterpretacionMobile({ rows, formData, onChange, disabled }: V
                 value={val(row.voName)}
                 onChange={onChange}
                 disabled={disabled}
+                maxLength={voMaxLength}
                 className="h-8 text-xs px-2"
               />
             </div>
             {row.intName && (
               <div>
                 <label className="text-[10px] text-slate-500">Interpretación</label>
-                <Textarea name={row.intName} value={val(row.intName)} onChange={onChange} disabled={disabled} className="min-h-8 text-xs" />
+                <Textarea name={row.intName} value={val(row.intName)} onChange={onChange} disabled={disabled} maxLength={intMaxLength} className="min-h-8 text-xs" />
               </div>
             )}
           </div>

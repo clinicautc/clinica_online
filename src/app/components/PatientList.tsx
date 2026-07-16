@@ -16,6 +16,7 @@ import { Button } from './ui/button';
 import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usuariosAPI } from '../lib/api';
+import { formatExpediente } from '../lib/formatExpediente';
 
 // Tipado sincronizado con PostgreSQL
 interface Patient {
@@ -85,6 +86,7 @@ export default function PatientList() {
   const filteredPatients = patients.filter(patient =>
       patient.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.id.toString().includes(searchTerm) ||
+      formatExpediente(patient.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -106,7 +108,7 @@ export default function PatientList() {
             <div className="relative w-full md:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
-                  placeholder="Buscar por nombre o ID..."
+                  placeholder="Buscar por nombre o expediente..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-blue-900/20 focus:outline-none focus:border-blue-900 rounded-full bg-white text-sm"
@@ -132,7 +134,7 @@ export default function PatientList() {
                   {filteredPatients.map((patient) => (
                       <div key={patient.id} className="p-4 bg-white space-y-3">
                         <div className="flex justify-between items-start">
-                          <span className="text-xs font-mono font-bold text-blue-900/40">ID: {patient.id}</span>
+                          <span className="text-xs font-mono font-bold text-blue-900/40">Expediente: {formatExpediente(patient.id)}</span>
                           <div className="flex gap-2">
                             <Badge className="bg-green-100 text-green-700 border-green-200 font-bold uppercase text-[9px]">REGISTRADO</Badge>
                             {/* Mostrar botón solo si es Master */}
@@ -157,11 +159,11 @@ export default function PatientList() {
                   <Table>
                     <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                       <TableRow>
-                        <TableHead className="text-blue-900 font-bold w-[80px]">ID</TableHead>
+                        <TableHead className="text-blue-900 font-bold w-[130px]">Expediente</TableHead>
                         <TableHead className="text-blue-900 font-bold">Nombre Completo</TableHead>
                         <TableHead className="text-blue-900 font-bold">Email Institucional</TableHead>
                         <TableHead className="text-blue-900 font-bold text-center">Estado</TableHead>
-                        <TableHead className="text-blue-900 font-bold text-right">Expediente</TableHead>
+                        <TableHead className="text-blue-900 font-bold text-right">Historial</TableHead>
                         {/* CABECERA ACCIONES: Mostrar solo si es Master */}
                         {esMaster && (
                           <TableHead className="text-blue-900 font-bold text-center">Acciones</TableHead>
@@ -171,7 +173,7 @@ export default function PatientList() {
                     <TableBody>
                       {filteredPatients.map((patient) => (
                           <TableRow key={patient.id} className="hover:bg-blue-50/50 transition-colors">
-                            <TableCell className="font-mono text-xs font-bold text-blue-900/60">{patient.id}</TableCell>
+                            <TableCell className="font-mono text-xs font-bold text-blue-900/60">{formatExpediente(patient.id)}</TableCell>
                             <TableCell className="font-bold text-blue-900 uppercase">{patient.nombre}</TableCell>
                             <TableCell className="text-slate-600 font-medium italic">{patient.email}</TableCell>
                             <TableCell className="text-center">

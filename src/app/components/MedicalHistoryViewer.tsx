@@ -22,6 +22,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch, citasAPI } from '../lib/api';
+import { formatExpediente } from '../lib/formatExpediente';
 import NutritionRecommendations from './NutritionRecommendations';
 
 interface MedicalHistory {
@@ -289,6 +290,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
               <p className="text-sm text-gray-500 font-medium tracking-wide">
                 Paciente: <span className="font-bold text-blue-900">{patientName || (loading ? 'Consultando...' : 'Sin Nombre')}</span>
               </p>
+              <p className="text-xs font-mono font-bold text-slate-500">Expediente: {formatExpediente(id)}</p>
             </div>
           </div>
 

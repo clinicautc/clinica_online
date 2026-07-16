@@ -28,8 +28,6 @@ type CitaDetalle = {
 
 type Fase = 'cargando' | 'iniciando' | 'activa' | 'terminal' | 'incompleta' | 'error';
 
-const DEBOUNCE_MS = 15_000;
-
 function resolveFormKey(area: string, tipoConsulta: string | null): string | null {
   if (area === 'nutricion'    && tipoConsulta === 'primera')     return 'historia_clinica_nutricion';
   if (area === 'nutricion'    && tipoConsulta === 'subsecuente') return 'seguimiento_nutricion';
@@ -94,7 +92,6 @@ const ConsultaWorkspace: React.FC = () => {
   const [formConfirmado, setFormConfirmado] = useState(false);
 
   const formRef            = useRef<FormClinicoHandle>(null);
-  const debounceTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ultimoBorradorStr  = useRef('');
   const startTimeRef       = useRef<Date | null>(null);
 
@@ -216,12 +213,10 @@ const ConsultaWorkspace: React.FC = () => {
   };
 
   const handleStateChange = (formKey: string, state: unknown) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => guardarBorradorSilencioso(formKey, state), DEBOUNCE_MS);
+    guardarBorradorSilencioso(formKey, state);
   };
 
   const handleSaveSuccess = async (_formKey: string) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
     try {
       // El consentimiento solo se sube en la primera consulta
       if (pendingConsent && cita?.tipo_consulta === 'primera') {
@@ -571,7 +566,7 @@ const ConsultaWorkspace: React.FC = () => {
             <div className={`border p-4 rounded-lg flex items-start gap-3 text-sm ${accent.banner}`}>
               <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>
-                Recuerda: Guarda borradores frecuentemente. Se guardan automáticamente cada 15 segundos.
+                El borrador se guarda automáticamente con cada cambio que hagas en el formulario.
                 {lastSaved && (
                   <span className="ml-1 font-semibold">
                     Último guardado: {formatTime(lastSaved)}.

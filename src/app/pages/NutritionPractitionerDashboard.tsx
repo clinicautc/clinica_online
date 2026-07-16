@@ -34,6 +34,7 @@ import PatientList from '../components/PatientList';
 import NotesViewer from '../components/NotesViewer';
 import { toast } from 'sonner';
 import { getEstadoBadgeClasses, getEstadoLabel, esFechaPasada } from '../lib/citasHelpers';
+import { formatExpediente } from '../lib/formatExpediente';
 
 // Interfaz sincronizada con las columnas de pgAdmin
 interface Appointment {
@@ -488,7 +489,7 @@ export default function NutritionPractitionerDashboard() {
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-orange-900 text-base sm:text-xl truncate">{apt.paciente_nombre}</p>
-                            <p className="text-slate-400 font-mono text-sm sm:text-base">ID: {apt.paciente_id}</p>
+                            <p className="text-slate-400 font-mono text-sm sm:text-base">Expediente: {formatExpediente(apt.paciente_id)}</p>
                             <div className="flex flex-wrap gap-2 sm:gap-3.5 mt-1">
                               <p className="text-base text-gray-500 flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded font-semibold">
                                 <Calendar className="w-3.5 h-3.5 text-orange-600"/> {format(new Date(apt.fecha.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy')}

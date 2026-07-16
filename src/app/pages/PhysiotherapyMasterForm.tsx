@@ -2,8 +2,11 @@ import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { usePhysiotherapyValoracionData } from '../hooks/formClinico/usePhysiotherapyValoracionData';
+import { usePrintFitScale } from '../hooks/usePrintFitScale';
+import { formatExpediente } from '../lib/formatExpediente';
 
 // IMPORTACIÓN DE IMÁGENES
+import logoUtc from './logo_historiales.jpg';
 import caritasImg from './Caritas.png';
 import Humano1Img from './Humano_1.png';
 import Humano2Img from './Humano_2.png';
@@ -36,6 +39,12 @@ interface PageProps {
 const PhysiotherapyMasterForm = () => {
   const navigate = useNavigate();
   const { appointmentId, formData } = usePhysiotherapyValoracionData({});
+
+  // Regla de impresión única para todos los documentos clínicos del sistema
+  // (ver src/app/hooks/usePrintFitScale.ts para la explicación completa del
+  // mecanismo). Validado originalmente en HojaEvolutiva.tsx y
+  // NutritionMasterForm.tsx; reutilizado tal cual aquí.
+  usePrintFitScale(['.page', '.page-p2', '.page-p3']);
 
   return (
     <div className="min-h-screen bg-zinc-600">
@@ -100,8 +109,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
   accumulatedData, 
   onUpdate, 
   onBack, 
-  onNext, 
-  appointmentId 
+  onNext
 }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, field: string) => {
@@ -133,8 +141,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
         .page {
             background-color: #fff;
-            width: 100%;
-            max-width: calc(100% - 20px);
+            width: var(--print-width, 215.9mm);
             min-height: 279.4mm;
             padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
@@ -268,20 +275,28 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         .btn-siguiente-fixed:hover { transform: scale(1.05); background-color: #15803d; }
 
         @media print {
-            @page { size: letter portrait; margin: 0; }
-            body, html { height: 100%; overflow: hidden; background-color: #fff; }
+            @page { size: 215.9mm 279.4mm; margin: 0; }
+            /* OJO: nunca poner height:100%/overflow:hidden en body/html aquí
+               — eso recorta TODO el documento a la altura de una sola página
+               e impide que las hojas 2 y 3 lleguen a paginarse. */
+            body, html { background-color: #fff; }
             .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: flex !important; justify-content: center !important; }
             .page {
                 box-shadow: none !important;
                 border: none !important;
-                width: 215.9mm !important;
-                max-width: 215.9mm !important;
+                /* Salto de página hacia la página 2 — sin esto, las 3 hojas
+                   fluían de corrido y se aplanaban en 1 sola página física. */
+                page-break-after: always;
+                width: var(--print-width, 215.9mm) !important;
                 min-height: 279.4mm !important;
                 padding: 10mm 14mm 8mm 14mm !important;
                 position: relative !important;
                 margin: 0 auto !important;
-                transform: scale(0.96);
-                transform-origin: top center;
+                /* Escala calculada en tiempo real por usePrintFitScale — NUNCA
+                   un valor fijo. Si la hoja cabe al 100%, --print-scale vale 1
+                   y no pasa nada; solo se reduce si el contenido real excede
+                   el alto físico de la hoja. */
+                zoom: var(--print-scale, 1);
             }
             .btn-salir-fixed, .btn-siguiente-fixed { display: none !important; }
         }
@@ -298,8 +313,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           {/* HEADER */}
           <div className="header">
             <div className="logo">
-              <h1>utc</h1>
-              <p>Universidad<br />Tres Culturas</p>
+              <img src={logoUtc} alt="Universidad Tres Culturas" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
             </div>
             <div className="title-section">
               <div className="main-title">Historia Clínica Fisioterapéutica</div>
@@ -327,7 +341,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
               </div>
               <div className="field" style={{ flex: 1.2 }}>
                 <span className="field-label">Expediente</span>
-                <input type="text" className="line-input" value={appointmentId || ''} disabled />
+                <input type="text" className="line-input" value={formatExpediente(accumulatedData.pagina_1.paciente_id)} disabled />
               </div>
             </div>
             <div className="form-row">
@@ -580,8 +594,9 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
 
         .page-p2 {
             background-color: #fff;
-            width: 100%;
-            max-width: calc(100% - 20px);
+            width: var(--print-width, 215.9mm);
+            margin-left: auto;
+            margin-right: auto;
             min-height: 279.4mm;
             padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
@@ -727,20 +742,22 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .page-num-p2 { font-size: 15px; font-weight: bold; }
 
         @media print {
-            @page { size: letter portrait; margin: 0; }
+            @page { size: 215.9mm 279.4mm; margin: 0; }
             .hc-body-p2 { padding: 0; background: white; }
             .controls-bar-p2, .btn-anterior-fixed, .btn-siguiente-fixed { display: none !important; }
             .eraser-container { display: none !important; }
             .page-p2 {
                 box-shadow: none !important;
-                width: 215.9mm !important;
-                max-width: 215.9mm !important;
+                /* Salto hacia la página 3 — misma razón que en .page. */
+                page-break-after: always;
+                width: var(--print-width, 215.9mm) !important;
                 min-height: 279.4mm !important;
                 padding: 10mm 14mm 8mm 14mm !important;
                 print-color-adjust: exact !important;
                 -webkit-print-color-adjust: exact !important;
-                transform: scale(0.96);
-                transform-origin: top center;
+                /* Escala calculada en tiempo real por usePrintFitScale — NUNCA
+                   un valor fijo. */
+                zoom: var(--print-scale, 1);
             }
         }
       `}</style>
@@ -1102,8 +1119,9 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
 
         .page-p3 {
             background-color: #fff;
-            width: 100%;
-            max-width: calc(100% - 20px);
+            width: var(--print-width, 215.9mm);
+            margin-left: auto;
+            margin-right: auto;
             min-height: 279.4mm;
             padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
@@ -1205,10 +1223,12 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; color: #1F4287; margin-top: auto; }
 
         @media print {
-            @page { size: letter portrait; margin: 0; }
+            @page { size: 215.9mm 279.4mm; margin: 0; }
             .hc-body-p3 { padding: 0; background: white; }
             .btn-anterior-p3, .btn-finalizar-p3, .eraser-container-p3 { display: none !important; }
-            .page-p3 { box-shadow: none !important; width: 215.9mm !important; max-width: 215.9mm !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 !important; }
+            /* Escala calculada en tiempo real por usePrintFitScale — NUNCA un
+               valor fijo. */
+            .page-p3 { box-shadow: none !important; width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 auto !important; zoom: var(--print-scale, 1); }
         }
       `}</style>
 

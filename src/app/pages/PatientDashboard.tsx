@@ -29,6 +29,7 @@ import DateFilterPicker from '../components/DateFilterPicker';
 import MonthFilterPicker from '../components/MonthFilterPicker';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
+import { formatExpediente } from '../lib/formatExpediente';
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth();
@@ -227,7 +228,7 @@ export default function PatientDashboard() {
               >
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none truncate">{patientName}</p>
-                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none mb-1 truncate">ID: {patientId}</p>
+                  <p className="text-xs sm:text-sm font-bold text-blue-900 leading-none mb-1 truncate">Expediente: {formatExpediente(patientId)}</p>
                   <p className="text-[8px] sm:text-[10px] font-black text-blue-900/60 uppercase tracking-wider truncate">{patientRole}</p>
                   <p className="text-xs sm:text-sm text-slate-600 font-black flex items-center justify-end gap-0.5 leading-tight mt-0.5 whitespace-nowrap">
                     <LogOut className="w-2.5 h-2.5 shrink-0" /> cerrar sesión
