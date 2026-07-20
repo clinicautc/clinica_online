@@ -258,23 +258,26 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
       <div className="relative z-10 size-full p-4 sm:p-6">
       {/* HEADER INSTITUCIONAL */}
       <header className="bg-white/90 backdrop-blur-sm shadow-sm mb-6 rounded-xl border border-gray-100">
-        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex items-center justify-center w-12 h-12 bg-blue-900 rounded-lg shadow-md">
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="hidden sm:flex relative items-center justify-center w-9 h-9 sm:w-12 sm:h-12 bg-blue-900 rounded-lg shadow-md shrink-0">
               {detectedArea === 'fisioterapia' ? (
-                <Activity className="w-6 h-6 text-white" />
+                <Activity className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               ) : (
-                <Utensils className="w-6 h-6 text-white" />
+                <Utensils className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               )}
             </div>
 
             {isMaster && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ver Historiales de:</span>
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <span className="text-[7px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap leading-tight">
+                  <span className="sm:hidden">Ver:</span>
+                  <span className="hidden sm:inline">Ver Historiales de:</span>
+                </span>
                 <select
                   value={selectedArea}
                   onChange={(e) => setSelectedArea(e.target.value as 'nutricion' | 'fisioterapia')}
-                  className="h-10 rounded-xl border-slate-200 px-3 bg-white font-bold text-xs text-slate-600 outline-none shadow-sm border"
+                  className="h-7 sm:h-10 rounded-xl border-slate-200 px-1.5 sm:px-3 bg-white font-bold text-[10px] sm:text-xs text-slate-600 outline-none shadow-sm border"
                 >
                   <option value="nutricion">NUTRICIÓN</option>
                   <option value="fisioterapia">FISIOTERAPIA</option>
@@ -282,20 +285,20 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
               </div>
             )}
 
-            <div>
-              <h1 className="text-2xl font-bold">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm sm:text-2xl font-bold truncate">
                 <span className="text-blue-900">Expediente</span>{' '}
                 <span className="text-orange-600">{detectedArea.toUpperCase()}</span>
               </h1>
-              <p className="text-sm text-gray-500 font-medium tracking-wide">
+              <p className="text-[10px] sm:text-sm text-gray-500 font-medium tracking-wide truncate">
                 Paciente: <span className="font-bold text-blue-900">{patientName || (loading ? 'Consultando...' : 'Sin Nombre')}</span>
               </p>
-              <p className="text-xs font-mono font-bold text-slate-500">Expediente: {formatExpediente(id)}</p>
+              <p className="text-[9px] sm:text-xs font-mono font-bold text-slate-500 truncate">Expediente: {formatExpediente(id)}</p>
             </div>
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl">
-            <ArrowLeft className="w-4 h-4 mr-2" />Volver
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl shrink-0 px-2 sm:px-4 text-xs sm:text-sm gap-1 sm:gap-2">
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Volver
           </Button>
         </div>
       </header>
@@ -310,7 +313,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
           <Tabs defaultValue="historiales" className="space-y-6">
             <TabsList className="bg-white/80 border shadow-sm p-1 h-auto gap-1 rounded-xl">
               <TabsTrigger value="historiales" className={`${theme.tabActive} font-bold`}><FileText className="w-4 h-4 mr-2" />Historial Médico</TabsTrigger>
-              <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Evolución</TabsTrigger>
+              <TabsTrigger value="evolucion" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Seguimiento</TabsTrigger>
               <TabsTrigger value="recomendaciones" className={`${theme.tabActive} font-bold`}><TrendingUp className="w-4 h-4 mr-2" />Recomendaciones</TabsTrigger>
              
             </TabsList>
@@ -479,7 +482,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
             <TabsContent value="evolucion">
               <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/95">
                 <CardHeader className={`${theme.bgLight} border-b p-7`}>
-                  <CardTitle className={`${theme.color} text-2xl font-black`}>Evolución</CardTitle>
+                  <CardTitle className={`${theme.color} text-2xl font-black`}>Seguimiento</CardTitle>
                 </CardHeader>
                 <CardContent className="p-7">
                   {loadingEvolucion ? (
@@ -526,7 +529,7 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                   <div className="flex-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-1">
                                       <h4 className={`font-black text-base ${accentText}`}>
-                                        Seguimiento #{index + 1}
+                                        {isFisio ? 'Notas de Evolución' : 'Seguimiento Nutricional'}
                                       </h4>
                                       {numConsulta && (
                                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${accentPill}`}>
@@ -557,7 +560,8 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
                                       className={`${accentBtn} text-white font-black`}
                                       onClick={() => {
                                         if (evol.appointment_id) {
-                                          navigate(`/forms/seguimiento/${evol.appointment_id}/documento`);
+                                          const ruta = isFisio ? 'seguimiento' : 'seguimiento-nutricional';
+                                          navigate(`/forms/${ruta}/${evol.appointment_id}/documento`);
                                         } else {
                                           toast.error("Este registro no está vinculado a ninguna cita.");
                                         }

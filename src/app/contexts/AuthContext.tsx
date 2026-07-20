@@ -51,6 +51,11 @@ interface AuthContextType {
     passwordNueva: string
   ) => Promise<User>;
 
+  completarRegistro: (
+    email: string,
+    code: string
+  ) => Promise<User>;
+
   logout: () => void;
 }
 
@@ -199,6 +204,22 @@ export function AuthProvider({
 
   /**
    * ============================================================================
+   * COMPLETAR REGISTRO (verificación de código → sesión iniciada de una vez,
+   * el paciente entra directo a su panel sin pasar por /login)
+   * ============================================================================
+   */
+  const completarRegistro = async (
+    email: string,
+    code: string
+  ): Promise<User> => {
+
+    const data = await authAPI.verifyRegister({ email, code });
+
+    return aplicarSesion(data);
+  };
+
+  /**
+   * ============================================================================
    * LOGOUT
    * ============================================================================
    */
@@ -224,6 +245,7 @@ export function AuthProvider({
         isLoading,
         login,
         completarPrimerInicio,
+        completarRegistro,
         logout
       }}
     >

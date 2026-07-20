@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { assertCitaEditablePorUsuario } = require('../middleware/authMiddleware');
 
 // OBTENER HOJA EVOLUTIVA POR ID DE CITA
 // Recupera el JSON guardado para rellenar la vista del frontend.
@@ -33,6 +34,8 @@ async function createEvolucion(req, res) {
     const apptIdInt = parseInt(appointment_id, 10) || null;
     const practIdInt = parseInt(practicante_id, 10) || null;
     let pacIdInt = parseInt(paciente_id, 10) || null;
+
+    await assertCitaEditablePorUsuario(apptIdInt, req.user);
 
     // AUTO-COMPLETADO DEL PACIENTE
     if (apptIdInt) {
@@ -71,7 +74,7 @@ async function createEvolucion(req, res) {
   } catch (error) {
     // Si la consola arroja código 23503, es porque la cita (appointment_id) no existe en tu tabla 'citas'
     console.error("❌ Error BD notas-evolucion:", error.message);
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: error.message });
   }
 }
 
@@ -81,6 +84,11 @@ async function updateEvolucion(req, res) {
   const { cuadro_evolucion, fecha_elaboracion } = req.body;
 
   try {
+    const existente = await pool.query('SELECT appointment_id FROM notas_evolucion WHERE id = $1', [id]);
+    if (existente.rows.length > 0) {
+      await assertCitaEditablePorUsuario(existente.rows[0].appointment_id, req.user);
+    }
+
     const result = await pool.query(
       `UPDATE notas_evolucion
        SET cuadro_evolucion = $1, fecha_elaboracion = $2
@@ -95,7 +103,7 @@ async function updateEvolucion(req, res) {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("❌ Error BD notas-evolucion (PUT):", error.message);
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: error.message });
   }
 }
 
@@ -104,7 +112,17 @@ async function getEvolucionByPaciente(req, res) {
   const { id } = req.params; // ID del paciente
   try {
     const result = await pool.query(
-      'SELECT * FROM notas_evolucion WHERE paciente_id = $1 ORDER BY fecha_creacion DESC',
+      `SELECT n.*,
+        u.nombre AS creado_por_nombre,
+        NULLIF((SELECT COUNT(*) FROM citas c
+         WHERE c.paciente_id = n.paciente_id
+           AND c.tipo = n.area
+           AND c.id <= n.appointment_id
+           AND c.estado = 'completada'), 0) AS numero_consulta
+       FROM notas_evolucion n
+       LEFT JOIN usuarios u ON u.id = n.practicante_id
+       WHERE n.paciente_id = $1
+       ORDER BY n.fecha_creacion DESC`,
       [id]
     );
     // Convertimos el string del cuadro_evolucion a JSON si es necesario
@@ -114,7 +132,60 @@ async function getEvolucionByPaciente(req, res) {
       }
       return fila;
     });
-    res.json(filas);
+
+    // Nutrición reutiliza notas_evolucion como un documento que acumula hasta 6
+    // consultas (columnas) bajo un solo practicante_id fijo (quien creó la
+    // columna 1). Para la lista, expandimos cada fila en una tarjeta por
+    // consulta real, con la fecha y el practicante que efectivamente la
+    // atendió — tomados de `citas`, no del registro fijo de la fila.
+    // Fisioterapia no se toca: ahí 1 fila siempre fue 1 consulta.
+    const filasFisio = filas.filter(f => f.area !== 'nutricion');
+    const filasNutricion = filas
+      .filter(f => f.area === 'nutricion')
+      .sort((a, b) => a.id - b.id); // orden de creación = orden del ciclo de 6
+
+    let tarjetasNutricion = [];
+    if (filasNutricion.length > 0) {
+      const citasSub = await pool.query(
+        `SELECT c.id, c.fecha, c.hora, c.practicante_nombre,
+           (SELECT COUNT(*) FROM citas c2
+            WHERE c2.paciente_id = c.paciente_id AND c2.tipo = 'nutricion'
+              AND c2.estado = 'completada' AND c2.id <= c.id) AS numero_consulta
+         FROM citas c
+         WHERE c.paciente_id = $1 AND c.tipo = 'nutricion'
+           AND c.tipo_consulta = 'subsecuente' AND c.estado = 'completada'
+         ORDER BY c.id ASC`,
+        [id]
+      );
+      const citas = citasSub.rows;
+
+      filasNutricion.forEach((fila, cicloIndex) => {
+        const base = cicloIndex * 6;
+        const tarjetasDeEsteCiclo = [];
+        for (let col = 1; col <= 6; col++) {
+          const fechaCampo = fila.cuadro_evolucion?.[`psi_fecha_${col}`];
+          const cita = citas[base + col - 1];
+          if (!fechaCampo || !cita) continue;
+          tarjetasDeEsteCiclo.push({
+            id: `${fila.id}-col${col}`,
+            paciente_id: fila.paciente_id,
+            nombre_completo: fila.nombre_completo,
+            numero_expediente: fila.numero_expediente,
+            appointment_id: cita.id,
+            fecha_elaboracion: fila.fecha_elaboracion,
+            fecha_creacion: cita.fecha,
+            area: 'nutricion',
+            creado_por_nombre: cita.practicante_nombre,
+            numero_consulta: cita.numero_consulta,
+          });
+        }
+        // Respaldo: si no se pudo alinear ninguna columna con `citas` (dato
+        // inconsistente), no perder el registro — mostramos la fila tal cual.
+        tarjetasNutricion.push(...(tarjetasDeEsteCiclo.length > 0 ? tarjetasDeEsteCiclo : [fila]));
+      });
+    }
+
+    res.json([...filasFisio, ...tarjetasNutricion]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

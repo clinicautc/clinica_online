@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { FormClinicoCallbacks, FormClinicoHandle } from '../lib/types/formClinico';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EvolucionSeguimientoCaptura from './captura/EvolucionSeguimientoCaptura';
+import SeguimientoNutricionalCaptura from './captura/SeguimientoNutricionalCaptura';
 import NutricionPrimeraConsultaCaptura from './captura/NutricionPrimeraConsultaCaptura';
 import FisioterapiaPrimeraConsultaCaptura from './captura/FisioterapiaPrimeraConsultaCaptura';
 
@@ -38,7 +39,7 @@ function resolveFormKey(area: string, tipoConsulta: string | null): string | nul
 
 function resolveFormName(area: string, tipoConsulta: string | null): string {
   if (area === 'nutricion'    && tipoConsulta === 'primera')     return 'Historia Clínica Nutricional';
-  if (area === 'nutricion'    && tipoConsulta === 'subsecuente') return 'Nota de Evolución';
+  if (area === 'nutricion'    && tipoConsulta === 'subsecuente') return 'Seguimiento Nutricional';
   if (area === 'fisioterapia' && tipoConsulta === 'primera')     return 'Valoración Inicial de Fisioterapia';
   if (area === 'fisioterapia' && tipoConsulta === 'subsecuente') return 'Nota de Evolución';
   return 'Documento Clínico';
@@ -503,7 +504,7 @@ const ConsultaWorkspace: React.FC = () => {
       {/* ── VISTA FORMULARIO (siempre montado para que el ref sea válido) ─── */}
       <div className={activeView === 'form' ? 'block' : 'hidden'}>
         {tipo === 'nutricion'    && tipo_consulta === 'primera'     && <NutricionPrimeraConsultaCaptura     ref={formRef} {...callbacks} />}
-        {tipo === 'nutricion'    && tipo_consulta === 'subsecuente' && <EvolucionSeguimientoCaptura         ref={formRef} {...callbacks} />}
+        {tipo === 'nutricion'    && tipo_consulta === 'subsecuente' && <SeguimientoNutricionalCaptura       ref={formRef} {...callbacks} />}
         {tipo === 'fisioterapia' && tipo_consulta === 'primera'     && <FisioterapiaPrimeraConsultaCaptura  ref={formRef} {...callbacks} />}
         {tipo === 'fisioterapia' && tipo_consulta === 'subsecuente' && <EvolucionSeguimientoCaptura         ref={formRef} {...callbacks} />}
         {!formKey && (

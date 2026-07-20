@@ -16,6 +16,8 @@ interface DiagnosticosNutriciosSectionProps {
   formData: Record<string, string | boolean>;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Exclusivo de Seguimiento Nutricional — ver MatrixTable.tsx. */
+  columnaActual?: number;
 }
 
 /**
@@ -25,7 +27,7 @@ interface DiagnosticosNutriciosSectionProps {
  * diagnóstico sobre sus 3 filas de estado, así que vive como componente
  * propio de este formulario.
  */
-export default function DiagnosticosNutriciosSection({ formData, onChange, onDateChange }: DiagnosticosNutriciosSectionProps) {
+export default function DiagnosticosNutriciosSection({ formData, onChange, onDateChange, columnaActual }: DiagnosticosNutriciosSectionProps) {
   const [openCol, setOpenCol] = useState(1);
   const val = (name: string) => (formData[name] as string) || '';
 
@@ -38,19 +40,23 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
             <TableRow>
               <TableHead className="w-1/4">Diagnóstico</TableHead>
               <TableHead>Estado</TableHead>
-              {Array.from({ length: NUM_COLS }, (_, i) => i + 1).map(col => (
-                <TableHead key={col} className="min-w-24">
-                  <Input
-                    type="text"
-                    name={`diag_nutri_fecha_${col}`}
-                    value={val(`diag_nutri_fecha_${col}`)}
-                    onChange={onDateChange}
-                    maxLength={10}
-                    placeholder="DD/MM/AAAA"
-                    className="h-8 text-xs px-2"
-                  />
-                </TableHead>
-              ))}
+              {Array.from({ length: NUM_COLS }, (_, i) => i + 1).map(col => {
+                const bloqueada = columnaActual != null && col !== columnaActual;
+                return (
+                  <TableHead key={col} className="min-w-24">
+                    <Input
+                      type="text"
+                      name={`diag_nutri_fecha_${col}`}
+                      value={val(`diag_nutri_fecha_${col}`)}
+                      onChange={onDateChange}
+                      readOnly={bloqueada}
+                      maxLength={10}
+                      placeholder="DD/MM/AAAA"
+                      className={`h-8 text-xs px-2${bloqueada ? ' bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                    />
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -64,6 +70,7 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
                           name={`diag_nutri_txt_${grupo}`}
                           value={val(`diag_nutri_txt_${grupo}`)}
                           onChange={onChange}
+                          maxLength={223}
                           className="min-h-20 text-xs"
                         />
                       </TableCell>
@@ -71,9 +78,10 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
                     <TableCell className="font-medium text-slate-600">{estado.label}</TableCell>
                     {Array.from({ length: NUM_COLS }, (_, i) => i + 1).map(col => {
                       const name = `diag_nutri_${grupo}_${estado.key}_col${col}`;
+                      const bloqueada = columnaActual != null && col !== columnaActual;
                       return (
-                        <TableCell key={col}>
-                          <Input type="text" name={name} value={val(name)} onChange={onChange} className="h-8 text-xs px-2" />
+                        <TableCell key={col} className="text-center">
+                          <input type="checkbox" name={name} checked={!!formData[name]} onChange={onChange} disabled={bloqueada} className="h-4 w-4 accent-blue-900 disabled:opacity-40" />
                         </TableCell>
                       );
                     })}
@@ -96,9 +104,12 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
               name={`diag_nutri_txt_${grupo}`}
               value={val(`diag_nutri_txt_${grupo}`)}
               onChange={onChange}
+              maxLength={223}
               className="min-h-20 text-xs"
             />
-            {Array.from({ length: NUM_COLS }, (_, i) => i + 1).map(col => (
+            {Array.from({ length: NUM_COLS }, (_, i) => i + 1).map(col => {
+              const bloqueada = columnaActual != null && col !== columnaActual;
+              return (
               <div key={col} className="border border-slate-100 rounded-lg overflow-hidden">
                 <button
                   type="button"
@@ -113,9 +124,10 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
                         name={`diag_nutri_fecha_${col}`}
                         value={val(`diag_nutri_fecha_${col}`)}
                         onChange={onDateChange}
+                        readOnly={bloqueada}
                         maxLength={10}
                         placeholder="DD/MM/AAAA"
-                        className="h-7 text-xs px-2"
+                        className={`h-7 text-xs px-2${bloqueada ? ' bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                       />
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${openCol === col ? 'rotate-180' : ''}`} />
@@ -126,16 +138,17 @@ export default function DiagnosticosNutriciosSection({ formData, onChange, onDat
                     {ESTADOS.map(estado => {
                       const name = `diag_nutri_${grupo}_${estado.key}_col${col}`;
                       return (
-                        <div key={estado.key} className="space-y-1">
-                          <label className="text-xs font-medium text-slate-600">{estado.label}</label>
-                          <Input type="text" name={name} value={val(name)} onChange={onChange} className="h-8 text-xs" />
+                        <div key={estado.key} className="flex items-center gap-2">
+                          <label className="text-xs font-medium text-slate-600 flex-1">{estado.label}</label>
+                          <input type="checkbox" name={name} checked={!!formData[name]} onChange={onChange} disabled={bloqueada} className="h-5 w-5 accent-blue-900 disabled:opacity-40" />
                         </div>
                       );
                     })}
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>

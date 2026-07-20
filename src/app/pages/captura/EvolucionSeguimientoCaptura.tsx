@@ -185,10 +185,10 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
         </TabsList>
 
         <TabsContent value="p1" className="space-y-4 mt-4">
-          <FormSectionCard title="A. Psicológicos"><MatrixTable numCols={5} fechaName={col => `psi_fecha_${col}`} rows={rowsPsicologicos} {...matrixProps} /></FormSectionCard>
-          <FormSectionCard title="Sintomatología"><MatrixTable numCols={5} fechaName={col => `sint_fecha_${col}`} rows={rowsSintomatologia} {...matrixProps} /></FormSectionCard>
-          <FormSectionCard title="Ejercicio"><MatrixTable numCols={5} fechaName={col => `ejer_fecha_${col}`} rows={rowsEjercicio} {...matrixProps} /></FormSectionCard>
-          <FormSectionCard title="A. Dietéticos"><MatrixTable numCols={5} fechaName={col => `diet_fecha_${col}`} rows={rowsDieteticos} {...matrixProps} /></FormSectionCard>
+          <FormSectionCard title="A. Psicológicos"><MatrixTable numCols={6} fechaName={col => `psi_fecha_${col}`} rows={rowsPsicologicos} {...matrixProps} /></FormSectionCard>
+          <FormSectionCard title="Sintomatología"><MatrixTable numCols={6} fechaName={col => `sint_fecha_${col}`} rows={rowsSintomatologia} {...matrixProps} /></FormSectionCard>
+          <FormSectionCard title="Ejercicio"><MatrixTable numCols={6} fechaName={col => `ejer_fecha_${col}`} rows={rowsEjercicio} {...matrixProps} /></FormSectionCard>
+          <FormSectionCard title="A. Dietéticos"><MatrixTable numCols={6} fechaName={col => `diet_fecha_${col}`} rows={rowsDieteticos} {...matrixProps} /></FormSectionCard>
         </TabsContent>
 
         <TabsContent value="p2" className="space-y-4 mt-4">
@@ -258,7 +258,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
 
         <TabsContent value="p6" className="space-y-4 mt-4">
           <FormSectionCard title="Intervención Nutricia">
-            <MatrixTable numCols={5} fechaName={col => `interv_fecha_${col}`} rows={rowsIntervencion} groupHeaders={gruposIntervencion} {...matrixProps} />
+            <MatrixTable numCols={6} fechaName={col => `interv_fecha_${col}`} rows={rowsIntervencion} groupHeaders={gruposIntervencion} {...matrixProps} />
           </FormSectionCard>
           <FormSectionCard title="Educación Nutricional y Consejería">
             <EducacionConsejeriaSection formData={formData} onChange={handleInputChange} onDateChange={handleDateInput} />

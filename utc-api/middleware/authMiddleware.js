@@ -391,12 +391,41 @@ if (user.rol === 'paciente') {
   }
 };
 
+/**
+ * ============================================================================
+ * BLOQUEO DE EDICIÓN CLÍNICA POST-CIERRE (historiales, notas de evolución)
+ * ============================================================================
+ * Un practicante solo puede escribir el expediente clínico mientras la cita
+ * sigue en curso. Una vez que la cita llegó a un estado terminal
+ * (completada/no_asistio), solo admin/master pueden seguir editando.
+ * Se expone como función de ayuda (no middleware de ruta) porque
+ * historialesController/notasController identifican el registro por
+ * distintas claves según el endpoint (appointment_id en el body al crear,
+ * o el id propio del registro en :params al actualizar).
+ */
+const ESTADOS_TERMINALES_CITA = ['completada', 'no_asistio'];
+
+async function assertCitaEditablePorUsuario(appointmentId, user) {
+  if (!appointmentId || !user) return;
+  if (user.rol === 'admin' || user.rol === 'master') return;
+
+  const result = await pool.query('SELECT estado FROM citas WHERE id = $1', [appointmentId]);
+  if (result.rows.length === 0) return;
+
+  if (ESTADOS_TERMINALES_CITA.includes(result.rows[0].estado)) {
+    const error = new Error('La cita ya fue completada; solo un admin o master puede editar este expediente.');
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
 module.exports = {
   requireAuth,
   verifyToken,
   requireRole,
   requireSameArea,
   canModifyAppointment,
+  assertCitaEditablePorUsuario,
   signAccessToken,
   generateRefreshToken,
   hashToken,

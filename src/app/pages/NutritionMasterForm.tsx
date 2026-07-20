@@ -8,6 +8,8 @@
   import { useNavigate } from 'react-router';
   import { useNutritionHistoriaData } from '../hooks/formClinico/useNutritionHistoriaData';
   import { usePrintFitScale } from '../hooks/usePrintFitScale';
+  import { useScreenFitScale } from '../hooks/useScreenFitScale';
+  import { useAuth } from '../contexts/AuthContext';
   import { formatExpediente } from '../lib/formatExpediente';
   // IMPORTACIÓN DE LA IMAGEN
   import bristolImg from './bristol.jpg';
@@ -33,6 +35,8 @@
     const {
       appointmentId, updateGlobalData, isSaving, yaGuardado, historialId, formData,
     } = useNutritionHistoriaData({});
+    const { user } = useAuth();
+    const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
     // Este componente ahora solo se monta cuando ya existe un historial
     // persistido (ver NutritionMasterFormRouteResolver.tsx) — es la
@@ -49,6 +53,8 @@
     // mecanismo). Validado originalmente en HojaEvolutiva.tsx y reutilizado
     // tal cual aquí y en PhysiotherapyMasterForm.tsx.
     usePrintFitScale(['.p1-paper']);
+    // Ajuste de pantalla en móvil (no impresión) — ver useScreenFitScale.ts.
+    useScreenFitScale(['.p1-paper']);
 
     return (
       <>
@@ -64,18 +70,24 @@
                fijo. Si la hoja cabe al 100%, --print-scale vale 1 y no pasa
                nada; solo se reduce si el contenido real excede el alto
                físico de la hoja. */
-            zoom: var(--print-scale, 1);
+            zoom: var(--print-scale, 1) !important;
           }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
         /* Tamaño de hoja y escala igual a la vista de Seguimiento Nutricional
            (HojaEvolutiva.tsx): ancho/alto fijos en mm, sin escalado responsive,
            para que se vea como una hoja física real en pantalla. */
-        .p1-paper { width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; margin: 0 auto !important; border-radius: 0 !important; }
+        .p1-paper { zoom: var(--screen-scale, 1); width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; margin: 0 auto !important; border-radius: 0 !important; }
         .p1-paper input:not([type="checkbox"]), .p1-paper textarea {
           word-break: break-word;
           overflow-wrap: break-word;
           padding-bottom: 2px;
+          /* Mismo tamaño de fuente de datos que Seguimiento Nutricional (8px) en
+             las 4 páginas — !important porque hay decenas de inputs/textareas
+             con su propio text-[Npx] de Tailwind (7-9.5px) esparcidos en el JSX
+             de las 4 páginas; forzarlo aquí es más simple y confiable que
+             editar cada uno por separado. */
+          font-size: 8px !important;
         }
         .p1-paper input, .p1-paper textarea, .p1-paper tr, .p1-paper td, .p1-paper th {
           border-color: #2c5697;
@@ -95,7 +107,7 @@
           overflow-wrap: break-word;
           overflow: hidden;
           font-family: inherit;
-          font-size: 9px;
+          font-size: 8px;
           line-height: 1.2;
           color: #333;
           display: block;
@@ -118,31 +130,31 @@
       {/* Solo lectura: las 4 páginas se muestran apiladas (no hay wizard de
           pasos que navegar, no aplica a un documento ya finalizado). Botones
           "Volver" / "Imprimir" / "Editar", fuera del fieldset deshabilitado. */}
-      <div className="fixed top-4 right-4 z-50 flex gap-2 print:hidden">
+      <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
           onClick={() => navigate(-1)}
-          className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
           </svg>
           Volver
         </button>
         <button
           onClick={() => window.print()}
-          className="bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          className="bg-blue-900 hover:bg-blue-800 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
           </svg>
           Imprimir
         </button>
-        {appointmentId && (
+        {appointmentId && puedeEditar && (
           <button
             onClick={() => navigate(`/forms/nutricion/${appointmentId}`)}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
             </svg>
             Editar
@@ -862,7 +874,7 @@
             width: 100%;
             border: none;
             outline: none;
-            font-size: 9px;
+            font-size: 8px;
             padding: 0 3px;
             background: transparent;
           }
@@ -972,7 +984,7 @@
             padding: 3px 5px;
             box-sizing: border-box;
             font-family: inherit;
-            font-size: 9px;
+            font-size: 8px;
             line-height: 1.2;
             background: transparent;
           }
@@ -1014,7 +1026,7 @@
             outline: none;
             padding: 0 3px;
             box-sizing: border-box;
-            font-size: 7.5px;
+            font-size: 8px;
             background: transparent;
             word-break: break-word;
             overflow-wrap: break-word;
@@ -1028,7 +1040,7 @@
             outline: none;
             padding: 0 3px;
             box-sizing: border-box;
-            font-size: 7.5px;
+            font-size: 8px;
             background: transparent;
             resize: none;
             white-space: pre-wrap;
@@ -1607,7 +1619,7 @@
               overflow-wrap: break-word;
               overflow: hidden;
               font-family: inherit;
-              font-size: 7.2px;
+              font-size: 8px;
               line-height: 1.2;
               color: #2c5697;
               display: block;
@@ -1661,7 +1673,7 @@
             .celda-hallazgo-compacta {
               padding: 1px 2px !important;
               height: 14px !important;
-              font-size: 7.2px !important;
+              font-size: 8px !important;
             }
             .contenedor-redondeado-azul {
               border: 2px solid #2c5697;

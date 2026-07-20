@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useHojaEvolutivaData } from '../hooks/formClinico/useHojaEvolutivaData';
+import { useAuth } from '../contexts/AuthContext';
 import { usePrintFitScale } from '../hooks/usePrintFitScale';
+import { useScreenFitScale } from '../hooks/useScreenFitScale';
 import { formatExpediente } from '../lib/formatExpediente';
 import logoUtc from './logo_historiales.jpg';
 
@@ -16,6 +18,8 @@ import logoUtc from './logo_historiales.jpg';
 const HojaEvolutiva = () => {
   const navigate = useNavigate();
   const { appointmentId, formData, isLoading } = useHojaEvolutivaData({});
+  const { user } = useAuth();
+  const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
   const handleVolver = () => navigate(-1);
   const handleImprimir = () => window.print();
@@ -34,6 +38,8 @@ const HojaEvolutiva = () => {
   // mecanismo). Validado en este componente y reutilizado tal cual en
   // NutritionMasterForm.tsx y PhysiotherapyMasterForm.tsx.
   usePrintFitScale(['.page', '.page2', '.page3', '.page4', '.page5', '.page6']);
+  // Ajuste de pantalla en móvil (no impresión) — ver useScreenFitScale.ts.
+  useScreenFitScale(['.page', '.page2', '.page3', '.page4', '.page5', '.page6']);
 
   // Lista dinámica para la página 2
   const alimentos: string[] = [
@@ -47,35 +53,47 @@ const HojaEvolutiva = () => {
   ];
 
   return (
-    <div className="hoja-evolutiva-wrapper">
-      
+    <>
       {/* ========================================================= */}
       {/* BOTONERA FLOTANTE — solo lectura: Volver / Imprimir / Editar */}
+      {/* Fuera de .hoja-evolutiva-wrapper a propósito: ese wrapper trae
+          un reset `* { padding: 0 }` para las celdas de la hoja impresa
+          que, si estos botones quedaran dentro, también les comía el
+          padding de Tailwind y los aplastaba. */}
       {/* ========================================================= */}
-      <div className="flex print:hidden" style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 50, gap: '10px' }}>
+      <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
           onClick={handleVolver}
-          style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#64748b', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px' }}
+          className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
           Volver
         </button>
         <button
           onClick={handleImprimir}
-          style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#1e3a8a', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+          className="bg-blue-900 hover:bg-blue-800 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+          </svg>
           Imprimir
         </button>
-        {appointmentId && (
+        {appointmentId && puedeEditar && (
           <button
             onClick={handleEditar}
-            style={{ padding: '12px 20px', borderRadius: '50px', backgroundColor: '#f97316', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+            </svg>
             Editar
           </button>
         )}
       </div>
 
+    <div className="hoja-evolutiva-wrapper">
       {/* LOADER PRINCIPAL */}
      {isLoading && (
          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.8)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -110,6 +128,7 @@ const HojaEvolutiva = () => {
               min-height: 100vh;
           }
           .page {
+              zoom: var(--screen-scale, 1);
               background-color: #ffffff;
               width: 215.9mm;
               min-height: 279.4mm;
@@ -152,13 +171,17 @@ const HojaEvolutiva = () => {
           .hoja-evolutiva-wrapper input[type="text"], .hoja-evolutiva-wrapper input[type="number"], .hoja-evolutiva-wrapper textarea { width: 100%; height: 100%; min-height: 16px; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 10px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; box-sizing: border-box; display: block; }
           .hoja-evolutiva-wrapper textarea { text-align: left; min-height: 20px; padding: 3px; }
           .hoja-evolutiva-wrapper input:focus, .hoja-evolutiva-wrapper textarea:focus { background-color: var(--azul-claro) !important; }
+          /* Fecha por columna — cada columna es una consulta distinta, la fecha
+             completa se escribe de arriba hacia abajo, un carácter por línea,
+             con cada carácter en posición vertical normal (no rotado de lado). */
+          .hoja-evolutiva-wrapper .fecha-vertical { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; text-align: start; margin: 0 auto; height: auto !important; width: auto !important; min-height: 0 !important; max-height: 100%; }
           .page-content { flex-grow: 1; }
           .footer { margin-top: auto; display: flex; justify-content: space-between; font-size: 7px; color: var(--azul-utc); font-weight: bold; padding-top: 5px; }
 
           /* ==========================================================
              ESTILOS - PÁGINA 2
              ========================================================== */
-          .page2 { width: 215.9mm; min-height: 279.4mm; background-color: #ffffff; padding: 30px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; border-radius: 4px; display: flex; flex-direction: column; margin-bottom: 20px;}
+          .page2 { zoom: var(--screen-scale, 1); width: 215.9mm; min-height: 279.4mm; background-color: #ffffff; padding: 30px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; border-radius: 4px; display: flex; flex-direction: column; margin-bottom: 20px;}
           .page2 .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 280px; font-weight: 900; color: rgba(155, 179, 214, 0.12); z-index: 0; pointer-events: none; letter-spacing: -10px; font-family: 'Arial Black', Impact, sans-serif; }
           .page2 .content { position: relative; z-index: 1; flex-grow: 1; }
           .page2 .section { position: relative; margin-left: 28px; margin-bottom: 25px; }
@@ -187,7 +210,7 @@ const HojaEvolutiva = () => {
           /* ==========================================================
              ESTILOS - PÁGINA 3
              ========================================================== */
-          .page3 { width: 215.9mm; min-height: 279.4mm; background-color: #ffffff; padding: 30px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; border-radius: 4px; margin-bottom: 20px; display: flex; flex-direction: column;}
+          .page3 { zoom: var(--screen-scale, 1); width: 215.9mm; min-height: 279.4mm; background-color: #ffffff; padding: 30px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; border-radius: 4px; margin-bottom: 20px; display: flex; flex-direction: column;}
           .page3 .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 280px; font-weight: 900; color: rgba(155, 179, 214, 0.12); z-index: 0; pointer-events: none; font-family: 'Arial Black', Impact, sans-serif; }
           .page3 td, .page3 th { border: 1px solid #9bb3d6; height: 20px; padding: 2px 8px; font-size: 11px; color: #2b5696; }
           .page3 .section-header td { font-weight: bold; background-color: #f8f9fa; }
@@ -198,6 +221,7 @@ const HojaEvolutiva = () => {
              ESTILOS - PÁGINA 4 (Diseño Flexbox pag4.html)
              ========================================================== */
           .page4 {
+              zoom: var(--screen-scale, 1);
               width: 215.9mm;
               height: 279.4mm; /* Altura fija estricta para A4 */
               background-color: #ffffff;
@@ -364,6 +388,7 @@ const HojaEvolutiva = () => {
              ESTILOS - PÁGINA 5
              ========================================================== */
           .page5 {
+              zoom: var(--screen-scale, 1);
               width: 215.9mm;
               height: 279.4mm;
               background-color: #ffffff;
@@ -415,6 +440,8 @@ const HojaEvolutiva = () => {
           .page5 input, .page5 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 11px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; display: block; }
           .page5 textarea { text-align: left; padding: 4px; }
           .page5 input:focus, .page5 textarea:focus { background-color: var(--azul-claro) !important; }
+          .page5 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; cursor: default; }
+          .page5 input[type="checkbox"]:checked { background-color: var(--azul-utc) !important; }
           
           .page5 .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; z-index: 1; }
           .page5 .footer-left { font-size: 7px; color: var(--azul-utc); font-weight: bold; line-height: 1.2; text-align: left; }
@@ -422,12 +449,15 @@ const HojaEvolutiva = () => {
           
           .page5 .t1-col1 { width: 28%; } .page5 .t1-cols { width: 12%; }
           .page5 .t2-col1 { width: 54%; } .page5 .t2-col2 { width: 10%; } .page5 .t2-cols { width: 6%; }
+          .page5 thead .t2-cols { padding: 0 !important; }
+          .page5 .t2-cols input.fecha-vertical { height: 64.5px !important; }
 
 
             /* ==========================================================
              ESTILOS - PÁGINA 6
              ========================================================== */
           .page6 {
+              zoom: var(--screen-scale, 1);
               width: 215.9mm;
               height: 279.4mm;
               background-color: #ffffff;
@@ -477,18 +507,22 @@ const HojaEvolutiva = () => {
           .page6 .cell-flex-col { display: flex; flex-direction: column; height: 100%; width: 100%; }
           .page6 .cell-half { flex: 1; display: flex; flex-direction: column; border-bottom: var(--borde-fino); }
           .page6 .cell-half:last-child { border-bottom: none; }
-          .page6 .text-mini { font-size: 8px; color: var(--azul-utc); text-align: left; padding: 2px 4px 0 4px; }
+          .page6 .cell-half textarea { flex: 1; }
+          .page6 .text-mini { font-size: 8px; color: var(--azul-utc); text-align: left; padding: 2px 4px 0 4px; flex-shrink: 0; }
           .page6 .estado-label { color: var(--azul-utc); font-size: 10px; text-align: left; padding-left: 6px; }
           
           .page6 input, .page6 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 8px; color: #000; text-align: center; outline: none; resize: none; padding: 0px; display: block; line-height: 1.1; }
-          .page6 textarea { text-align: left; padding: 1px 3px; }
+          .page6 textarea { text-align: left; padding: 1px 3px; min-height: 0 !important; }
           .page6 input:focus, .page6 textarea:focus { background-color: var(--azul-claro) !important; }
+          .page6 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; cursor: default; }
+          .page6 input[type="checkbox"]:checked { background-color: var(--azul-utc) !important; }
+          .page6 .fecha-alta input { font-size: 4.8px !important; padding: 1px 0 !important; letter-spacing: -0.3px; height: 64.5px !important; }
           
           .page6 .footer { display: flex; justify-content: flex-end; align-items: center; margin-top: 10px; z-index: 1; }
           .page6 .footer-num { font-size: 16px; font-weight: bold; color: var(--azul-utc); }
           
-          .page6 .flex-t1 { flex: 0 0 42%; }
-          .page6 .flex-t2 { flex: 0 0 40%; }
+          .page6 .flex-t1 { flex: 0 0 auto; }
+          .page6 .flex-t2 { flex: 0 0 auto; }
           .page6 .flex-t3 { flex: 1; }
 
 
@@ -518,7 +552,7 @@ const HojaEvolutiva = () => {
                      fijo. Si la hoja cabe al 100%, --print-scale vale 1 y no
                      pasa nada; solo se reduce si el contenido real excede el
                      alto físico de la hoja. */
-                  zoom: var(--print-scale, 1);
+                  zoom: var(--print-scale, 1) !important;
               }
               input:focus, textarea:focus { background-color: transparent !important; }
               .header-azul, .page3 .t2-header, .page4 .tab-vertical { background-color: #2b5a9e !important; color: white !important; }
@@ -571,8 +605,8 @@ const HojaEvolutiva = () => {
                 <thead>
                   <tr>
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={{ width: '13%' }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={{ width: '10.8%' }}>
                         <input type="text" name={`psi_fecha_${i}`} value={(formData[`psi_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
@@ -588,7 +622,7 @@ const HojaEvolutiva = () => {
                   ].map((pregunta, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{pregunta}</td>
-                      {[1, 2, 3, 4, 5].map(col => (
+                      {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col}><textarea name={`psi_q${idx}_col${col}`} value={(formData[`psi_q${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
                       ))}
                     </tr>
@@ -606,8 +640,8 @@ const HojaEvolutiva = () => {
                 <thead>
                   <tr>
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={{ width: '13%' }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={{ width: '10.8%' }}>
                         <input type="text" name={`sint_fecha_${i}`} value={(formData[`sint_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
@@ -617,7 +651,7 @@ const HojaEvolutiva = () => {
                   {["Gastritis", "Colitis", "Reflujo gastroesofágico", "Diarrea", "Estreñimiento", "Vómito", "Náuseas", "Disfagia", "Hiperfagia", "Flatulencias", "Distensión abdominal", "Hiporexia", "Escala de Bristol"].map((sintoma, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{sintoma}</td>
-                      {[1, 2, 3, 4, 5].map(col => (
+                      {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col}><input type="text" name={`sint_${idx}_col${col}`} value={(formData[`sint_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
@@ -635,8 +669,8 @@ const HojaEvolutiva = () => {
                 <thead>
                   <tr>
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={{ width: '13%' }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={{ width: '10.8%' }}>
                         <input type="text" name={`ejer_fecha_${i}`} value={(formData[`ejer_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
@@ -646,7 +680,7 @@ const HojaEvolutiva = () => {
                   {["Si/No", "Anaerobico/Aeróbico", "¿Cual?", "Frecuencia", "Intensidad", "Tiempo", "Volumen", "Progresion"].map((param, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
-                      {[1, 2, 3, 4, 5].map(col => (
+                      {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col}><input type="text" name={`ejer_${idx}_col${col}`} value={(formData[`ejer_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
@@ -664,8 +698,8 @@ const HojaEvolutiva = () => {
                 <thead>
                   <tr>
                     <th className="th-fecha" style={{ width: '35%' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={{ width: '13%' }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={{ width: '10.8%' }}>
                         <input type="text" name={`diet_fecha_${i}`} value={(formData[`diet_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} maxLength={10} placeholder="DD/MM/AAAA" />
                       </th>
                     ))}
@@ -675,7 +709,7 @@ const HojaEvolutiva = () => {
                   {["Comidas al día", "Dieta especial", "Uso de laxantes", "Medicamentos ↓ peso"].map((param, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
-                      {[1, 2, 3, 4, 5].map(col => (
+                      {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col}><input type="text" name={`diet_${idx}_col${col}`} value={(formData[`diet_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
                       ))}
                     </tr>
@@ -1099,14 +1133,15 @@ const HojaEvolutiva = () => {
                     <th className="th-fecha t2-col2">Fecha</th>
                     {[1, 2, 3, 4, 5, 6].map(i => (
                       <th key={i} className="t2-cols" style={i === 6 ? { borderRight: 'none !important' } : {}}>
-                        <input 
-                          type="text" 
-                          name={`diag_nutri_fecha_${i}`} 
-                          value={(formData[`diag_nutri_fecha_${i}`] as string) || ''} 
-                          onChange={handleDateInput} readOnly tabIndex={-1} 
-                          placeholder="DD/MM/AAAA" 
-                          maxLength={10} 
-                          style={{ fontSize: '7.5px', padding: '0' }} /* <-- ESTO LO HACE PEQUEÑO */
+                        <input
+                          type="text"
+                          className="fecha-vertical"
+                          name={`diag_nutri_fecha_${i}`}
+                          value={(formData[`diag_nutri_fecha_${i}`] as string) || ''}
+                          onChange={handleDateInput} readOnly tabIndex={-1}
+                          placeholder="DD/MM/AAAA"
+                          maxLength={10}
+                          style={{ fontSize: '4.8px', padding: '1px 0', letterSpacing: '-0.3px' }} /* <-- ESTO LO HACE PEQUEÑO */
                         />
                       </th>
                     ))}
@@ -1124,7 +1159,7 @@ const HojaEvolutiva = () => {
                           <td className="estado-label">Nuevo</td>
                           {[1, 2, 3, 4, 5, 6].map(col => (
                             <td key={`nuevo_${col}`} style={col === 6 ? { borderRight: 'none !important' } : {}}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_nuevo_col${col}`} value={(formData[`diag_nutri_${diagGroup}_nuevo_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                              <input type="checkbox" name={`diag_nutri_${diagGroup}_nuevo_col${col}`} checked={!!formData[`diag_nutri_${diagGroup}_nuevo_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1132,7 +1167,7 @@ const HojaEvolutiva = () => {
                           <td className="estado-label">Continuo</td>
                           {[1, 2, 3, 4, 5, 6].map(col => (
                             <td key={`cont_${col}`} style={col === 6 ? { borderRight: 'none !important' } : {}}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_cont_col${col}`} value={(formData[`diag_nutri_${diagGroup}_cont_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                              <input type="checkbox" name={`diag_nutri_${diagGroup}_cont_col${col}`} checked={!!formData[`diag_nutri_${diagGroup}_cont_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1143,7 +1178,7 @@ const HojaEvolutiva = () => {
                               ...(isLast ? { borderBottom: 'none !important' } : {}),
                               ...(col === 6 ? { borderRight: 'none !important' } : {})
                             }}>
-                              <input type="text" name={`diag_nutri_${diagGroup}_res_col${col}`} value={(formData[`diag_nutri_${diagGroup}_res_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                              <input type="checkbox" name={`diag_nutri_${diagGroup}_res_col${col}`} checked={!!formData[`diag_nutri_${diagGroup}_res_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} />
                             </td>
                           ))}
                         </tr>
@@ -1181,13 +1216,13 @@ const HojaEvolutiva = () => {
               <table>
                 <colgroup>
                   <col style={{ width: '35%' }} />
-                  {[1, 2, 3, 4, 5].map(i => <col key={i} style={{ width: '13%' }} />)}
+                  {[1, 2, 3, 4, 5, 6].map(i => <col key={i} style={{ width: '10.83%' }} />)}
                 </colgroup>
                 <thead>
                   <tr>
                     <th className="th-fecha" style={{ textAlign: 'right', paddingRight: '15px' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={i === 5 ? { borderRight: 'none !important' } : {}}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={i === 6 ? { borderRight: 'none !important' } : {}}>
                         <input type="text" name={`interv_fecha_${i}`} value={(formData[`interv_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} style={{ fontSize: '8px' }} />
                       </th>
                     ))}
@@ -1196,20 +1231,20 @@ const HojaEvolutiva = () => {
                 <tbody>
                   <tr>
                     <td className="td-label">Indicación de<br/>Alimentos/Nutrimentos</td>
-                    {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>)}
+                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>)}
                   </tr>
-                  <tr><td colSpan={6} className="subtitulo-p6">Contenido Nutrimental</td></tr>
+                  <tr><td colSpan={7} className="subtitulo-p6">Contenido Nutrimental</td></tr>
                   {["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"].map((macro, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{macro}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
-                  <tr><td colSpan={6} className="subtitulo-p6">Equivalentes (rac)</td></tr>
+                  <tr><td colSpan={7} className="subtitulo-p6">Equivalentes (rac)</td></tr>
                   {["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"].map((eq, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{eq}</td>
-                      {[1, 2, 3, 4, 5].map(col => <td key={col} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -1225,16 +1260,16 @@ const HojaEvolutiva = () => {
                   <col style={{ width: '35%' }} />
                   <col style={{ width: '35%' }} />
                   <col style={{ width: '10%' }} />
-                  {[1, 2, 3, 4, 5].map(i => <col key={i} style={{ width: '4%' }} />)}
+                  {[1, 2, 3, 4, 5, 6].map(i => <col key={i} style={{ width: '3.33%' }} />)}
                 </colgroup>
                 <thead>
-                  <tr>
+                  <tr className="fecha-alta" style={{ height: '64.5px' }}>
                     <th className="header-azul">Educación Nutricional</th>
                     <th className="header-azul">Consejería Nutricional</th>
                     <th className="th-fecha" style={{ backgroundColor: 'white', borderBottom: 'var(--borde-fino)' }}>Fecha</th>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <th key={i} style={{ backgroundColor: 'white', borderBottom: 'var(--borde-fino)', ...(i === 5 ? { borderRight: 'none !important' } : {}) }}>
-                        <input type="text" name={`edu_fecha_${i}`} value={(formData[`edu_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM" maxLength={5} style={{ fontSize: '7px', padding: '0' }} />
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <th key={i} style={{ backgroundColor: 'white', borderBottom: 'var(--borde-fino)', ...(i === 6 ? { borderRight: 'none !important' } : {}) }}>
+                        <input type="text" className="fecha-vertical" name={`edu_fecha_${i}`} value={(formData[`edu_fecha_${i}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} />
                       </th>
                     ))}
                   </tr>
@@ -1245,28 +1280,28 @@ const HojaEvolutiva = () => {
                     return (
                       <React.Fragment key={rowBlock}>
                         <tr>
-                          <td rowSpan={3} style={{ padding: 0, ...(isLastBlock ? { borderBottom: 'none !important' } : {}) }}>
+                          <td rowSpan={3} style={{ padding: 0, borderTop: 'var(--borde-grueso) !important', borderRight: 'var(--borde-grueso) !important', ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }) }}>
                             <div className="cell-flex-col">
                               <div className="cell-half"><span className="text-mini">Contenido (E-1___)</span><textarea name={`edu_cont_${rowBlock}`} value={(formData[`edu_cont_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                               <div className="cell-half"><span className="text-mini">Aplicación (E-2___)</span><textarea name={`edu_apl_${rowBlock}`} value={(formData[`edu_apl_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                             </div>
                           </td>
-                          <td rowSpan={3} style={{ padding: 0, ...(isLastBlock ? { borderBottom: 'none !important' } : {}) }}>
+                          <td rowSpan={3} style={{ padding: 0, borderTop: 'var(--borde-grueso) !important', borderLeft: 'var(--borde-grueso) !important', borderRight: 'var(--borde-grueso) !important', ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }) }}>
                             <div className="cell-flex-col">
                               <div className="cell-half"><span className="text-mini">Bases/Acercamiento Teórico (C-1___)</span><textarea name={`cons_base_${rowBlock}`} value={(formData[`cons_base_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                               <div className="cell-half"><span className="text-mini">Estrategias (C-2___)</span><textarea name={`cons_est_${rowBlock}`} value={(formData[`cons_est_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
                             </div>
                           </td>
-                          <td className="estado-label">Logrado</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`log_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_log_col${col}`} value={(formData[`edu_${rowBlock}_log_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                          <td className="estado-label" style={{ borderTop: 'var(--borde-grueso) !important', borderLeft: 'var(--borde-grueso) !important' }}>Logrado</td>
+                          {[1, 2, 3, 4, 5, 6].map(col => <td key={`log_${col}`} style={{ borderTop: 'var(--borde-grueso) !important', ...(col === 6 ? { borderRight: 'none !important' } : {}) }}><input type="checkbox" name={`edu_${rowBlock}_log_col${col}`} checked={!!formData[`edu_${rowBlock}_log_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                         <tr>
-                          <td className="estado-label">Suspendida</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`sus_${col}`} style={col === 5 ? { borderRight: 'none !important' } : {}}><input type="text" name={`edu_${rowBlock}_sus_col${col}`} value={(formData[`edu_${rowBlock}_sus_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                          <td className="estado-label" style={{ borderLeft: 'var(--borde-grueso) !important' }}>Suspendida</td>
+                          {[1, 2, 3, 4, 5, 6].map(col => <td key={`sus_${col}`} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="checkbox" name={`edu_${rowBlock}_sus_col${col}`} checked={!!formData[`edu_${rowBlock}_sus_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                         <tr>
-                          <td className="estado-label" style={isLastBlock ? { borderBottom: 'none !important' } : {}}>No lograda</td>
-                          {[1, 2, 3, 4, 5].map(col => <td key={`nol_${col}`} style={{ ...(isLastBlock ? { borderBottom: 'none !important' } : {}), ...(col === 5 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`edu_${rowBlock}_nol_col${col}`} value={(formData[`edu_${rowBlock}_nol_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                          <td className="estado-label" style={{ borderLeft: 'var(--borde-grueso) !important', ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }) }}>No lograda</td>
+                          {[1, 2, 3, 4, 5, 6].map(col => <td key={`nol_${col}`} style={{ ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }), ...(col === 6 ? { borderRight: 'none !important' } : {}) }}><input type="checkbox" name={`edu_${rowBlock}_nol_col${col}`} checked={!!formData[`edu_${rowBlock}_nol_col${col}`]} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
                         </tr>
                       </React.Fragment>
                     );
@@ -1315,6 +1350,7 @@ const HojaEvolutiva = () => {
 
 
     </div>
+    </>
     );
 };
 

@@ -104,8 +104,12 @@ function crearHtmlBienvenidaPaciente(nombre) {
           </tr>
 
           <tr>
-            <td align="center" style="background:#ffffff;border-top:1px solid #e5e7eb;padding:20px;">
-              <p style="margin:0;color:#94a3b8;font-size:12px;">Clínica UTC · Sistema Institucional</p>
+            <td align="center" style="background:#ffffff;border-top:1px solid #e5e7eb;padding:20px 25px;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">Clínica UTC · Sistema Institucional</p>
+              <p style="margin:0 0 6px;color:#94a3b8;font-size:11px;line-height:1.6;">
+                Este es un mensaje automático del portal Clínica UTC para informarte sobre cambios importantes relacionados con tus citas. Por favor, no respondas a este correo.
+              </p>
+              <p style="margin:0;color:#cbd5e1;font-size:11px;">Este es un buzón de solo envío, no recibe respuestas.</p>
             </td>
           </tr>
 

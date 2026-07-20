@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import { usePhysiotherapyValoracionData } from '../hooks/formClinico/usePhysiotherapyValoracionData';
 import { usePrintFitScale } from '../hooks/usePrintFitScale';
+import { useScreenFitScale } from '../hooks/useScreenFitScale';
+import { useAuth } from '../contexts/AuthContext';
 import { formatExpediente } from '../lib/formatExpediente';
 
 // IMPORTACIÓN DE IMÁGENES
@@ -39,34 +40,46 @@ interface PageProps {
 const PhysiotherapyMasterForm = () => {
   const navigate = useNavigate();
   const { appointmentId, formData } = usePhysiotherapyValoracionData({});
+  const { user } = useAuth();
+  const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
   // Regla de impresión única para todos los documentos clínicos del sistema
   // (ver src/app/hooks/usePrintFitScale.ts para la explicación completa del
   // mecanismo). Validado originalmente en HojaEvolutiva.tsx y
   // NutritionMasterForm.tsx; reutilizado tal cual aquí.
   usePrintFitScale(['.page', '.page-p2', '.page-p3']);
+  // Ajuste de pantalla en móvil (no impresión) — ver useScreenFitScale.ts.
+  useScreenFitScale(['.page', '.page-p2', '.page-p3']);
 
   return (
     <div className="min-h-screen bg-zinc-600">
-      <div className="fixed top-4 right-4 z-50 flex gap-2 print:hidden">
+      <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
           onClick={() => navigate(-1)}
-          className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
           Volver
         </button>
         <button
           onClick={() => window.print()}
-          className="bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+          className="bg-blue-900 hover:bg-blue-800 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+          </svg>
           Imprimir
         </button>
-        {appointmentId && (
+        {appointmentId && puedeEditar && (
           <button
             onClick={() => navigate(`/forms/fisioterapia/${appointmentId}`)}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-2 text-sm"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+            </svg>
             Editar
           </button>
         )}
@@ -140,6 +153,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
 
         /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
         .page {
+            zoom: var(--screen-scale, 1);
             background-color: #fff;
             width: var(--print-width, 215.9mm);
             min-height: 279.4mm;
@@ -296,7 +310,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                    un valor fijo. Si la hoja cabe al 100%, --print-scale vale 1
                    y no pasa nada; solo se reduce si el contenido real excede
                    el alto físico de la hoja. */
-                zoom: var(--print-scale, 1);
+                zoom: var(--print-scale, 1) !important;
             }
             .btn-salir-fixed, .btn-siguiente-fixed { display: none !important; }
         }
@@ -593,6 +607,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .btn-siguiente-fixed:hover { transform: scale(1.05); background-color: #15803d; }
 
         .page-p2 {
+            zoom: var(--screen-scale, 1);
             background-color: #fff;
             width: var(--print-width, 215.9mm);
             margin-left: auto;
@@ -757,7 +772,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
                 -webkit-print-color-adjust: exact !important;
                 /* Escala calculada en tiempo real por usePrintFitScale — NUNCA
                    un valor fijo. */
-                zoom: var(--print-scale, 1);
+                zoom: var(--print-scale, 1) !important;
             }
         }
       `}</style>
@@ -1118,6 +1133,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         }
 
         .page-p3 {
+            zoom: var(--screen-scale, 1);
             background-color: #fff;
             width: var(--print-width, 215.9mm);
             margin-left: auto;
@@ -1228,7 +1244,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             .btn-anterior-p3, .btn-finalizar-p3, .eraser-container-p3 { display: none !important; }
             /* Escala calculada en tiempo real por usePrintFitScale — NUNCA un
                valor fijo. */
-            .page-p3 { box-shadow: none !important; width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 auto !important; zoom: var(--print-scale, 1); }
+            .page-p3 { box-shadow: none !important; width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 auto !important; zoom: var(--print-scale, 1) !important; }
         }
       `}</style>
 

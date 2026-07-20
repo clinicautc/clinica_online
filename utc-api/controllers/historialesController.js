@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { assertCitaEditablePorUsuario } = require('../middleware/authMiddleware');
 
 async function getAll(req, res) {
   try {
@@ -41,13 +42,18 @@ async function updateGenerico(req, res) {
   const tabla = tipo === 'nutricion' ? 'historiales_nutricion' : 'historiales_fisioterapia';
 
   try {
+    const existente = await pool.query(`SELECT appointment_id FROM ${tabla} WHERE id = $1`, [id]);
+    if (existente.rows.length > 0) {
+      await assertCitaEditablePorUsuario(existente.rows[0].appointment_id, req.user);
+    }
+
     const result = await pool.query(
       `UPDATE ${tabla} SET datos = $1 WHERE id = $2 RETURNING *`,
       [JSON.stringify(datos), id]
     );
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: error.message });
   }
 }
 
@@ -161,6 +167,8 @@ async function create(req, res) {
   else if (tipoLimpio === 'fisioterapia') tablaDestino = 'historiales_fisioterapia';
 
   try {
+    await assertCitaEditablePorUsuario(appointment_id, req.user);
+
     // Si el formulario nos envía el ID de la cita, le preguntamos a la base de datos a quién le pertenece.
     if (appointment_id) {
       const citaResult = await pool.query('SELECT paciente_id, paciente_nombre FROM citas WHERE id = $1', [appointment_id]);
@@ -203,7 +211,7 @@ async function create(req, res) {
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: error.message });
   }
 }
 

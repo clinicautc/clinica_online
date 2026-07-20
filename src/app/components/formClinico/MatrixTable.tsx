@@ -10,6 +10,7 @@ export interface MatrixRowConfig {
   label: ReactNode;
   name: (col: number) => string;
   type?: MatrixInputType;
+  maxLength?: number;
 }
 
 export interface MatrixGroupHeader {
@@ -32,10 +33,19 @@ interface MatrixTableProps {
   onDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDaysChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /**
+   * Exclusivo de Seguimiento Nutricional: columna (1-6) que corresponde a la
+   * consulta en curso. Si se pasa, todas las demás columnas se muestran en
+   * solo lectura (anteriores ya cerradas, futuras aún no alcanzadas) — un
+   * practicante solo puede escribir en `columnaActual`. Si se omite (caso de
+   * Fisioterapia, que no usa este bloqueo), el comportamiento es idéntico al
+   * de siempre: las 6 columnas quedan editables.
+   */
+  columnaActual?: number;
 }
 
 function CellInput({
-  name, type, value, onChange, onDateChange, onNumberChange, onDaysChange, isDateHeader, fechaPlaceholder, fechaMaxLength,
+  name, type, value, onChange, onDateChange, onNumberChange, onDaysChange, isDateHeader, fechaPlaceholder, fechaMaxLength, bloqueada, maxLength,
 }: {
   name: string;
   type?: MatrixInputType;
@@ -47,7 +57,10 @@ function CellInput({
   isDateHeader?: boolean;
   fechaPlaceholder?: string;
   fechaMaxLength?: number;
+  bloqueada?: boolean;
+  maxLength?: number;
 }) {
+  const claseBloqueada = bloqueada ? ' bg-slate-100 text-slate-400 cursor-not-allowed' : '';
   if (isDateHeader) {
     return (
       <Input
@@ -55,9 +68,10 @@ function CellInput({
         name={name}
         value={(value as string) || ''}
         onChange={onDateChange}
+        readOnly={bloqueada}
         maxLength={fechaMaxLength ?? 10}
         placeholder={fechaPlaceholder ?? 'DD/MM/AAAA'}
-        className="h-8 text-xs px-2"
+        className={`h-8 text-xs px-2${claseBloqueada}`}
       />
     );
   }
@@ -67,7 +81,9 @@ function CellInput({
         name={name}
         value={(value as string) || ''}
         onChange={onChange}
-        className="min-h-16 text-xs"
+        readOnly={bloqueada}
+        maxLength={maxLength}
+        className={`min-h-16 text-xs${claseBloqueada}`}
       />
     );
   }
@@ -79,7 +95,8 @@ function CellInput({
         name={name}
         value={(value as string) || ''}
         onChange={onNumberChange}
-        className="h-8 text-xs px-2"
+        readOnly={bloqueada}
+        className={`h-8 text-xs px-2${claseBloqueada}`}
       />
     );
   }
@@ -91,10 +108,11 @@ function CellInput({
           name={name}
           value={(value as string) || ''}
           onChange={onDaysChange}
+          readOnly={bloqueada}
           maxLength={1}
-          className="h-8 w-10 text-xs px-2 text-center"
+          className={`h-8 w-10 text-xs px-2 text-center${claseBloqueada}`}
         />
-        <span className="text-xs text-slate-400">/7</span>
+        <span className="text-xs text-slate-400">/7 días</span>
       </div>
     );
   }
@@ -104,7 +122,9 @@ function CellInput({
       name={name}
       value={(value as string) || ''}
       onChange={onChange}
-      className="h-8 text-xs px-2"
+      readOnly={bloqueada}
+      maxLength={maxLength}
+      className={`h-8 text-xs px-2${claseBloqueada}`}
     />
   );
 }
@@ -118,7 +138,7 @@ function CellInput({
  * angostas — mismos campos, agrupados de otra forma, ninguno se oculta.
  */
 export default function MatrixTable(props: MatrixTableProps) {
-  const { numCols, fechaName, fechaPlaceholder, fechaMaxLength, rows, groupHeaders, formData } = props;
+  const { numCols, fechaName, fechaPlaceholder, fechaMaxLength, rows, groupHeaders, formData, columnaActual } = props;
   const [openCol, setOpenCol] = useState(1);
 
   const rowsWithHeaders: Array<{ header?: string; row?: MatrixRowConfig; idx?: number }> = [];
@@ -148,6 +168,7 @@ export default function MatrixTable(props: MatrixTableProps) {
                     isDateHeader
                     fechaPlaceholder={fechaPlaceholder}
                     fechaMaxLength={fechaMaxLength}
+                    bloqueada={columnaActual != null && col !== columnaActual}
                   />
                 </TableHead>
               ))}
@@ -180,6 +201,8 @@ export default function MatrixTable(props: MatrixTableProps) {
                           onDateChange={props.onDateChange}
                           onNumberChange={props.onNumberChange}
                           onDaysChange={props.onDaysChange}
+                          bloqueada={columnaActual != null && col !== columnaActual}
+                          maxLength={row.maxLength}
                         />
                       </TableCell>
                     );
@@ -213,6 +236,7 @@ export default function MatrixTable(props: MatrixTableProps) {
                     isDateHeader
                     fechaPlaceholder={fechaPlaceholder}
                     fechaMaxLength={fechaMaxLength}
+                    bloqueada={columnaActual != null && col !== columnaActual}
                   />
                 </div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${openCol === col ? 'rotate-180' : ''}`} />
@@ -237,6 +261,8 @@ export default function MatrixTable(props: MatrixTableProps) {
                         onDateChange={props.onDateChange}
                         onNumberChange={props.onNumberChange}
                         onDaysChange={props.onDaysChange}
+                        bloqueada={columnaActual != null && col !== columnaActual}
+                        maxLength={row.maxLength}
                       />
                     </div>
                   );

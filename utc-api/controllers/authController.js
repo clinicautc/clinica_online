@@ -228,7 +228,8 @@ async function verifyAndRegister(req, res) {
     notificationService.notificarBienvenidaPaciente(nombre, email.trim().toLowerCase());
 
     const { password: _omitPassword, ...usuarioCreado } = newUser.rows[0];
-    res.status(201).json(usuarioCreado);
+    const tokens = await issueTokens(newUser.rows[0]);
+    res.status(201).json({ ...usuarioCreado, ...tokens });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

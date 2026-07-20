@@ -22,6 +22,19 @@ export const notasAPI = {
     });
   },
 
+  // Seguimiento Nutricional — exclusivo de nutrición, ver seguimientoNutricionalController.js
+  getSeguimientoNutricional(appointmentId: string | number) {
+    return apiFetchJson(`/seguimiento-nutricional/${appointmentId}`);
+  },
+
+  guardarSeguimientoNutricional(appointmentId: string | number, cuadroEvolucion: Record<string, unknown>) {
+    return apiFetchJson(`/seguimiento-nutricional/${appointmentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cuadro_evolucion: cuadroEvolucion })
+    });
+  },
+
   getUniversitarias() {
     return apiFetchJson('/notas_universitarias');
   },

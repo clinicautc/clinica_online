@@ -4,6 +4,7 @@ import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Chec
 import { toast } from 'sonner';
 import { authAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Register() {
   const [nombre, setNombre] = useState('');
@@ -33,6 +34,7 @@ export default function Register() {
   const [_isVerified, _setIsVerified] = useState(false);
 
   const navigate = useNavigate();
+  const { completarRegistro } = useAuth();
 
   // --- 1. LÓGICA PARA ENVIAR CÓDIGO VÍA RESEND ---
   // Reemplaza la función handleSendCode en Register.tsx
@@ -111,13 +113,10 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
   try {
-await authAPI.verifyRegister({
-  email,
-  code: verificationCode
-});
+    await completarRegistro(email, verificationCode);
 
     toast.success('Cuenta creada exitosamente');
-    navigate('/login');
+    navigate('/dashboard');
 
   } catch (err: any) {
     setError(err.message);

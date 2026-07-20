@@ -28,6 +28,7 @@ import PhysiotherapyMasterFormRouteResolver from './pages/PhysiotherapyMasterFor
 import NutritionMasterForm from './pages/NutritionMasterForm';
 import PhysiotherapyMasterForm from './pages/PhysiotherapyMasterForm';
 import HojaEvolutiva from './pages/HojaEvolutiva';
+import SeguimientoNutricional from './pages/SeguimientoNutricional';
 
 import StatisticsPage from './pages/StatisticsPage';
 import ManagePersonnelPage from './pages/ManagePersonnelPage';
@@ -38,6 +39,7 @@ import MedicalHistoryViewer from './components/MedicalHistoryViewer';
 // --Nueva pagina de Notas Evolutivas
 // --- NUEVA IMPORTACIÓN: HOJA EVOLUTIVA ---
 import EvolucionSeguimientoCaptura from './pages/captura/EvolucionSeguimientoCaptura';
+import SeguimientoNutricionalCaptura from './pages/captura/SeguimientoNutricionalCaptura';
 import ConsultaWorkspace from './pages/ConsultaWorkspace';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
@@ -209,7 +211,7 @@ const routeDefinitions = [
 },
 // Mantén esta también por si algún componente usa el nombre largo
 {
-  path: '/medical-history-viewer/:patientId',
+  path: '/medical-history-viewer/:id',
   element: (
     <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
       <MedicalHistoryViewer />
@@ -257,10 +259,31 @@ const routeDefinitions = [
   },
   {
     // Vista documental de solo lectura, idéntica al PDF — a donde manda "Ver Expediente".
+    // Fisioterapia (Nota de Evolución) — sin bloqueo por columna.
     path: '/forms/seguimiento/:appointmentId/documento',
     element: (
       <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
         <HojaEvolutiva />
+      </ProtectedRoute>
+    )
+  },
+  /**
+   * RUTAS: SEGUIMIENTO NUTRICIONAL — exclusivo de nutrición, documento por
+   * columnas con bloqueo progresivo (ver seguimientoNutricionalController.js).
+   */
+  {
+    path: '/forms/seguimiento-nutricional/:appointmentId',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <SeguimientoNutricionalCaptura />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/forms/seguimiento-nutricional/:appointmentId/documento',
+    element: (
+      <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
+        <SeguimientoNutricional />
       </ProtectedRoute>
     )
   },
