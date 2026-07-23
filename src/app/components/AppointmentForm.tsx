@@ -12,11 +12,19 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Calendar } from './ui/calendar';
-import { format, isBefore, startOfDay, isToday, parseISO } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { format, isBefore, isAfter, startOfDay, addDays, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Clock, Loader2 } from 'lucide-react';
-import { apiFetch, citasAPI } from '../lib/api';
+import { apiFetch, citasAPI, horariosAtencionAPI, HorarioAtencionDia } from '../lib/api';
+
+// Límite de anticipación para agendar — debe mantenerse en sync con
+// DIAS_MAXIMOS_ANTICIPACION en utc-api/controllers/citasController.js
+const DIAS_MAXIMOS_ANTICIPACION = 90;
+
+// JS: 0=domingo…6=sábado. ISO (igual que horarios_atencion): 1=lunes…7=domingo.
+const isoDow = (d: Date) => (d.getDay() === 0 ? 7 : d.getDay());
 
 interface Appointment {
   id?: number;
@@ -58,6 +66,14 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
   const [isSaving, setIsSaving] = useState(false);
   const [diasCompletos, setDiasCompletos] = useState<string[]>([]);
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [showLimiteFechaModal, setShowLimiteFechaModal] = useState(false);
+
+  // Horario de atención configurado por el master para el área elegida —
+  // reemplaza el bloqueo fijo de fin de semana y el rango fijo 8:00-24:00.
+  const [reglasHorario, setReglasHorario] = useState<Record<number, HorarioAtencionDia>>({});
+  const [diasCerrados, setDiasCerrados] = useState<Set<string>>(new Set());
+
+  const fechaMaxima = startOfDay(addDays(new Date(), DIAS_MAXIMOS_ANTICIPACION));
 
   useEffect(() => {
     if (isAdmin && currentUser?.area && !isRescheduling) {
@@ -68,17 +84,44 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
     }
   }, [currentUser, isAdmin, isRescheduling]);
 
-const generateAvailableSlots = () => {
+  // Trae el horario de atención (por día de la semana) y los días cerrados
+  // configurados por el master para el área elegida.
+  useEffect(() => {
+    if (!type) {
+      setReglasHorario({});
+      setDiasCerrados(new Set());
+      return;
+    }
+    horariosAtencionAPI.getHorarios(type)
+      .then(dias => {
+        const porDia: Record<number, HorarioAtencionDia> = {};
+        dias.forEach(d => { porDia[d.dia_semana] = d; });
+        setReglasHorario(porDia);
+      })
+      .catch(() => setReglasHorario({}));
+
+    horariosAtencionAPI.getCierres(type)
+      .then(cierres => setDiasCerrados(new Set(cierres.map(c => c.fecha.substring(0, 10)))))
+      .catch(() => setDiasCerrados(new Set()));
+  }, [type]);
+
+  const generateAvailableSlots = (forDate: Date | undefined) => {
+    if (!forDate) return [];
+    const regla = reglasHorario[isoDow(forDate)];
+    if (!regla || !regla.activo) return [];
+
+    const [hIni] = regla.hora_inicio.split(':').map(Number);
+    const [hFin] = regla.hora_fin.split(':').map(Number);
+
     const slots = [];
-    // Iniciamos el ciclo a las 8 y terminamos a las 24 (12:00 AM)
-    for (let hour = 8; hour <= 24; hour++) {
+    for (let hour = hIni; hour <= hFin; hour++) {
       const hh = hour.toString().padStart(2, '0');
-      slots.push(`${hh}:00`); // Solo agregamos la hora en punto
+      slots.push(`${hh}:00`);
     }
     return slots;
   };
 
-  const availableTimeSlots = generateAvailableSlots();
+  const availableTimeSlots = generateAvailableSlots(date);
 
   // Carga los días completamente ocupados del mes visible
   useEffect(() => {
@@ -132,6 +175,11 @@ const generateAvailableSlots = () => {
 
     if (isToday(date)) {
       toast.error("Las citas deben agendarse con un mínimo de 24 horas de anticipación.");
+      return;
+    }
+
+    if (isAfter(date, fechaMaxima)) {
+      setShowLimiteFechaModal(true);
       return;
     }
 
@@ -209,7 +257,9 @@ const generateAvailableSlots = () => {
 
   const isDateDisabled = (d: Date): boolean => {
     if (isToday(d) || isBefore(d, startOfDay(new Date()))) return true;
-    if (d.getDay() === 0 || d.getDay() === 6) return true;
+    if (isAfter(d, fechaMaxima)) return true;
+    if (!reglasHorario[isoDow(d)]?.activo) return true;
+    if (diasCerrados.has(format(d, 'yyyy-MM-dd'))) return true;
     if (diasCompletos.includes(format(d, 'yyyy-MM-dd'))) return true;
     return false;
   };
@@ -259,6 +309,7 @@ const generateAvailableSlots = () => {
                 mode="single"
                 selected={date}
                 onSelect={(newDate) => { setDate(newDate); setTime(''); }}
+                onDayClick={(d) => { if (isAfter(d, fechaMaxima)) setShowLimiteFechaModal(true); }}
                 disabled={(d) => isDateDisabled(d) || isSaving}
                 onMonthChange={setVisibleMonth}
                 locale={es}
@@ -282,7 +333,12 @@ const generateAvailableSlots = () => {
             ) : (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                 <Label className="text-blue-900 font-semibold flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Horario Disponible (00:00 - 17:00)
+                  <Clock className="w-4 h-4" /> Horario Disponible
+                  {date && reglasHorario[isoDow(date)] && (
+                    <span className="text-xs font-normal text-blue-900/60">
+                      ({reglasHorario[isoDow(date)].hora_inicio.substring(0, 5)} - {reglasHorario[isoDow(date)].hora_fin.substring(0, 5)})
+                    </span>
+                  )}
                 </Label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md shadow-inner bg-slate-50">
                   {availableTimeSlots.map((slot) => {
@@ -332,6 +388,36 @@ const generateAvailableSlots = () => {
           </Button>
         </form>
       </CardContent>
+
+      <Dialog open={showLimiteFechaModal} onOpenChange={setShowLimiteFechaModal}>
+        <DialogContent className="sm:max-w-md rounded-2xl border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-blue-900 text-xl font-black flex items-center gap-3">
+              <CalendarIcon className="w-6 h-6 text-blue-600" />
+              Fecha fuera de rango
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 font-medium mt-1">
+              No es posible agendar citas con tanta anticipación.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-3 p-4 rounded-xl bg-blue-50 border border-blue-100 space-y-1">
+            <p className="text-xs text-blue-600 font-bold uppercase tracking-widest">Límite de anticipación</p>
+            <p className="text-blue-900 font-black text-lg">
+              {DIAS_MAXIMOS_ANTICIPACION} días
+            </p>
+            <p className="text-[11px] text-slate-500">Selecciona una fecha dentro de los próximos {DIAS_MAXIMOS_ANTICIPACION} días.</p>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => setShowLimiteFechaModal(false)}
+            className="w-full mt-4 bg-blue-900 hover:bg-blue-800 font-bold shadow-md"
+          >
+            Entendido
+          </Button>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

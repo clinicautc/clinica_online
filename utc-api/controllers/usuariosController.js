@@ -31,21 +31,40 @@ async function getById(req, res) {
 // ENDPOINT DEFINITIVO: ACTUALIZAR PERFIL (NOMBRE, TELÉFONO Y MATRÍCULA)
 async function updateProfile(req, res) {
   const { id } = req.params;
-  const { nombre, telefono, matricula } = req.body;
+  const { telefono, matricula } = req.body;
 
   if (String(req.user.id) !== String(id)) {
     return res.status(403).json({ error: 'No tienes autorización para modificar este perfil.' });
   }
 
+  // El nombre nunca se acepta en este endpoint (no se puede modificar el propio
+  // nombre, bloqueado en el frontend para todos los roles). La matrícula solo
+  // la puede tocar un paciente, y solo dígitos (máx. 9) — respaldo del lado del
+  // servidor al bloqueo de ese campo en el frontend para practicante/admin/master.
+  const esPaciente = req.user.rol === 'paciente';
+  let matriculaFinal = null; // null -> COALESCE conserva el valor actual (campo bloqueado)
+
+  if (esPaciente && matricula !== undefined) {
+    if (matricula && !/^\d{1,9}$/.test(matricula)) {
+      return res.status(400).json({ error: 'La matrícula solo puede contener números (máximo 9 dígitos).' });
+    }
+    matriculaFinal = matricula || '';
+  }
+
+  // TELÉFONO: solo dígitos, máximo 10 — respaldo del lado del servidor a la
+  // validación que ya existe en el frontend.
+  if (telefono && !/^\d{1,10}$/.test(telefono)) {
+    return res.status(400).json({ error: 'El teléfono solo puede contener números (máximo 10 dígitos).' });
+  }
+
   try {
     const result = await pool.query(
       `UPDATE usuarios
-       SET nombre = COALESCE($1, nombre),
-           telefono = COALESCE($2, telefono),
-           matricula = COALESCE($3, matricula)
-       WHERE id = $4
+       SET telefono = COALESCE($1, telefono),
+           matricula = COALESCE($2, matricula)
+       WHERE id = $3
        RETURNING id, nombre, telefono, matricula, email, rol, area, status`,
-      [nombre, telefono, matricula, id]
+      [telefono, matriculaFinal, id]
     );
 
     if (result.rows.length === 0) {

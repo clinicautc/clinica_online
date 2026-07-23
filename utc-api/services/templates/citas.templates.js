@@ -34,6 +34,26 @@ function _formatearHora(hora) { return String(hora).substring(0, 5); }
 function _formatearArea(area) { return area === 'nutricion' ? 'Nutrición' : 'Fisioterapia'; }
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const INBODY_URL = 'https://play.google.com/store/apps/details?id=com.inbody2014.inbody';
+
+// Solo para citas de Nutrición — recomendación de descargar la app InBody antes
+// de la consulta. Se usa tanto en la confirmación como en el recordatorio de cita.
+function _bloqueInBody(area) {
+  if (area !== 'nutricion') return '';
+  return `
+              <div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #f97316;border-radius:12px;padding:20px;margin:20px 0;">
+                <p style="margin:0 0 14px;color:#7c2d12;font-size:14px;line-height:1.6;">
+                  <strong>Recomendación:</strong> te sugerimos descargar la app <strong>InBody</strong> antes de iniciar tu consulta de Nutrición.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" bgcolor="#f97316" style="border-radius:8px;">
+                      <a href="${INBODY_URL}" target="_blank" style="display:inline-block;padding:10px 24px;font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">Descargar InBody</a>
+                    </td>
+                  </tr>
+                </table>
+              </div>`;
+}
 
 function crearHtmlCitaCreada(nombre, fecha, hora, area, practicanteNombre) {
   const fechaFormateada   = _formatearFecha(fecha);
@@ -115,6 +135,115 @@ function crearHtmlCitaCreada(nombre, fecha, hora, area, practicanteNombre) {
 
               <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">${pieTexto}</p>
               <p style="color:#6b7280;font-size:14px;line-height:1.7;">Si necesitas cancelar o reagendar tu cita, accede a tu portal con 24 horas de anticipación a tu horario de cita.</p>
+              ${_bloqueInBody(area)}
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Accede aquí</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="background:#ffffff;border-top:1px solid #e5e7eb;padding:20px 25px;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">Clínica UTC · Sistema Institucional</p>
+              <p style="margin:0 0 6px;color:#94a3b8;font-size:11px;line-height:1.6;">
+                Este es un mensaje automático del portal Clínica UTC para informarte sobre cambios importantes relacionados con tus citas. Por favor, no respondas a este correo.
+              </p>
+              <p style="margin:0;color:#cbd5e1;font-size:11px;">Este es un buzón de solo envío, no recibe respuestas.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>`;
+}
+
+function crearHtmlRecordatorioCita(nombre, fecha, hora, area, practicanteNombre) {
+  const fechaFormateada   = _formatearFecha(fecha);
+  const horaFormateada    = _formatearHora(hora);
+  const areaFormateada    = _formatearArea(area);
+  const filaPracticante   = practicanteNombre
+    ? `<tr>
+         <td>
+           <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">profesional de la salud</p>
+           <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#1e3a8a;">${practicanteNombre}</p>
+         </td>
+       </tr>`
+    : '';
+
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="x-apple-disable-message-reformatting" />
+  ${STYLES}
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,sans-serif;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;padding:20px 10px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);border:1px solid #e5e7eb;">
+
+          <tr>
+            <td class="email-header" align="center" style="background:linear-gradient(135deg,#dbeafe,#eff6ff);padding:35px 20px;">
+              <h1 class="brand-title" style="margin:0;font-size:34px;font-weight:900;color:#1e3a8a;">Clínica UTC</h1>
+              <p style="margin-top:10px;font-size:14px;color:#475569;">Sistema Clínico Universitario</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="email-body" style="padding:35px 25px;">
+
+              <h2 class="email-title" style="margin-top:0;color:#111827;font-size:24px;line-height:1.3;">Recordatorio: tu cita es mañana ⏰</h2>
+
+              <p style="color:#4b5563;font-size:16px;line-height:1.8;margin-bottom:30px;">
+                Hola, <strong>${nombre}</strong>. Te recordamos que tienes una cita programada en el área de <strong>${areaFormateada}</strong> dentro de las próximas 24 horas.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div class="info-box" style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:12px;padding:25px;margin-bottom:20px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Área</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#1e3a8a;">${areaFormateada}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Fecha</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#111827;">${fechaFormateada}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="${practicanteNombre ? 'padding-bottom:12px;' : ''}">
+                            <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Hora</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#111827;">${horaFormateada} hrs</p>
+                          </td>
+                        </tr>
+                        ${filaPracticante}
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Si ya no puedes asistir, por favor cancela o reagenda desde tu portal lo antes posible para liberar el horario.</p>
+              ${_bloqueInBody(area)}
 
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
                 <tr>
@@ -349,4 +478,202 @@ function crearHtmlReasignacion(pacienteNombre, fecha, hora, nuevoPracticanteNomb
 </html>`;
 }
 
-module.exports = { crearHtmlCitaCreada, crearHtmlAsignacionAutomatica, crearHtmlReasignacion };
+function crearHtmlCambioHorarioOperacion(pacienteNombre, fechaAnterior, fechaNueva, hora, area) {
+  const fechaAnteriorFormateada = _formatearFecha(fechaAnterior);
+  const fechaNuevaFormateada    = _formatearFecha(fechaNueva);
+  const horaFormateada          = _formatearHora(hora);
+  const areaFormateada          = _formatearArea(area);
+
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="x-apple-disable-message-reformatting" />
+  ${STYLES}
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,sans-serif;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;padding:20px 10px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);border:1px solid #e5e7eb;">
+
+          <tr>
+            <td class="email-header" align="center" style="background:linear-gradient(135deg,#fef3c7,#fffbeb);padding:35px 20px;">
+              <h1 class="brand-title" style="margin:0;font-size:34px;font-weight:900;color:#92400e;">Clínica UTC</h1>
+              <p style="margin-top:10px;font-size:14px;color:#475569;">Sistema Clínico Universitario</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="email-body" style="padding:35px 25px;">
+
+              <h2 class="email-title" style="margin-top:0;color:#111827;font-size:24px;line-height:1.3;">Cambio en tu cita por horario de operación</h2>
+
+              <p style="color:#4b5563;font-size:16px;line-height:1.8;margin-bottom:30px;">
+                Hola, <strong>${pacienteNombre}</strong>. Actualizamos el horario de atención del área de <strong>${areaFormateada}</strong> y tu cita ya no cae dentro del nuevo horario disponible, así que la reagendamos automáticamente al día más próximo con el mismo horario.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div class="info-box" style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:12px;padding:25px;margin-bottom:20px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Fecha anterior</p>
+                            <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:#78350f;text-decoration:line-through;">${fechaAnteriorFormateada}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Nueva fecha</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#111827;">${fechaNuevaFormateada}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <p style="margin:0;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Hora (sin cambio)</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#111827;">${horaFormateada} hrs</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Si esta nueva fecha no te funciona, puedes reagendar o cancelar tu cita libremente desde tu portal.</p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#2563eb" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Accede aquí</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="background:#ffffff;border-top:1px solid #e5e7eb;padding:20px 25px;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">Clínica UTC · Sistema Institucional</p>
+              <p style="margin:0 0 6px;color:#94a3b8;font-size:11px;line-height:1.6;">
+                Este es un mensaje automático del portal Clínica UTC para informarte sobre cambios importantes relacionados con tus citas. Por favor, no respondas a este correo.
+              </p>
+              <p style="margin:0;color:#cbd5e1;font-size:11px;">Este es un buzón de solo envío, no recibe respuestas.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>`;
+}
+
+function crearHtmlConflictoHorarioOperacion(pacienteNombre, fecha, hora, area) {
+  const fechaFormateada = _formatearFecha(fecha);
+  const horaFormateada  = _formatearHora(hora);
+  const areaFormateada  = _formatearArea(area);
+
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="x-apple-disable-message-reformatting" />
+  ${STYLES}
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,sans-serif;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;padding:20px 10px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);border:1px solid #e5e7eb;">
+
+          <tr>
+            <td class="email-header" align="center" style="background:linear-gradient(135deg,#fee2e2,#fef2f2);padding:35px 20px;">
+              <h1 class="brand-title" style="margin:0;font-size:34px;font-weight:900;color:#991b1b;">Clínica UTC</h1>
+              <p style="margin-top:10px;font-size:14px;color:#475569;">Sistema Clínico Universitario</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="email-body" style="padding:35px 25px;">
+
+              <h2 class="email-title" style="margin-top:0;color:#111827;font-size:24px;line-height:1.3;">Acción requerida: tu cita necesita reagendarse</h2>
+
+              <p style="color:#4b5563;font-size:16px;line-height:1.8;margin-bottom:30px;">
+                Hola, <strong>${pacienteNombre}</strong>. Actualizamos el horario de atención del área de <strong>${areaFormateada}</strong> y tu cita ya no cae dentro del nuevo horario disponible. Esta vez no logramos encontrarte automáticamente un horario libre equivalente, así que necesitamos que tú mismo elijas una nueva fecha.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div class="info-box" style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:12px;padding:25px;margin-bottom:20px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="margin:0;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:1px;">Cita afectada</p>
+                            <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:#7f1d1d;">${fechaFormateada}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <p style="margin:0;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:1px;">Hora</p>
+                            <p style="margin:4px 0 0 0;font-size:16px;font-weight:700;color:#111827;">${horaFormateada} hrs</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Por favor entra a tu portal y reagenda o cancela esta cita lo antes posible — de lo contrario podría quedar en un horario que ya no atendemos.</p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="#dc2626" style="border-radius:8px;">
+                    <a href="${FRONTEND_URL}/dashboard" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Reagendar ahora</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="background:#ffffff;border-top:1px solid #e5e7eb;padding:20px 25px;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">Clínica UTC · Sistema Institucional</p>
+              <p style="margin:0 0 6px;color:#94a3b8;font-size:11px;line-height:1.6;">
+                Este es un mensaje automático del portal Clínica UTC para informarte sobre cambios importantes relacionados con tus citas. Por favor, no respondas a este correo.
+              </p>
+              <p style="margin:0;color:#cbd5e1;font-size:11px;">Este es un buzón de solo envío, no recibe respuestas.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>`;
+}
+
+module.exports = {
+  crearHtmlCitaCreada,
+  crearHtmlRecordatorioCita,
+  crearHtmlAsignacionAutomatica,
+  crearHtmlReasignacion,
+  crearHtmlCambioHorarioOperacion,
+  crearHtmlConflictoHorarioOperacion,
+};

@@ -22,6 +22,7 @@ const recomendacionesRoutes = require('./routes/recomendacionesRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const horariosRoutes = require('./routes/horariosRoutes');
 const asistenciaRoutes = require('./routes/asistenciaRoutes');
+const horariosAtencionRoutes = require('./routes/horariosAtencionRoutes');
 
 const { iniciarTareasProgramadas } = require('./services/scheduledTasks');
 
@@ -50,6 +51,7 @@ app.use('/api', recomendacionesRoutes);
 app.use('/api', statsRoutes);
 app.use('/api', horariosRoutes);
 app.use('/api', asistenciaRoutes);
+app.use('/api', horariosAtencionRoutes);
 
 // --- RUTA DE SALUD (PARA MONITOREO) ---
 app.get('/api/health', async (req, res) => {

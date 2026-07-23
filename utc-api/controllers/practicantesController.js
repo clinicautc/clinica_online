@@ -23,6 +23,12 @@ async function create(req, res) {
   const esDocente = tipo === 'docente';
   const identificador = esDocente ? numero_empleado : matricula;
 
+  // VALIDACIÓN DE NOMBRE: solo letras y espacios (respaldo del lado del
+  // servidor a la validación que ya existe en el formulario).
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,90}$/.test((nombre || '').trim())) {
+    return res.status(400).json({ error: 'El nombre solo puede contener letras y espacios.' });
+  }
+
   // VALIDACIÓN DE IDENTIFICADOR: solo números, máximo 9 dígitos (respaldo del
   // lado del servidor a la validación que ya existe en el formulario).
   if (!/^\d{1,9}$/.test(identificador || '')) {

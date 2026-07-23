@@ -12,3 +12,5 @@ export { horariosAPI } from './horariosAPI';
 export type { DiaSemana } from './horariosAPI';
 export { asistenciaAPI } from './asistenciaAPI';
 export type { RegistroAsistencia, PracticanteAsistencia, AsistenciaMesEntry } from './asistenciaAPI';
+export { horariosAtencionAPI } from './horariosAtencionAPI';
+export type { Area, HorarioAtencionDia, CierreClinico } from './horariosAtencionAPI';

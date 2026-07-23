@@ -111,6 +111,7 @@ export default function PhysiotherapyAdminDashboard() {
     nombre: user?.nombre || 'Coordinador Fisioterapia',
     telefono: user?.telefono || '',
     matricula: user?.matricula || '',
+    numero_empleado: user?.numero_empleado || '',
     rol: user?.rol || '',
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
@@ -133,12 +134,13 @@ export default function PhysiotherapyAdminDashboard() {
         setTodasCitas(allAppointments);
         const filtered = allAppointments.filter((apt) => {
           if (apt.tipo !== 'fisioterapia') return false;
-          if (estadoFilter !== 'todos') return apt.estado === estadoFilter;
           const cleanAptDate = apt.fecha.split('T')[0];
           const matchesFecha = viewMode === 'day'
             ? cleanAptDate === selectedDate
             : cleanAptDate.startsWith(selectedMonth);
-          return matchesFecha;
+          if (!matchesFecha) return false;
+          if (estadoFilter !== 'todos' && apt.estado !== estadoFilter) return false;
+          return true;
         });
         filtered.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
         setTodayAppointments(filtered);
@@ -198,6 +200,7 @@ export default function PhysiotherapyAdminDashboard() {
         nombre: user.nombre || profileData.nombre,
         telefono: user.telefono || profileData.telefono,
         matricula: user.matricula || profileData.matricula,
+        numero_empleado: user.numero_empleado || profileData.numero_empleado,
         rol: user.rol || profileData.rol
       });
     }
@@ -454,11 +457,10 @@ export default function PhysiotherapyAdminDashboard() {
                   <div>
                     <CardTitle className="text-blue-900 font-extrabold text-xl">Citas de Fisioterapia</CardTitle>
                     <CardDescription className="font-medium italic text-base">
-                      {estadoFilter !== 'todos'
-                        ? `Mostrando todas las citas: ${getEstadoLabel(estadoFilter).toLowerCase()}`
-                        : viewMode === 'day'
+                      {viewMode === 'day'
                         ? `Mostrando citas del ${format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}`
                         : `Mostrando todas las citas de ${format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })}`}
+                      {estadoFilter !== 'todos' && ` · ${getEstadoLabel(estadoFilter)}`}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1023,8 +1025,8 @@ export default function PhysiotherapyAdminDashboard() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
-          <div className="flex flex-col items-center mb-6">
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+          <div className="flex flex-col items-center mb-4">
             <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 border-4 border-white shadow-lg flex items-center justify-center mb-3">
               <span className="text-3xl font-black text-blue-700">{inicialesAvatar.toUpperCase()}</span>
             </div>
@@ -1035,7 +1037,7 @@ export default function PhysiotherapyAdminDashboard() {
           </div>
 
           <div className="flex-1 flex flex-col justify-between">
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</span>
                 {!isEditingProfile && (
@@ -1053,23 +1055,14 @@ export default function PhysiotherapyAdminDashboard() {
                     <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Nombre Completo</Label>
                     <div className="relative flex items-center">
                       <User className="w-4 h-4 text-blue-400 absolute left-4" />
-                      <input 
-                        type="text" 
-                        maxLength={40} // <-- 1. Límite estricto de 40 caracteres
+                      <input
+                        type="text"
                         value={profileData.nombre}
-                        onChange={(e) => {
-                          // 2. Esta línea elimina cualquier cosa que NO sea letra, acento, ñ, o espacio
-                          const soloLetras = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
-                          
-                          // Opcional: Si quieres que no puedan poner múltiples espacios seguidos, puedes usar:
-                          // const nombreLimpio = soloLetras.replace(/\s{2,}/g, ' ');
-                          
-                          setProfileData({...profileData, nombre: soloLetras});
-                        }}
-                        disabled={!isEditingProfile}
-                        className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+                        disabled={true}
+                        className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
                       />
                     </div>
+                    <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El nombre no puede ser modificado.</p>
                   </div>
 
 
@@ -1082,7 +1075,7 @@ export default function PhysiotherapyAdminDashboard() {
     <Phone className="w-4 h-4 text-blue-400 absolute left-4" />
     <input 
       type="tel" // <-- 1. Cambiado a 'tel'
-      maxLength={15} // <-- 2. Límite estricto de 15 dígitos
+      maxLength={10} // <-- 2. Límite estricto de 10 dígitos
       value={profileData.telefono}
       onChange={(e) => {
         // 3. Esta línea elimina cualquier carácter que NO sea un dígito (\D)
@@ -1090,33 +1083,31 @@ export default function PhysiotherapyAdminDashboard() {
         setProfileData({...profileData, telefono: soloNumeros});
       }}
       disabled={!isEditingProfile}
-      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
+      className={`w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
     />
   </div>
 </div>
 
-              {(profileData.rol === 'practicante' || profileData.rol === 'paciente') && (
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Matrícula Institucional</Label>
-                  <div className="relative flex items-center">
-                    <FileText className="w-4 h-4 text-blue-400 absolute left-4" />
-                    <input 
-                      type="text" 
-                      value={profileData.matricula}
-                      onChange={(e) => setProfileData({...profileData, matricula: e.target.value})}
-                      disabled={!isEditingProfile}
-                      placeholder="Ej. UTC-12345"
-                      className={`w-full rounded-xl pl-11 pr-4 py-3 text-sm font-medium transition-all focus:outline-none ${isEditingProfile ? 'bg-white border-blue-300 ring-2 ring-blue-500 border' : 'bg-slate-50 border border-slate-200 text-blue-950 disabled:cursor-not-allowed'}`}
-                    />
-                  </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Número de Empleado</Label>
+                <div className="relative flex items-center">
+                  <FileText className="w-4 h-4 text-blue-400 absolute left-4" />
+                  <input
+                    type="text"
+                    value={profileData.numero_empleado}
+                    disabled={true}
+                    placeholder="Sin asignar"
+                    className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
+                  />
                 </div>
-              )}
-              
+                <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El número de empleado no puede ser modificado.</p>
+              </div>
+
               <div className="space-y-1">
                 <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Área Asignada</Label>
                 <div className="relative flex items-center">
                   <Building className="w-4 h-4 text-blue-400 absolute left-4" />
-                  <input type="text" value="Fisioterapia Clínica" disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm text-slate-400 font-medium cursor-not-allowed" />
+                  <input type="text" value="Fisioterapia Clínica" disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-2.5 text-sm text-slate-400 font-medium cursor-not-allowed" />
                 </div>
               </div>
 
@@ -1133,11 +1124,11 @@ export default function PhysiotherapyAdminDashboard() {
             </div>
 
             {!isEditingProfile && (
-              <div className="space-y-3 pt-6 border-t border-slate-100 mt-6">
-                <button onClick={handleLogout} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              <div className="space-y-2 pt-3 border-t border-slate-100 mt-3">
+                <button onClick={handleLogout} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
                   <LogOut className="w-4 h-4" /> Cerrar Sesión
                 </button>
-                <button onClick={() => setIsDeleteModalOpen(true)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-100">
+                <button onClick={() => setIsDeleteModalOpen(true)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-100">
                   <Trash2 className="w-4 h-4" /> Eliminar Cuenta
                 </button>
               </div>

@@ -59,6 +59,7 @@ export default function ManagePersonnelPage() {
   const [horarioModalOpen, setHorarioModalOpen] = useState(false);
   const [horarioModalId, setHorarioModalId] = useState<string | null>(null);
   const [horarioModalNombre, setHorarioModalNombre] = useState('');
+  const [horarioModalArea, setHorarioModalArea] = useState<'nutricion' | 'fisioterapia' | ''>('');
 
   // Asistencia
   const hoy = format(new Date(), 'yyyy-MM-dd');
@@ -86,15 +87,27 @@ export default function ManagePersonnelPage() {
     }
   }, [user]);
 
+  // Sondeo cada 30s (mismo patrón que los dashboards) para ver en vivo altas o
+  // cambios de estado hechos por otro admin/master sin recargar la página.
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(cargarDocentes, 30_000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     if (!user || viewModeAsistencia !== 'day') return;
     cargarAsistencia();
+    const interval = setInterval(() => cargarAsistencia(true), 30_000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, viewModeAsistencia, selectedDateAsistencia]);
 
   useEffect(() => {
     if (!user || viewModeAsistencia !== 'month') return;
     cargarAsistenciaMes();
+    const interval = setInterval(() => cargarAsistenciaMes(true), 30_000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, viewModeAsistencia, selectedMonthAsistencia]);
 
@@ -129,8 +142,8 @@ export default function ManagePersonnelPage() {
     }
   };
 
-  const cargarAsistencia = useCallback(async () => {
-    setCargandoAsistencia(true);
+  const cargarAsistencia = useCallback(async (silent = false) => {
+    if (!silent) setCargandoAsistencia(true);
     try {
       const data = await asistenciaAPI.getByFecha(selectedDateAsistencia, user?.area || undefined);
       setAsistencia(data);
@@ -140,21 +153,28 @@ export default function ManagePersonnelPage() {
           init[p.id] = p.asistencia;
         }
       });
-      setEstadosAsistencia(init);
+      if (silent) {
+        // Sondeo en segundo plano: no pisar marcas que el admin ya seleccionó
+        // localmente y todavía no guarda — solo se completan filas que no
+        // tenía tocadas (ej. alguien más ya las registró).
+        setEstadosAsistencia(prev => ({ ...init, ...prev }));
+      } else {
+        setEstadosAsistencia(init);
+      }
     } catch {
     } finally {
-      setCargandoAsistencia(false);
+      if (!silent) setCargandoAsistencia(false);
     }
   }, [selectedDateAsistencia, user?.area]);
 
-  const cargarAsistenciaMes = useCallback(async () => {
-    setCargandoMes(true);
+  const cargarAsistenciaMes = useCallback(async (silent = false) => {
+    if (!silent) setCargandoMes(true);
     try {
       const data = await asistenciaAPI.getByMes(selectedMonthAsistencia, user?.area || undefined);
       setAsistenciasMes(data);
     } catch {
     } finally {
-      setCargandoMes(false);
+      if (!silent) setCargandoMes(false);
     }
   }, [selectedMonthAsistencia, user?.area]);
 
@@ -217,9 +237,10 @@ export default function ManagePersonnelPage() {
     }
   };
 
-  const abrirHorarioModal = (id: string, nombre: string) => {
+  const abrirHorarioModal = (id: string, nombre: string, area: 'nutricion' | 'fisioterapia' | '') => {
     setHorarioModalId(id);
     setHorarioModalNombre(nombre);
+    setHorarioModalArea(area);
     setHorarioModalOpen(true);
   };
 
@@ -361,10 +382,12 @@ export default function ManagePersonnelPage() {
                     <Label className="text-blue-900 font-bold">Nombre(s)</Label>
                     <Input
                       value={nuevoD.nombre}
-                      onChange={e => setNuevoD({ ...nuevoD, nombre: e.target.value })}
+                      onChange={e => setNuevoD({ ...nuevoD, nombre: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') })}
                       placeholder="Nombre(s)"
+                      maxLength={40}
                       required className="bg-white border-blue-900/20"
                     />
+                    <p className="text-[10px] text-slate-400">Solo letras y espacios, sin números ni símbolos.</p>
                   </div>
 
                   {/* Apellido(s) */}
@@ -372,10 +395,12 @@ export default function ManagePersonnelPage() {
                     <Label className="text-blue-900 font-bold">Apellido(s)</Label>
                     <Input
                       value={nuevoD.apellido}
-                      onChange={e => setNuevoD({ ...nuevoD, apellido: e.target.value })}
+                      onChange={e => setNuevoD({ ...nuevoD, apellido: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') })}
                       placeholder="Apellido(s)"
+                      maxLength={40}
                       required className="bg-white border-blue-900/20"
                     />
+                    <p className="text-[10px] text-slate-400">Solo letras y espacios, sin números ni símbolos.</p>
                   </div>
 
                   {/* Email */}
@@ -436,7 +461,7 @@ export default function ManagePersonnelPage() {
                         <p className="text-xs text-slate-500">Opcional al registrar — editable en cualquier momento desde la tabla.</p>
                       </div>
                     </div>
-                    <HorarioPracticas onChange={setHorarioNuevo} />
+                    <HorarioPracticas area={nuevoD.area} onChange={setHorarioNuevo} />
                   </div>
                 )}
 
@@ -548,7 +573,7 @@ export default function ManagePersonnelPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => abrirHorarioModal(docente.id, docente.name)}
+                          onClick={() => abrirHorarioModal(docente.id, docente.name, docente.area)}
                           className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs gap-1.5"
                         >
                           <CalendarClock className="w-3.5 h-3.5" /> Horario
@@ -650,7 +675,7 @@ export default function ManagePersonnelPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => abrirHorarioModal(docente.id, docente.name)}
+                              onClick={() => abrirHorarioModal(docente.id, docente.name, docente.area)}
                               className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs px-3 gap-1.5"
                             >
                               <CalendarClock className="w-3.5 h-3.5" /> Horario
@@ -1036,6 +1061,7 @@ export default function ManagePersonnelPage() {
             {horarioModalId && (
               <HorarioPracticas
                 usuarioId={horarioModalId}
+                area={horarioModalArea}
                 onChange={() => {}}
               />
             )}

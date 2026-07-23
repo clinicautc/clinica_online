@@ -346,12 +346,6 @@ async function exportToExcel(
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border    = bd();
   };
-  const dCell = (cell: any, zebra = false, align: 'left' | 'center' | 'right' = 'left') => {
-    cell.font      = { name: 'Arial', size: 9, color: { argb: COL.darkText } };
-    cell.alignment = { vertical: 'middle', horizontal: align };
-    cell.border    = bd();
-    if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.zebra } };
-  };
 
   // ── Pre-cálculos desde rawData ────────────────────────────────────────────
   const allCitas   = rawData.citas;
@@ -944,7 +938,7 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
         const [citas, historiales, dbStats, usuarios] = await Promise.all([
           citasAPI.getAll(),
           historialesAPI.getAll(),
-          metricasAPI.getDashboardStats({}),
+          metricasAPI.getDashboardStats(),
           usuariosAPI.getAll().catch(() => []),
         ]);
         setRawData({ citas, usuarios, historiales });

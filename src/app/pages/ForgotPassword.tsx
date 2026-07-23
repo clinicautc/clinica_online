@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check,Mail,KeyRound,Eye,EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
@@ -10,15 +10,45 @@ import { authAPI } from '../lib/api';
 
 type Step = 'email' | 'code' | 'password' | 'success';
 
+// Mismo problema que en Register.tsx: en móvil, salir a revisar el correo por
+// el código puede hacer que el navegador descargue y recargue la pestaña. Sin
+// esto, se perdería el paso en el que iban y habría que pedir un código nuevo.
+const DRAFT_KEY = 'utc_forgot_password_draft';
+
+function loadDraft(): Partial<{
+  currentStep: Step; email: string; verificationCode: string;
+  newPassword: string; confirmPassword: string;
+}> {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function ForgotPassword() {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<Step>('email');
+  const draft = loadDraft();
+  const [currentStep, setCurrentStep] = useState<Step>(draft.currentStep === 'success' ? 'email' : (draft.currentStep || 'email'));
 
-  const [email, setEmail] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState(draft.email || '');
+  const [verificationCode, setVerificationCode] = useState(draft.verificationCode || '');
+  const [newPassword, setNewPassword] = useState(draft.newPassword || '');
+  const [confirmPassword, setConfirmPassword] = useState(draft.confirmPassword || '');
   const [showPassword, setShowPassword] = useState(false);const [ showConfirmPassword,setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        currentStep, email, verificationCode, newPassword, confirmPassword
+      }));
+    } catch {}
+  }, [currentStep, email, verificationCode, newPassword, confirmPassword]);
+
+  const clearDraft = () => {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+  };
 
   const [emailError, setEmailError] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -53,7 +83,7 @@ const passwordsMatch =
     return value !== newPassword ? 'No coinciden' : '';
   };
 
-  const handleBackToLogin = () => navigate('/');
+  const handleBackToLogin = () => { clearDraft(); navigate('/'); };
   const handleResendCode = async () => {
 
     try {
@@ -315,6 +345,7 @@ setCurrentStep('password');
                 newPassword
                });
 
+clearDraft();
 setCurrentStep('success');
 
                 } catch {

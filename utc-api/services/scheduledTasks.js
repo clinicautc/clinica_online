@@ -1,4 +1,5 @@
 const pool = require('../db');
+const notificationService = require('./notificationService');
 
 // ---------------------------------------------------------------------------
 // DESACTIVACIÓN DIARIA
@@ -158,12 +159,53 @@ async function cerrarCitasNoAtendidas() {
 }
 
 // ---------------------------------------------------------------------------
+// RECORDATORIO DE CITA (24 HORAS ANTES, SOLO AL PACIENTE)
+// Se ejecuta cada minuto. En cuanto una cita 'programada' entra dentro de las
+// próximas 24 horas se marca recordatorio_enviado = true (claim atómico vía
+// UPDATE...RETURNING, igual que cerrarCitasNoAtendidas) y recién después se
+// manda el correo — así un tick concurrente nunca puede reenviarlo dos veces.
+// ---------------------------------------------------------------------------
+
+async function enviarRecordatoriosCitas() {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE citas c
+          SET recordatorio_enviado = true
+        WHERE c.estado = 'programada'
+          AND c.recordatorio_enviado = false
+          AND (c.fecha + c.hora)::timestamp <= (NOW() AT TIME ZONE 'America/Mexico_City')::timestamp + INTERVAL '24 hours'
+          AND (c.fecha + c.hora)::timestamp > (NOW() AT TIME ZONE 'America/Mexico_City')::timestamp
+        RETURNING id, paciente_id, paciente_nombre, practicante_nombre, tipo, fecha, hora`
+    );
+
+    for (const cita of rows) {
+      try {
+        const { rows: pacRows } = await pool.query('SELECT email FROM usuarios WHERE id = $1', [cita.paciente_id]);
+        if (pacRows.length === 0) continue;
+        await notificationService.notificarRecordatorioCita(
+          cita.paciente_nombre, pacRows[0].email, cita.fecha, cita.hora, cita.tipo, cita.practicante_nombre
+        );
+      } catch (err) {
+        console.error('[recordatorio-cita] Error al notificar cita', cita.id, ':', err.message);
+      }
+    }
+
+    if (rows.length > 0) {
+      console.log(`[recordatorio-cita] ${rows.length} recordatorio(s) enviado(s): [${rows.map(c => `#${c.id}`).join(', ')}]`);
+    }
+  } catch (error) {
+    console.error('[scheduledTasks] Error en enviarRecordatoriosCitas:', error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // ARRANQUE
 // ---------------------------------------------------------------------------
 
 async function tick() {
   await verificarYDesactivarPracticantes();
   await cerrarCitasNoAtendidas();
+  await enviarRecordatoriosCitas();
 }
 
 function iniciarTareasProgramadas() {

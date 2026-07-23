@@ -10,6 +10,18 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 const REFRESH_TOKEN_KEY = 'utc_refresh_token';
 
+// Si el backend/túnel no responde, no dejar el fetch colgado indefinidamente.
+const REQUEST_TIMEOUT_MS = 15000;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 export interface SessionUser {
   id: number | string;
   nombre: string;
@@ -17,6 +29,9 @@ export interface SessionUser {
   rol: 'paciente' | 'practicante' | 'admin' | 'master';
   area?: string | null;
   status?: string;
+  telefono?: string;
+  matricula?: string;
+  numero_empleado?: string;
 }
 
 let accessToken: string | null = null;
@@ -50,7 +65,7 @@ async function refreshAccessToken(): Promise<{ accessToken: string; user: Sessio
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: storedRefreshToken })
@@ -114,12 +129,12 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     return headers;
   };
 
-  let response = await fetch(url, { ...options, headers: buildHeaders() });
+  let response = await fetchWithTimeout(url, { ...options, headers: buildHeaders() });
 
   if (response.status === 401 && getRefreshToken()) {
     const refreshed = await refreshOnce();
     if (refreshed) {
-      response = await fetch(url, { ...options, headers: buildHeaders() });
+      response = await fetchWithTimeout(url, { ...options, headers: buildHeaders() });
     }
   }
 

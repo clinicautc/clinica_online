@@ -26,6 +26,7 @@ import {
 export interface User {
   telefono?: string;
   matricula?: string;
+  numero_empleado?: string;
   id: string | number;
   nombre: string;
   email: string;
@@ -135,7 +136,8 @@ export function AuthProvider({
       area: data.area,
       estado: data.estado || 'activo',
       telefono: data.telefono || '',
-      matricula: data.matricula || ''
+      matricula: data.matricula || '',
+      numero_empleado: data.numero_empleado || ''
     };
 
     setClientAccessToken(data.accessToken);

@@ -220,7 +220,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
   }));
   const signosRows: VoInterpRow[] = SIGNOS_VITALES.map(s => ({ label: s, voName: `sv_${s}_vo`, intName: `sv_${s}_int` }));
   const bioqRows: VoInterpRow[] = Array.from({ length: 28 }, (_, i) => ({
-    label: { fieldName: `bq_${i}_nom`, maxLength: 26 }, voName: `bq_${i}_vo`, intName: `bq_${i}_int`,
+    label: { fieldName: `bq_${i}_nom` }, voName: `bq_${i}_vo`, intName: `bq_${i}_int`,
   }));
 
   return (
@@ -237,11 +237,11 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
         <TabsContent value="p1" className="space-y-4 mt-4">
           <FormSectionCard title="Datos personales">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Nombre completo</label><Input maxLength={100} {...field1('nombre')} /></div>
+              <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Nombre completo</label><Input {...field1('nombre')} /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Expediente</label><Input value={formatExpediente(p1.paciente_id)} readOnly tabIndex={-1} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Fecha</label><Input maxLength={20} {...field1('fecha')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Edad</label><Input maxLength={6} {...field1('edad')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">F/N</label><Input maxLength={14} {...field1('fn')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Fecha</label><Input {...field1('fecha')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Edad</label><Input {...field1('edad')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">F/N</label><Input {...field1('fn')} /></div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Sexo</label>
                 <div className="flex gap-3">
@@ -258,15 +258,15 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   ))}
                 </div>
               </div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Ocupación</label><Input maxLength={38} {...field1('ocupacion')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Teléfono</label><Input maxLength={37} {...field1('telefono')} /></div>
-              <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Dirección</label><Input maxLength={84} {...field1('direccion')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Ocupación</label><Input {...field1('ocupacion')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Teléfono</label><Input type="tel" inputMode="numeric" {...field1('telefono')} onChange={(e) => set1({ telefono: e.target.value.replace(/\D/g, '') })} /></div>
+              <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Dirección</label><Input {...field1('direccion')} /></div>
             </div>
           </FormSectionCard>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormSectionCard title="Motivos de consulta"><Textarea maxLength={150} {...field1('motivos')} className="min-h-20" /></FormSectionCard>
-            <FormSectionCard title="Qx o Tx previos"><Textarea maxLength={150} {...field1('qx')} className="min-h-20" /></FormSectionCard>
+            <FormSectionCard title="Motivos de consulta"><Textarea {...field1('motivos')} className="min-h-20" /></FormSectionCard>
+            <FormSectionCard title="Qx o Tx previos"><Textarea {...field1('qx')} className="min-h-20" /></FormSectionCard>
           </div>
 
           <FormSectionCard title="Antecedentes patológicos heredofamiliares">
@@ -280,7 +280,6 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 value: (p1.otrasHeredo as string) || '',
                 onTextChange: (value) => set1({ otrasHeredo: value }),
                 fieldName: (ci) => `heredo-otras-${ci}`,
-                maxLength: 30,
               }}
             />
           </FormSectionCard>
@@ -299,7 +298,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 <input type="checkbox" checked={!!p1.otrasPersCheck} onChange={e => set1({ otrasPersCheck: e.target.checked })} />
                 Otras
               </label>
-              <Input maxLength={44} {...field1('otrasPers')} />
+              <Input {...field1('otrasPers')} />
             </div>
           </FormSectionCard>
 
@@ -308,7 +307,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
               {SINTOMAS.map(item => (
                 <div key={item} className="flex items-center gap-3">
                   <label className="flex items-center gap-2 text-sm flex-1"><input type="checkbox" checked={!!p1[`sintoma-check-${item}`]} onChange={e => set1({ [`sintoma-check-${item}`]: e.target.checked })} />{item}</label>
-                  <Input className="w-32" maxLength={18} placeholder="Freq./Cant." value={(p1[`sintoma-val-${item}`] as string) || ''} onChange={e => set1({ [`sintoma-val-${item}`]: e.target.value })} />
+                  <Input className="w-32" placeholder="Freq./Cant." value={(p1[`sintoma-val-${item}`] as string) || ''} onChange={e => set1({ [`sintoma-val-${item}`]: e.target.value })} />
                 </div>
               ))}
             </div>
@@ -336,8 +335,8 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
               {NO_PATOLOGICOS.map(item => (
                 <div key={item} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!p1[`nopato-check-${item}`]} onChange={e => set1({ [`nopato-check-${item}`]: e.target.checked })} />{item}</label>
-                  <Input placeholder="Frecuencia" maxLength={14} value={(p1[`nopato-freq-${item}`] as string) || ''} onChange={e => set1({ [`nopato-freq-${item}`]: e.target.value })} />
-                  <Input placeholder="Cantidad" maxLength={14} value={(p1[`nopato-cant-${item}`] as string) || ''} onChange={e => set1({ [`nopato-cant-${item}`]: e.target.value })} />
+                  <Input placeholder="Frecuencia" value={(p1[`nopato-freq-${item}`] as string) || ''} onChange={e => set1({ [`nopato-freq-${item}`]: e.target.value })} />
+                  <Input placeholder="Cantidad" value={(p1[`nopato-cant-${item}`] as string) || ''} onChange={e => set1({ [`nopato-cant-${item}`]: e.target.value })} />
                 </div>
               ))}
             </div>
@@ -345,7 +344,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
 
           <FormSectionCard title="Diagnósticos médicos">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[0, 1, 2, 3, 4].map(i => <Textarea key={i} maxLength={70} value={(p1[`diag-med-${i}`] as string) || ''} onChange={e => set1({ [`diag-med-${i}`]: e.target.value })} className="min-h-14" />)}
+              {[0, 1, 2, 3, 4].map(i => <Textarea key={i} value={(p1[`diag-med-${i}`] as string) || ''} onChange={e => set1({ [`diag-med-${i}`]: e.target.value })} className="min-h-14" />)}
             </div>
           </FormSectionCard>
 
@@ -353,8 +352,8 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
             <div className="space-y-2">
               {[0, 1, 2, 3, 4].map(i => (
                 <div key={i} className="grid grid-cols-2 gap-2">
-                  <Input placeholder="Medicamento" maxLength={20} value={(p1[`med-nom-${i}`] as string) || ''} onChange={e => set1({ [`med-nom-${i}`]: e.target.value })} />
-                  <Input placeholder="Dosis" maxLength={20} value={(p1[`med-dos-${i}`] as string) || ''} onChange={e => set1({ [`med-dos-${i}`]: e.target.value })} />
+                  <Input placeholder="Medicamento" value={(p1[`med-nom-${i}`] as string) || ''} onChange={e => set1({ [`med-nom-${i}`]: e.target.value })} />
+                  <Input placeholder="Dosis" value={(p1[`med-dos-${i}`] as string) || ''} onChange={e => set1({ [`med-dos-${i}`]: e.target.value })} />
                 </div>
               ))}
             </div>
@@ -369,22 +368,22 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
               <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={!!p1.ejercicio_anaerobico} onChange={e => set1({ ejercicio_anaerobico: e.target.checked })} /> Anaeróbico</label>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">¿Cuál?</label><Input maxLength={62} {...field1('ejercicioCual')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Frecuencia</label><Input maxLength={22} {...field1('frecuencia')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Intensidad</label><Input maxLength={22} {...field1('intensidad')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Tiempo</label><Input maxLength={25} {...field1('tiempo')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Volumen</label><Input maxLength={25} {...field1('volumen')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Progresión</label><Input maxLength={59} {...field1('progresion')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">¿Cuál?</label><Input {...field1('ejercicioCual')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Frecuencia</label><Input {...field1('frecuencia')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Intensidad</label><Input {...field1('intensidad')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Tiempo</label><Input {...field1('tiempo')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Volumen</label><Input {...field1('volumen')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Progresión</label><Input {...field1('progresion')} /></div>
             </div>
           </FormSectionCard>
 
           <FormSectionCard title="Antecedentes gineco-obstétricos">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">G</label><Input maxLength={5} {...field1('g')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">P</label><Input maxLength={4} {...field1('p')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">C</label><Input maxLength={4} {...field1('c')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">A</label><Input maxLength={4} {...field1('a')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">FUM</label><Input maxLength={12} {...field1('fum')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">G</label><Input {...field1('g')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">P</label><Input {...field1('p')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">C</label><Input {...field1('c')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">A</label><Input {...field1('a')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">FUM</label><Input {...field1('fum')} /></div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Embarazo</label>
                 <div className="flex items-center gap-3 h-9">
@@ -392,14 +391,14 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={!!p1.embarazo_si} onChange={e => set1({ embarazo_si: e.target.checked })} /> Sí</label>
                 </div>
               </div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">SDG</label><Input maxLength={10} {...field1('sdg')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">SDG</label><Input {...field1('sdg')} /></div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Remplazo hormonal</label>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={!!p1.hormo_no} onChange={e => set1({ hormo_no: e.target.checked })} /> No</label>
                   <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={!!p1.hormo_si} onChange={e => set1({ hormo_si: e.target.checked })} /> Sí</label>
                 </div>
-                <Input maxLength={39} {...field1('hormo')} />
+                <Input {...field1('hormo')} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Anticonceptivos</label>
@@ -407,7 +406,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={!!p1.anti_no} onChange={e => set1({ anti_no: e.target.checked })} /> No</label>
                   <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={!!p1.anti_si} onChange={e => set1({ anti_si: e.target.checked })} /> Sí</label>
                 </div>
-                <Input maxLength={43} {...field1('anti')} />
+                <Input {...field1('anti')} />
               </div>
             </div>
           </FormSectionCard>
@@ -422,25 +421,25 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   <span className="text-sm capitalize">{name.replace(/_/g, ' ')}</span>
                   <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_no`]} onChange={onChange2} name={`${name}_no`} /> No</label>
                   <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_si`]} onChange={onChange2} name={`${name}_si`} /> Sí</label>
-                  <Input placeholder="¿Cuál?" name={`${name}_txt`} maxLength={95} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
+                  <Input placeholder="¿Cuál?" name={`${name}_txt`} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
                 </div>
               ))}
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Alimentos que no le agradan o no acostumbre</label>
-                <Input maxLength={108} {...field2('desagrados')} />
+                <Input {...field2('desagrados')} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                <Input placeholder="Comidas al día" maxLength={6} {...field2('comidas_dia')} />
-                <Input placeholder="Fuertes" maxLength={6} {...field2('comidas_fuertes')} />
-                <Input placeholder="Colaciones" maxLength={6} {...field2('comidas_col')} />
-                <Input placeholder="¿Quién prepara sus alimentos en su casa?" maxLength={52} {...field2('quien_prepara')} />
+                <Input placeholder="Comidas al día" {...field2('comidas_dia')} />
+                <Input placeholder="Fuertes" {...field2('comidas_fuertes')} />
+                <Input placeholder="Colaciones" {...field2('comidas_col')} />
+                <Input placeholder="¿Quién prepara sus alimentos en su casa?" {...field2('quien_prepara')} />
               </div>
               {['modifico_alim', 'dieta_previa', 'alim_animo', 'laxantes', 'meds_peso'].map(name => (
                 <div key={name} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_2fr] gap-2 items-center">
                   <span className="text-sm capitalize">{name.replace(/_/g, ' ')}</span>
                   <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_no`]} onChange={onChange2} name={`${name}_no`} /> No</label>
                   <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!p2[`${name}_si`]} onChange={onChange2} name={`${name}_si`} /> Sí</label>
-                  <Input placeholder="Cómo/Cuál" name={`${name}_txt`} maxLength={70} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
+                  <Input placeholder="Cómo/Cuál" name={`${name}_txt`} value={(p2[`${name}_txt`] as string) || ''} onChange={onChange2} />
                 </div>
               ))}
             </div>
@@ -458,20 +457,20 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
           </FormSectionCard>
 
           <FormSectionCard title="Antropometría">
-            <VoInterpretacionTable rows={antropRows} formData={p2} onChange={onChange2} voMaxLength={16} intMaxLength={37} />
-            <VoInterpretacionMobile rows={antropRows} formData={p2} onChange={onChange2} voMaxLength={16} intMaxLength={37} />
-            <div className="mt-3 space-y-1"><label className="text-xs font-medium text-slate-600">Interpretación antropométrica</label><Textarea maxLength={230} {...field2('int_antrop')} className="min-h-16" /></div>
+            <VoInterpretacionTable rows={antropRows} formData={p2} onChange={onChange2} />
+            <VoInterpretacionMobile rows={antropRows} formData={p2} onChange={onChange2} />
+            <div className="mt-3 space-y-1"><label className="text-xs font-medium text-slate-600">Interpretación antropométrica</label><Textarea {...field2('int_antrop')} className="min-h-16" /></div>
           </FormSectionCard>
 
           <FormSectionCard title="Signos Vitales">
-            <VoInterpretacionTable rows={signosRows} formData={p2} onChange={onChange2} voMaxLength={16} intMaxLength={37} />
-            <VoInterpretacionMobile rows={signosRows} formData={p2} onChange={onChange2} voMaxLength={16} intMaxLength={37} />
+            <VoInterpretacionTable rows={signosRows} formData={p2} onChange={onChange2} />
+            <VoInterpretacionMobile rows={signosRows} formData={p2} onChange={onChange2} />
           </FormSectionCard>
 
           <FormSectionCard title="Parámetros bioquímicos">
-            <VoInterpretacionTable rows={bioqRows} formData={p2} onChange={onChange2} voMaxLength={15} intMaxLength={34} />
-            <VoInterpretacionMobile rows={bioqRows} formData={p2} onChange={onChange2} voMaxLength={15} intMaxLength={34} />
-            <div className="mt-3 space-y-1"><label className="text-xs font-medium text-slate-600">Interpretación bioquímica</label><Textarea maxLength={230} {...field2('int_bioq')} className="min-h-16" /></div>
+            <VoInterpretacionTable rows={bioqRows} formData={p2} onChange={onChange2} />
+            <VoInterpretacionMobile rows={bioqRows} formData={p2} onChange={onChange2} />
+            <div className="mt-3 space-y-1"><label className="text-xs font-medium text-slate-600">Interpretación bioquímica</label><Textarea {...field2('int_bioq')} className="min-h-16" /></div>
           </FormSectionCard>
 
           <FormSectionCard title="Solicitud de análisis">
@@ -480,7 +479,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 <label key={s} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!p2[`sol_${s}`]} onChange={onChange2} name={`sol_${s}`} />{s}</label>
               ))}
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!p2.sol_otro} onChange={onChange2} name="sol_otro" />Otro</label>
-              <Input placeholder="¿Cuál?" maxLength={30} {...field2('sol_otro_txt')} className="w-40" />
+              <Input placeholder="¿Cuál?" {...field2('sol_otro_txt')} className="w-40" />
             </div>
           </FormSectionCard>
         </TabsContent>
@@ -522,7 +521,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
           </FormSectionCard>
 
           <FormSectionCard title="Diagnóstico Matriz IMG/IMLG">
-            <Textarea maxLength={72} {...field3('diag_matriz_imlo_img')} className="min-h-16" />
+            <Textarea {...field3('diag_matriz_imlo_img')} className="min-h-16" />
           </FormSectionCard>
 
           <FormSectionCard title="Hallazgos físicos orientados a Nut" description="DEN: Deficiencia o exceso en nutrimento.">
@@ -532,7 +531,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 return (
                   <div key={h} className="grid grid-cols-[1fr_auto] gap-2 items-center border border-slate-100 rounded-lg p-2">
                     <p className="text-xs font-bold text-slate-700">{h}</p>
-                    <Input placeholder="DEN" maxLength={13} className="w-24 h-8 text-xs" value={(p3[`hallazgo_${key}_den`] as string) || ''} onChange={e => set3({ [`hallazgo_${key}_den`]: e.target.value })} />
+                    <Input placeholder="DEN" className="w-24 h-8 text-xs" value={(p3[`hallazgo_${key}_den`] as string) || ''} onChange={e => set3({ [`hallazgo_${key}_den`]: e.target.value })} />
                   </div>
                 );
               })}
@@ -543,14 +542,14 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
               <div>
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <Input placeholder="Fecha" maxLength={23} {...field3('rec_fecha')} />
+                  <Input placeholder="Fecha" {...field3('rec_fecha')} />
                   <Input placeholder="Hora" {...field3('rec_hora')} />
                 </div>
                 <div className="space-y-2">
                   {[1, 2, 3, 4, 5].map(i => (
                     <div key={i} className="grid grid-cols-[auto_1fr] gap-2">
-                      <Input placeholder="Hora" className="w-24" maxLength={24} value={(p3[`rec_hora_${i}`] as string) || ''} onChange={e => set3({ [`rec_hora_${i}`]: e.target.value })} />
-                      <Textarea placeholder="Contenido (platillo: cantidad y alimento)" maxLength={225} value={(p3[`rec_contenido_${i}`] as string) || ''} onChange={e => set3({ [`rec_contenido_${i}`]: e.target.value })} className="min-h-10" />
+                      <Input placeholder="Hora" className="w-24" value={(p3[`rec_hora_${i}`] as string) || ''} onChange={e => set3({ [`rec_hora_${i}`]: e.target.value })} />
+                      <Textarea placeholder="Contenido (platillo: cantidad y alimento)" value={(p3[`rec_contenido_${i}`] as string) || ''} onChange={e => set3({ [`rec_contenido_${i}`]: e.target.value })} className="min-h-10" />
                     </div>
                   ))}
                 </div>
@@ -676,7 +675,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                 return (
                   <div key={item} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
                     <span className="text-sm font-medium">{item}</span>
-                    <Input placeholder="Dieta" maxLength={10} className="w-full sm:w-32 h-8 text-xs" value={(p3[`ian_${ik}_dieta`] as string) || ''} onChange={e => set3({ [`ian_${ik}_dieta`]: e.target.value })} />
+                    <Input placeholder="Dieta" className="w-full sm:w-32 h-8 text-xs" value={(p3[`ian_${ik}_dieta`] as string) || ''} onChange={e => set3({ [`ian_${ik}_dieta`]: e.target.value })} />
                     <Input type="number" placeholder="% IAN" className="w-full sm:w-20 h-8 text-xs" value={(p3[`ian_${ik}_pct`] as string) || ''} onChange={e => set3({ [`ian_${ik}_pct`]: e.target.value })} />
                   </div>
                 );
@@ -702,19 +701,19 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
         {/* ================= PÁGINA 4 ================= */}
         <TabsContent value="p4" className="space-y-4 mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormSectionCard title="Diagnósticos Nutricios"><Textarea maxLength={600} {...field4('diag')} className="min-h-20" /></FormSectionCard>
-            <FormSectionCard title="Objetivo general (SMART)"><Textarea maxLength={270} {...field4('objetivo')} className="min-h-20" /></FormSectionCard>
+            <FormSectionCard title="Diagnósticos Nutricios"><Textarea {...field4('diag')} className="min-h-20" /></FormSectionCard>
+            <FormSectionCard title="Objetivo general (SMART)"><Textarea {...field4('objetivo')} className="min-h-20" /></FormSectionCard>
             <FormSectionCard title="Educación Nutricia">
-              <div className="flex gap-2 mb-2"><Input placeholder="E-1" className="w-16" maxLength={4} {...field4('edu_cont_num')} /><span className="text-xs self-center">Contenido</span></div>
-              <Textarea maxLength={190} {...field4('edu_contenido')} className="min-h-14 mb-2" />
-              <div className="flex gap-2 mb-2"><Input placeholder="E-2" className="w-16" maxLength={4} {...field4('edu_app_num')} /><span className="text-xs self-center">Aplicación</span></div>
-              <Textarea maxLength={190} {...field4('edu_aplicacion')} className="min-h-14" />
+              <div className="flex gap-2 mb-2"><Input placeholder="E-1" className="w-16" {...field4('edu_cont_num')} /><span className="text-xs self-center">Contenido</span></div>
+              <Textarea {...field4('edu_contenido')} className="min-h-14 mb-2" />
+              <div className="flex gap-2 mb-2"><Input placeholder="E-2" className="w-16" {...field4('edu_app_num')} /><span className="text-xs self-center">Aplicación</span></div>
+              <Textarea {...field4('edu_aplicacion')} className="min-h-14" />
             </FormSectionCard>
             <FormSectionCard title="Consejería Nutricia">
-              <div className="flex gap-2 mb-2"><Input placeholder="C-1" className="w-16" maxLength={4} {...field4('cons_bases_num')} /><span className="text-xs self-center">Bases/Acercamiento Teórico</span></div>
-              <Textarea maxLength={190} {...field4('cons_bases')} className="min-h-14 mb-2" />
-              <div className="flex gap-2 mb-2"><Input placeholder="C-2" className="w-16" maxLength={4} {...field4('cons_est_num')} /><span className="text-xs self-center">Estrategias</span></div>
-              <Textarea maxLength={190} {...field4('cons_estrategias')} className="min-h-14" />
+              <div className="flex gap-2 mb-2"><Input placeholder="C-1" className="w-16" {...field4('cons_bases_num')} /><span className="text-xs self-center">Bases/Acercamiento Teórico</span></div>
+              <Textarea {...field4('cons_bases')} className="min-h-14 mb-2" />
+              <div className="flex gap-2 mb-2"><Input placeholder="C-2" className="w-16" {...field4('cons_est_num')} /><span className="text-xs self-center">Estrategias</span></div>
+              <Textarea {...field4('cons_estrategias')} className="min-h-14" />
             </FormSectionCard>
           </div>
 
@@ -722,17 +721,17 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-16">
               <div>
                 <p className="text-xs font-bold text-blue-900 mb-2">Indicación de Alimentos/Nutrimentos</p>
-                <div className="space-y-2">{[1, 2, 3, 4].map(i => <Textarea key={i} maxLength={130} value={(p4[`indicacion_${i}`] as string) || ''} onChange={e => set4({ [`indicacion_${i}`]: e.target.value })} className="min-h-10 text-xs" />)}</div>
+                <div className="space-y-2">{[1, 2, 3, 4].map(i => <Textarea key={i} value={(p4[`indicacion_${i}`] as string) || ''} onChange={e => set4({ [`indicacion_${i}`]: e.target.value })} className="min-h-10 text-xs" />)}</div>
               </div>
               <div>
                 <p className="text-xs font-bold text-blue-900 mb-2">Requerimiento calórico</p>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!p4.req_ec_pred} onChange={e => set4({ req_ec_pred: e.target.checked })} />Ecuación predictiva</label>
-                  <Input placeholder="Nombre de ecuación" maxLength={42} {...field4('req_ec_pred_nombre')} className="text-xs h-8" />
+                  <Input placeholder="Nombre de ecuación" {...field4('req_ec_pred_nombre')} className="text-xs h-8" />
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!p4.req_ec_rapida} onChange={e => set4({ req_ec_rapida: e.target.checked })} />Ecuación rápida</label>
-                  <Input placeholder="Peso a usar (kg)" maxLength={8} {...field4('req_ec_rapida_peso')} className="text-xs h-8" />
-                  <Input placeholder="Constante de kcal (kcal/kg/d)" maxLength={35} {...field4('req_ec_rapida_kcal_kg')} className="text-xs h-8" />
-                  <Input placeholder="Total (kcal)" maxLength={28} {...field4('req_total_kcal')} className="text-xs h-8" />
+                  <Input placeholder="Peso a usar (kg)" {...field4('req_ec_rapida_peso')} className="text-xs h-8" />
+                  <Input placeholder="Constante de kcal (kcal/kg/d)" {...field4('req_ec_rapida_kcal_kg')} className="text-xs h-8" />
+                  <Input placeholder="Total (kcal)" {...field4('req_total_kcal')} className="text-xs h-8" />
                 </div>
               </div>
               <div>
@@ -744,15 +743,15 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                       <div key={m} className="grid grid-cols-4 gap-1">
                         <span className="text-[10px] col-span-4 font-medium">{m}</span>
                         {['porc', 'kcal', 'g', 'g_kg'].map(col => (
-                          <Input key={col} placeholder={col} className="h-8 text-xs" maxLength={10} value={(p4[`${mk}_${col}`] as string) || ''} onChange={e => set4({ [`${mk}_${col}`]: e.target.value })} />
+                          <Input key={col} placeholder={col} className="h-8 text-xs" value={(p4[`${mk}_${col}`] as string) || ''} onChange={e => set4({ [`${mk}_${col}`]: e.target.value })} />
                         ))}
                       </div>
                     );
                   })}
                   <div className="grid grid-cols-4 gap-1 pt-1 items-center">
                     <span className="text-[10px] text-slate-500">100%</span>
-                    <Input placeholder="Kcal" className="h-8 text-xs" maxLength={12} {...field4('total_kcal')} />
-                    <Input placeholder="Gramos" className="h-8 text-xs" maxLength={12} {...field4('total_g')} />
+                    <Input placeholder="Kcal" className="h-8 text-xs" {...field4('total_kcal')} />
+                    <Input placeholder="Gramos" className="h-8 text-xs" {...field4('total_g')} />
                     <span className="text-[9px] text-slate-500">kcal/kgPI/d</span>
                   </div>
                 </div>
@@ -772,18 +771,18 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                     return (
                       <TableRow key={g}>
                         <TableCell className="font-medium">{g}</TableCell>
-                        {CALC_COLS.map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" maxLength={15} value={(p4[`calc_${gk}_${col}`] as string) || ''} onChange={e => set4({ [`calc_${gk}_${col}`]: e.target.value })} /></TableCell>)}
+                        {CALC_COLS.map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" value={(p4[`calc_${gk}_${col}`] as string) || ''} onChange={e => set4({ [`calc_${gk}_${col}`]: e.target.value })} /></TableCell>)}
                       </TableRow>
                     );
                   })}
                   <TableRow>
                     <TableCell className="font-bold">Total</TableCell>
-                    {['kcal', 'prot', 'lip', 'hco'].map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" maxLength={15} value={(p4[`calc_total_${col}`] as string) || ''} onChange={e => set4({ [`calc_total_${col}`]: e.target.value })} /></TableCell>)}
+                    {['kcal', 'prot', 'lip', 'hco'].map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" value={(p4[`calc_total_${col}`] as string) || ''} onChange={e => set4({ [`calc_total_${col}`]: e.target.value })} /></TableCell>)}
                     <TableCell colSpan={6} />
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-bold">% Adecuación</TableCell>
-                    {['kcal', 'prot', 'lip', 'hco'].map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" maxLength={15} value={(p4[`calc_adec_${col}`] as string) || ''} onChange={e => set4({ [`calc_adec_${col}`]: e.target.value })} /></TableCell>)}
+                    {['kcal', 'prot', 'lip', 'hco'].map(col => <TableCell key={col}><Input className="h-8 text-xs w-16" value={(p4[`calc_adec_${col}`] as string) || ''} onChange={e => set4({ [`calc_adec_${col}`]: e.target.value })} /></TableCell>)}
                     <TableCell colSpan={6} />
                   </TableRow>
                 </TableBody>
@@ -799,7 +798,7 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                       {CALC_COLS.map(col => (
                         <div key={col}>
                           <label className="text-[10px] text-slate-500">{CALC_COLS_LABELS[col]}</label>
-                          <Input className="h-8 text-xs" maxLength={15} value={(p4[`calc_${gk}_${col}`] as string) || ''} onChange={e => set4({ [`calc_${gk}_${col}`]: e.target.value })} />
+                          <Input className="h-8 text-xs" value={(p4[`calc_${gk}_${col}`] as string) || ''} onChange={e => set4({ [`calc_${gk}_${col}`]: e.target.value })} />
                         </div>
                       ))}
                     </div>
@@ -812,13 +811,13 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
                   {['kcal', 'prot', 'lip', 'hco'].map(col => (
                     <div key={col}>
                       <label className="text-[10px] text-slate-500 uppercase">Total {col}</label>
-                      <Input className="h-8 text-xs" maxLength={15} value={(p4[`calc_total_${col}`] as string) || ''} onChange={e => set4({ [`calc_total_${col}`]: e.target.value })} />
+                      <Input className="h-8 text-xs" value={(p4[`calc_total_${col}`] as string) || ''} onChange={e => set4({ [`calc_total_${col}`]: e.target.value })} />
                     </div>
                   ))}
                   {['kcal', 'prot', 'lip', 'hco'].map(col => (
                     <div key={col}>
                       <label className="text-[10px] text-slate-500 uppercase">% Adec. {col}</label>
-                      <Input className="h-8 text-xs" maxLength={15} value={(p4[`calc_adec_${col}`] as string) || ''} onChange={e => set4({ [`calc_adec_${col}`]: e.target.value })} />
+                      <Input className="h-8 text-xs" value={(p4[`calc_adec_${col}`] as string) || ''} onChange={e => set4({ [`calc_adec_${col}`]: e.target.value })} />
                     </div>
                   ))}
                 </div>
@@ -829,15 +828,15 @@ const NutricionPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial<Fo
           <FormSectionCard title="Menú del día">
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
               {[['desayuno', 'Desayuno'], ['cm', 'C.M.'], ['comida', 'Comida'], ['cv', 'C.V.'], ['cena', 'Cena']].map(([key, label]) => (
-                <div key={key} className="space-y-1"><label className="text-xs font-medium text-slate-600">{label}</label><Textarea maxLength={350} value={(p4[`menu_${key}`] as string) || ''} onChange={e => set4({ [`menu_${key}`]: e.target.value })} className="min-h-16 text-xs" /></div>
+                <div key={key} className="space-y-1"><label className="text-xs font-medium text-slate-600">{label}</label><Textarea value={(p4[`menu_${key}`] as string) || ''} onChange={e => set4({ [`menu_${key}`]: e.target.value })} className="min-h-16 text-xs" /></div>
               ))}
             </div>
           </FormSectionCard>
 
           <FormSectionCard title="Firmas">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, matrícula y firma del alumno</label><Input maxLength={65} {...field4('firma_alumno')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, cédula y firma del docente responsable</label><Input maxLength={65} {...field4('firma_docente')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, matrícula y firma del alumno</label><Input {...field4('firma_alumno')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Nombre, cédula y firma del docente responsable</label><Input {...field4('firma_docente')} /></div>
             </div>
           </FormSectionCard>
         </TabsContent>

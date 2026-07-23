@@ -19,21 +19,49 @@ interface LocationState {
 
 type Step = 'code' | 'password';
 
+// Esta pantalla solo se alcanza por location.state (Login.tsx), que es
+// puramente en memoria: una recarga de pestaña en móvil (por salir a revisar
+// el correo del código) lo borra por completo, y el guard de abajo mandaría
+// al usuario de vuelta a /login. Guardamos el mismo estado en sessionStorage
+// para poder restaurar la pantalla sin perder el paso ni pedir un código nuevo.
+const DRAFT_KEY = 'utc_cambio_password_inicial_draft';
+
+function loadDraft(): Partial<{
+  email: string; passwordActual: string; step: Step;
+  verificationCode: string; passwordNueva: string; confirmarPassword: string;
+}> {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function CambiarPasswordInicial() {
   const location = useLocation();
   const navigate = useNavigate();
   const { completarPrimerInicio } = useAuth();
 
-  const state = location.state as LocationState | null;
+  const locState = location.state as LocationState | null;
+  const draft = loadDraft();
 
-  const [step, setStep] = useState<Step>('code');
+  // Si venimos de Login.tsx con state fresco lo usamos; si no (p. ej. tras una
+  // recarga que borró location.state), recuperamos del borrador guardado.
+  const email = locState?.email || draft.email || '';
+  const passwordActual = locState?.passwordActual || draft.passwordActual || '';
+  // true cuando NO venimos de un login fresco sino de un borrador restaurado —
+  // en ese caso el código ya se había mandado antes y no hay que reenviarlo.
+  const veniaDeDraft = !locState?.email && !!draft.email;
 
-  const [verificationCode, setVerificationCode] = useState('');
+  const [step, setStep] = useState<Step>(draft.step || 'code');
+
+  const [verificationCode, setVerificationCode] = useState(draft.verificationCode || '');
   const [codeError, setCodeError] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
 
-  const [passwordNueva, setPasswordNueva] = useState('');
-  const [confirmarPassword, setConfirmarPassword] = useState('');
+  const [passwordNueva, setPasswordNueva] = useState(draft.passwordNueva || '');
+  const [confirmarPassword, setConfirmarPassword] = useState(draft.confirmarPassword || '');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -53,29 +81,46 @@ export default function CambiarPasswordInicial() {
   const yaEnvioCodigo = useRef(false);
 
   useEffect(() => {
-    if (!state?.email || yaEnvioCodigo.current) return;
+    if (!email || yaEnvioCodigo.current) return;
     yaEnvioCodigo.current = true;
+
+    // Si ya veníamos de un borrador restaurado, el código anterior sigue
+    // siendo válido — no pedimos uno nuevo, solo restauramos la pantalla.
+    if (veniaDeDraft) return;
 
     (async () => {
       try {
         setIsSendingCode(true);
-        await authAPI.sendCodigoPrimerInicio(state.email);
+        await authAPI.sendCodigoPrimerInicio(email);
       } catch {
         setCodeError('No se pudo enviar el código. Usa "Reenviar código" para intentar de nuevo.');
       } finally {
         setIsSendingCode(false);
       }
     })();
-  }, [state?.email]);
+  }, [email]);
 
-  if (!state?.email || !state?.passwordActual) {
+  useEffect(() => {
+    if (!email) return;
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        email, passwordActual, step, verificationCode, passwordNueva, confirmarPassword
+      }));
+    } catch {}
+  }, [email, passwordActual, step, verificationCode, passwordNueva, confirmarPassword]);
+
+  const clearDraft = () => {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+  };
+
+  if (!email || !passwordActual) {
     return <Navigate to="/login" replace />;
   }
 
   const handleResendCode = async () => {
     try {
       setCodeError('');
-      await authAPI.resendCode({ email: state.email, tipo: 'primer_inicio' });
+      await authAPI.resendCode({ email, tipo: 'primer_inicio' });
     } catch {
       setCodeError('Error al reenviar el código.');
     }
@@ -90,7 +135,7 @@ export default function CambiarPasswordInicial() {
     }
 
     try {
-      await authAPI.verifyResetCode({ email: state.email, code: verificationCode });
+      await authAPI.verifyResetCode({ email, code: verificationCode });
       setStep('password');
     } catch (err: any) {
       setCodeError(err.message || 'Código incorrecto o expirado.');
@@ -105,7 +150,8 @@ export default function CambiarPasswordInicial() {
 
     try {
       setIsSubmitting(true);
-      await completarPrimerInicio(state.email, state.passwordActual, passwordNueva);
+      await completarPrimerInicio(email, passwordActual, passwordNueva);
+      clearDraft();
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'No se pudo actualizar la contraseña.');
@@ -178,7 +224,7 @@ export default function CambiarPasswordInicial() {
             <h3 className="text-2xl lg:text-3xl font-extrabold text-[#002f6c] mb-1">Cambia tu contraseña</h3>
             <p className="text-slate-500 text-sm font-medium">
               {step === 'code'
-                ? <>Te enviamos un código a <strong className="text-[#002f6c]">{state.email}</strong>.</>
+                ? <>Te enviamos un código a <strong className="text-[#002f6c]">{email}</strong>.</>
                 : 'Define una nueva contraseña segura para continuar.'}
             </p>
           </div>
@@ -192,7 +238,7 @@ export default function CambiarPasswordInicial() {
                 type="email"
                 name="username"
                 autoComplete="username"
-                value={state.email}
+                value={email}
                 readOnly
                 aria-hidden="true"
                 tabIndex={-1}
@@ -259,7 +305,7 @@ export default function CambiarPasswordInicial() {
                 type="email"
                 name="username"
                 autoComplete="username"
-                value={state.email}
+                value={email}
                 readOnly
                 aria-hidden="true"
                 tabIndex={-1}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Check,X} from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,12 +6,32 @@ import { authAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { useAuth } from '../contexts/AuthContext';
 
+// En móvil, salir de la app para abrir el correo y leer el código puede hacer
+// que el navegador descargue la pestaña por memoria y la recargue al volver.
+// sessionStorage sobrevive exactamente ese caso (a diferencia del estado de
+// React) — así el borrador del registro y el paso "esperando código" no se
+// pierden, evitando el ciclo de pedir un código nuevo cada vez que se recarga.
+const DRAFT_KEY = 'utc_registro_draft';
+
+function loadDraft(): Partial<{
+  nombre: string; apellido: string; email: string; password: string;
+  confirmPassword: string; verificationCode: string; codeSent: boolean;
+}> {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function Register() {
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const draft = loadDraft();
+  const [nombre, setNombre] = useState(draft.nombre || '');
+  const [apellido, setApellido] = useState(draft.apellido || '');
+  const [email, setEmail] = useState(draft.email || '');
+  const [password, setPassword] = useState(draft.password || '');
+  const [confirmPassword, setConfirmPassword] = useState(draft.confirmPassword || '');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword,setShowConfirmPassword] = useState(false);
   const passwordValidation = {
@@ -24,17 +44,32 @@ export default function Register() {
 
   const isPasswordValid = Object.values(passwordValidation).every(Boolean);
   const passwordsMatch =password === confirmPassword;
-  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationCode, setVerificationCode] = useState(draft.verificationCode || '');
 
   // ESTADOS DE FLUJO DE VERIFICACIÓN
   const [error, setError] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isResendingCode, setIsResendingCode] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
+  const [codeSent, setCodeSent] = useState(draft.codeSent || false);
   const [_isVerified, _setIsVerified] = useState(false);
 
   const navigate = useNavigate();
   const { completarRegistro } = useAuth();
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        nombre, apellido, email, password, confirmPassword, verificationCode, codeSent
+      }));
+    } catch {
+      // sessionStorage no disponible (modo privado, etc.) — el flujo sigue funcionando,
+      // solo se pierde la recuperación tras una recarga.
+    }
+  }, [nombre, apellido, email, password, confirmPassword, verificationCode, codeSent]);
+
+  const clearDraft = () => {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+  };
 
   // --- 1. LÓGICA PARA ENVIAR CÓDIGO VÍA RESEND ---
   // Reemplaza la función handleSendCode en Register.tsx
@@ -115,6 +150,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     await completarRegistro(email, verificationCode);
 
+    clearDraft();
     toast.success('Cuenta creada exitosamente');
     navigate('/dashboard');
 
@@ -212,12 +248,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                     id="nombre"
                     autoComplete="given-name"
                     value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
+                    onChange={(e) => setNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
+                    maxLength={40}
                     required
                     className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#002f6c]/20 focus:border-[#002f6c] transition-all text-slate-800 placeholder-slate-400 font-medium"
                     placeholder="Tu nombre"
                   />
                 </div>
+                <p className="text-[10px] text-slate-400 ml-1">Solo letras y espacios, sin números ni símbolos.</p>
               </div>
 
               <div className="space-y-1">
@@ -228,12 +266,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                     id="apellido"
                     autoComplete="family-name"
                     value={apellido}
-                    onChange={(e) => setApellido(e.target.value)}
+                    onChange={(e) => setApellido(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
+                    maxLength={40}
                     required
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#002f6c]/20 focus:border-[#002f6c] transition-all text-slate-800 placeholder-slate-400 font-medium"
                     placeholder="Tus apellidos"
                   />
                 </div>
+                <p className="text-[10px] text-slate-400 ml-1">Solo letras y espacios, sin números ni símbolos.</p>
               </div>
             </div>
 

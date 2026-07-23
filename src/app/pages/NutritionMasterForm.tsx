@@ -4,7 +4,7 @@
    * PROPÓSITO: Formulario Multi-pasos con persistencia de datos local.
    * ============================================================================
    */
-  import React, { useState } from 'react';
+  import React, { useState, useEffect } from 'react';
   import { useNavigate } from 'react-router';
   import { useNutritionHistoriaData } from '../hooks/formClinico/useNutritionHistoriaData';
   import { usePrintFitScale } from '../hooks/usePrintFitScale';
@@ -55,6 +55,47 @@
     usePrintFitScale(['.p1-paper']);
     // Ajuste de pantalla en móvil (no impresión) — ver useScreenFitScale.ts.
     useScreenFitScale(['.p1-paper']);
+
+    // useScreenFitScale solo ajusta por ANCHO (para que la hoja quepa en
+    // móvil); nunca revisa el ALTO, a diferencia de usePrintFitScale, que sí
+    // reduce la hoja si el contenido real excede el alto físico de una
+    // página Carta (279.4mm). Si una hoja crece (más filas, más márgenes) y
+    // pasa de esa medida, la impresión se reducía para caber pero la
+    // pantalla seguía mostrando el 100% — pantalla e impresión dejaban de
+    // coincidir. Este efecto agrega el mismo chequeo de alto en pantalla,
+    // combinando el factor de alto con el de ancho que ya puso
+    // useScreenFitScale (se toma el menor de los dos), para que ambas vistas
+    // siempre coincidan. Se re-ejecuta con los mismos disparadores que
+    // useScreenFitScale (resize/orientationchange) más los cambios de
+    // formData (para recalcular una vez que el historial real ya cargó),
+    // y corre después de ese hook en el mismo evento para tener la última
+    // palabra sin pisarle su propio ajuste de ancho.
+    useEffect(() => {
+      const CARTA_ALTO_MM = 279.4;
+      const PX_POR_MM = 96 / 25.4;
+      const COLCHON_REDONDEO_PX = 6;
+      const altoDisponiblePx = CARTA_ALTO_MM * PX_POR_MM - COLCHON_REDONDEO_PX;
+
+      const ajustarPorAlto = () => {
+        document.querySelectorAll<HTMLElement>('.p1-paper').forEach(hoja => {
+          const factorAncho = parseFloat(hoja.style.getPropertyValue('--screen-scale') || '1');
+          const zoomPrevio = hoja.style.zoom;
+          hoja.style.zoom = '1';
+          const altoNatural = hoja.scrollHeight;
+          hoja.style.zoom = zoomPrevio;
+          const factorAlto = Math.min(1, altoDisponiblePx / altoNatural);
+          hoja.style.setProperty('--screen-scale', String(Math.min(factorAncho, factorAlto)));
+        });
+      };
+
+      ajustarPorAlto();
+      window.addEventListener('resize', ajustarPorAlto);
+      window.addEventListener('orientationchange', ajustarPorAlto);
+      return () => {
+        window.removeEventListener('resize', ajustarPorAlto);
+        window.removeEventListener('orientationchange', ajustarPorAlto);
+      };
+    }, [formData]);
 
     return (
       <>
@@ -108,12 +149,19 @@
           overflow: hidden;
           font-family: inherit;
           font-size: 8px;
-          line-height: 1.2;
+          line-height: 1.05;
           color: #333;
           display: block;
         }
         @media print {
-          .p1-paper textarea { overflow: visible !important; height: auto !important; }
+          /* NO forzar overflow:visible/height:auto en <textarea> — Chromium
+             ignora overflow:visible en textareas (siempre se comporta como
+             auto/scrollable) y su height:auto no se ajusta al contenido real
+             como en un <div>, cae a un alto intrínseco pequeño en vez de
+             crecer — el resultado real era un textarea MÁS CHICO en
+             impresión que en pantalla, no uno que mostrara más texto. Se
+             elimina para que impresión use exactamente el mismo tamaño fijo
+             que pantalla (mismo recorte, sin discrepancia). */
           .p1-paper tr, .p1-paper td { break-inside: avoid; }
         }
         /* Cada una de las 4 hojas (.p1-paper) ocupa su propia página impresa,
@@ -193,7 +241,7 @@
             </header>
 
             {/* FECHA — fuera del recuadro de Datos personales, solo unos px arriba */}
-            <div className="relative z-10 flex justify-end mt-2 mb-0.5 pr-[95px]">
+            <div className="relative z-10 flex justify-end mt-1 mb-2 pr-[95px]">
               <div className="flex items-end gap-1 text-[10px] font-bold text-[#2c5697] whitespace-nowrap">
                 <span>Fecha</span>
                 <input
@@ -211,7 +259,7 @@
               title="Datos personales"
               marginTop="mt-0"
             >
-              <div className="flex items-end gap-1 mb-1 text-[9.5px] font-bold w-full">
+              <div className="flex items-end gap-1 mb-0.5 text-[9.5px] font-bold w-full">
                 <span className="shrink-0">Nombre completo</span>
       <input
     type="text"
@@ -230,7 +278,7 @@
                 />
               </div>
 
-              <div className="flex items-end gap-2 text-[9.5px] font-bold overflow-hidden w-full mb-1">
+              <div className="flex items-end gap-2 text-[9.5px] font-bold overflow-hidden w-full mb-0.5">
                 <div className="flex items-end gap-1 shrink-0">
                   <span>Edad</span>
                   <input
@@ -311,21 +359,21 @@
 
             {/* MOTIVOS Y QX */}
             <div className="grid grid-cols-2 gap-4 shrink-0">
-              <SectionBox title="Motivos de consulta" paddingX="px-2" marginTop="mt-2">
+              <SectionBox title="Motivos de consulta" paddingX="px-2" marginTop="mt-[14px]">
                 <LineTextarea
                   id="motivos"
                   value={formData.pagina_1.motivos || ''}
                   onChange={handleInputChange}
-                  rows={2}
+                  rows={5.36}
                   lineHeight={16}
                 />
               </SectionBox>
-              <SectionBox title="Qx o Tx previos" paddingX="px-2" marginTop="mt-2">
+              <SectionBox title="Qx o Tx previos" paddingX="px-2" marginTop="mt-[14px]">
                 <LineTextarea
                   id="qx"
                   value={formData.pagina_1.qx || ''}
                   onChange={handleInputChange}
-                  rows={2}
+                  rows={5.36}
                   lineHeight={16}
                 />
               </SectionBox>
@@ -333,63 +381,59 @@
 
             {/* ANTECEDENTES GRID */}
             <div className="grid grid-cols-[1.6fr_1fr] items-start gap-4 shrink-0">
-              <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-2">
-                <div className="w-full h-full overflow-hidden rounded-b-md">
-                  <table className="w-full border-collapse text-[8.5px] font-bold table-fixed mt-0">
-                    <thead>
-                      <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
-                        <th className="text-left pl-2 w-[40%] py-1">Enfermedades</th>
-                        {['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'].map(h => <th key={h} className="text-[7.5px] py-1">{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody className="text-center">
-                      {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map((item) => (
-                        <tr key={item} className="border-b-[1.5px] border-[#2c5392] h-[13.5px]">
-                          <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] whitespace-nowrap overflow-hidden text-ellipsis">{item}</td>
-                          {[...Array(6)].map((_, i) => (
-                            <td key={i} className="border-r-[1.5px] border-[#2c5392] last:border-r-0">
-                              <input
-                                type="checkbox"
-                                checked={formData.pagina_1[`heredo-${item}-${i}`] || false}
-                                onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
-                                disabled={isReadOnly}
-                                className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                      <tr className="border-b-[1.5px] border-[#2c5392] h-[13.5px]">
-                        <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] whitespace-nowrap overflow-hidden text-ellipsis">
-                          <div className="flex items-center gap-1">
-                            <span className="shrink-0">Otras:</span>
-                            <input
-                              type="text"
-                              id="otrasHeredo"
-                              value={formData.pagina_1.otrasHeredo || ''}
-                              onChange={(e) => handleInputChange(e, 'otrasHeredo')}
-                              className="w-full min-w-0 outline-none h-3.5 bg-transparent text-[8.5px] text-[#333]"
-                            />
-                          </div>
-                        </td>
+              <SectionBox title="Antecedentes patológicos heredofamiliares" paddingX="px-0" marginTop="mt-[14px]" style={{ height: '235px' }}>
+                <div className="w-full h-full overflow-hidden rounded-b-md flex flex-col text-[8.5px] font-bold">
+                  <div className="flex border-b-[1.5px] border-[#2c5392] bg-slate-50/50 shrink-0">
+                    <div className="text-left pl-2 w-[40%] py-1">Enfermedades</div>
+                    {['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'].map(h => <div key={h} className="w-[10%] text-[7.5px] py-1 text-center">{h}</div>)}
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map((item) => (
+                      <div key={item} className="flex flex-1 items-center border-b-[1.5px] border-[#2c5392]">
+                        <div className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[40%] h-full flex items-center whitespace-nowrap overflow-hidden text-ellipsis">{item}</div>
                         {[...Array(6)].map((_, i) => (
-                          <td key={i} className="border-r-[1.5px] border-[#2c5392] last:border-r-0">
+                          <div key={i} className="w-[10%] border-r-[1.5px] border-[#2c5392] last:border-r-0 h-full flex items-center justify-center">
                             <input
                               type="checkbox"
-                              checked={formData.pagina_1[`heredo-otras-${i}`] || false}
-                              onChange={(e) => updateGlobalData('pagina_1', {[`heredo-otras-${i}`]: e.target.checked})}
+                              checked={formData.pagina_1[`heredo-${item}-${i}`] || false}
+                              onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
                               disabled={isReadOnly}
                               className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
                             />
-                          </td>
+                          </div>
                         ))}
-                      </tr>
-                    </tbody>
-                  </table>
+                      </div>
+                    ))}
+                    <div className="flex flex-1 items-center border-b-[1.5px] border-[#2c5392]">
+                      <div className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[40%] h-full flex items-center whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="flex items-center gap-1 w-full">
+                          <span className="shrink-0">Otras:</span>
+                          <input
+                            type="text"
+                            id="otrasHeredo"
+                            value={formData.pagina_1.otrasHeredo || ''}
+                            onChange={(e) => handleInputChange(e, 'otrasHeredo')}
+                            className="w-full min-w-0 outline-none h-3.5 bg-transparent text-[8.5px] text-[#333]"
+                          />
+                        </div>
+                      </div>
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="w-[10%] border-r-[1.5px] border-[#2c5392] last:border-r-0 h-full flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={formData.pagina_1[`heredo-otras-${i}`] || false}
+                            onChange={(e) => updateGlobalData('pagina_1', {[`heredo-otras-${i}`]: e.target.checked})}
+                            disabled={isReadOnly}
+                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-2" pill={false}>
+              <SectionBox title="Antecedentes patológicos personales" marginTop="mt-[14px]" pill={false} style={{ height: '235px' }}>
                 <div className="flex flex-col gap-1.5 text-[9px] font-bold px-1 py-1">
                   {['Diabetes Mellitus', 'Obesidad o Sobrepeso', 'Cáncer', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enferm. Gastrointestinales'].map(item => (
                     <CustomCheckbox
@@ -419,14 +463,17 @@
               </SectionBox>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 shrink-0">
-              <SectionBox title="Sintomatología" paddingX="px-0" className="row-span-2" marginTop="mt-2" pill={false}>
-                <table className="w-full text-[8.5px] font-bold table-fixed border-collapse mt-0 h-full">
-                  <thead><tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50"><th className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[60%] py-1">Enfermedades</th><th className="py-1">Freq./Cant.</th></tr></thead>
-                  <tbody>
+            <div className="grid grid-cols-[calc((100%-32px)/3)_1fr] gap-4 shrink-0">
+              <SectionBox title="Sintomatología" paddingX="px-0" marginTop="mt-[11px]" pill={false}>
+                <div className="flex flex-col w-full h-full text-[8.5px] font-bold">
+                  <div className="flex shrink-0 border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
+                    <div className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[53%] py-1">Enfermedades</div>
+                    <div className="flex-1 py-1 text-center">Freq./Cant.</div>
+                  </div>
+                  <div className="flex flex-col flex-1">
                     {['Gastritis', 'Colitis', 'Reflujo gastroesofágico', 'Diarrea', 'Estreñimiento', 'Vómito', 'Náuseas', 'Disfagia', 'Hiperfagia', 'Flatulencias', 'Distensión abdominal', 'Hiporexia'].map(item => (
-                      <tr key={item} className="border-b-[1.5px] border-[#2c5392] h-[14.5px]">
-                        <td className="text-left pl-2 border-r-[1.5px] border-[#2c5392] flex items-center gap-1.5 h-full">
+                      <div key={item} className="flex flex-1 border-b-[1.5px] border-[#2c5392] last:border-b-0">
+                        <div className="text-left pl-2 border-r-[1.5px] border-[#2c5392] w-[53%] flex items-center gap-1.5">
                           <input
                             type="checkbox"
                             checked={formData.pagina_1[`sintoma-check-${item}`] || false}
@@ -434,22 +481,27 @@
                             className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] shrink-0 cursor-pointer align-middle"
                           />
                           <span className="truncate">{item}</span>
-                        </td>
-                        <td className="p-0 border-none h-full">
+                        </div>
+                        <div className="flex-1">
                           <input
                             type="text"
                             value={formData.pagina_1[`sintoma-val-${item}`] || ''}
                             onChange={(e) => updateGlobalData('pagina_1', {[`sintoma-val-${item}`]: e.target.value})}
-                            className="w-full h-full border-none outline-none px-1.5 bg-transparent text-center text-[#333]"
+                            className="w-full h-full border-none outline-none px-1.5 bg-transparent text-left text-[#333]"
                           />
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </SectionBox>
 
-              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-2" pill={false}>
+              {/* Sub-grid propio para Bristol/Antecedentes personales no patológicos/Diagnósticos
+                  médicos/Medicamentos — separado de Sintomatología para poder reposicionar este
+                  bloque como unidad sin afectarla (ver conversación: reubicar el hueco de mt-2 de
+                  "antes del bloque" a "entre sus dos filas internas", sin mover nada más). */}
+              <div className="grid grid-cols-2 gap-4">
+              <SectionBox title="Escala de Bristol" className="text-center" marginTop="mt-[11px]" pill={false}>
                 <div className="flex flex-col items-center justify-center w-full h-full py-1">
                   <img
                     src={bristolImg}
@@ -479,7 +531,7 @@
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-2" className="pb-0" pill={false}>
+              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-[11px]" className="pb-0" pill={false} style={{ marginLeft: '-8px', width: 'calc(100% + 8px)' }}>
                 <table className="w-full text-[8.5px] font-bold border-collapse table-fixed mt-0 h-full">
                   <thead>
                     <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
@@ -522,10 +574,13 @@
                 </table>
               </SectionBox>
 
-              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-2" pill={false}>
-                <div className="flex flex-col justify-between h-full border-t-[1.5px] border-[#2c5392]">
+              <SectionBox title="Diagnósticos médicos" paddingX="px-0" marginTop="mt-0" pill={false}>
+                <div className="flex flex-col">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="border-b-[1.5px] border-[#2c5392] last:border-b-0 flex-1 flex items-center">
+                    <div
+                      key={i}
+                      className="border-b-[1.5px] border-[#2c5392] last:border-b-0 flex items-center shrink-0 h-[28px]"
+                    >
                       <textarea
                         value={formData.pagina_1[`diag-med-${i}`] || ''}
                         onChange={(e) => updateGlobalData('pagina_1', {[`diag-med-${i}`]: e.target.value})}
@@ -538,7 +593,7 @@
 
               <SectionBox title={
                 <div className="flex w-full gap-2 px-2 text-[9px]"><span className="flex-1 text-center">Medicamentos</span><span className="flex-1 text-center">Dosis</span></div>
-              } paddingX="px-1.5" marginTop="mt-2" pill={false}>
+              } paddingX="px-1.5" marginTop="mt-0" pill={false} style={{ marginLeft: '-8px', width: 'calc(100% + 8px)' }}>
                 <div className="flex flex-col justify-between h-full py-0.5">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="flex justify-between items-center w-full gap-2">
@@ -558,10 +613,11 @@
                   ))}
                 </div>
               </SectionBox>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 shrink-0">
-              <SectionBox title="Ejercicio" marginTop="mt-2">
+              <SectionBox title="Ejercicio" marginTop="mt-[14px]">
                 <div className="flex flex-col gap-1 w-full h-full justify-center">
                   <div className="flex items-center gap-2 text-[9px] font-bold w-full mb-1">
                     <span className="shrink-0">Realiza ejercicio</span>
@@ -615,7 +671,7 @@
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes gineco-obstétricos" marginTop="mt-2">
+              <SectionBox title="Antecedentes gineco-obstétricos" marginTop="mt-[14px]">
                 <div className="flex flex-col gap-1.5 justify-center h-full w-full">
                   <div className="flex items-end gap-1.5 text-[9px] font-bold w-full">
                     <span>G</span><input type="text" value={formData.pagina_1.g || ''} onChange={(e) => updateGlobalData('pagina_1', {g: e.target.value})} className="border-b-[1.5px] border-[#2c5392] w-6 outline-none text-center h-[13px] text-[#333]" />
@@ -703,10 +759,12 @@
     marginTop?: string,
     /** false = encabezado completo (barra azul de ancho total, estilo original); true (default) = píldora tipo legend. */
     pill?: boolean,
-  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3", pill = true }) => (
+    /** Override puntual (margin/width) para desplazar una caja dentro de su celda de grid sin tocar grid-template-columns — ver "Antecedentes personales no patológicos"/"Medicamentos". */
+    style?: React.CSSProperties,
+  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3", pill = true, style }) => (
     <section
       className={`relative rounded-[10px] border-[2px] border-[#2c5697] ${marginTop} flex w-full flex-col bg-white ${className}`}
-      style={title && pill ? { paddingTop: '11px' } : undefined}
+      style={{ ...(title && pill ? { paddingTop: '11px' } : undefined), ...style }}
     >
       {title && (
         pill ? (
@@ -719,7 +777,7 @@
           </div>
         )
       )}
-      <div className={`flex flex-1 flex-col justify-start overflow-hidden rounded-[8px] py-1 ${paddingX} w-full h-full`}>
+      <div className={`flex flex-1 flex-col justify-start overflow-hidden rounded-[8px] py-1 ${paddingX} w-full h-full min-h-0`}>
         {children}
       </div>
     </section>
@@ -1060,7 +1118,9 @@
             word-wrap: break-word;
           }
           @media print {
-            td textarea { overflow: visible !important; height: auto !important; }
+            /* overflow:visible/height:auto no funciona en <textarea> (ver
+               nota igual en la página 1) — se quita para que impresión
+               coincida con pantalla en vez de achicar el textarea. */
             td { height: auto !important; }
             tr { break-inside: avoid; }
           }
@@ -1646,7 +1706,9 @@
               line-height: 1.2;
             }
             @media print {
-              textarea.ta-cell, textarea.ta-linea { overflow: visible !important; height: auto !important; }
+              /* overflow:visible/height:auto no funciona en <textarea> (ver
+                 nota igual en la página 1) — se quita para que impresión
+                 coincida con pantalla en vez de achicar el textarea. */
               tr { break-inside: avoid; }
               td { height: auto !important; }
             }
@@ -2218,7 +2280,9 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
               word-wrap: break-word;
             }
             @media print {
-              .printable-page textarea { overflow: visible !important; height: auto !important; }
+              /* overflow:visible/height:auto no funciona en <textarea> (ver
+                 nota igual en la página 1) — se quita para que impresión
+                 coincida con pantalla en vez de achicar el textarea. */
               .printable-page tr { break-inside: avoid; }
               .printable-page td { height: auto !important; }
             }
@@ -2458,7 +2522,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
               <tr>
                 {['desayuno', 'cm', 'comida', 'cv', 'cena'].map(meal => (
                   <td key={meal} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}>
-                    <textarea name={`menu_${meal}`} value={accumulatedData.pagina_4?.[`menu_${meal}`] || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, fontSize: '9px'}}></textarea>
+                    <textarea name={`menu_${meal}`} value={accumulatedData.pagina_4?.[`menu_${meal}`] || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, fontSize: '9px', paddingTop: '8px'}}></textarea>
                   </td>
                 ))}
               </tr>

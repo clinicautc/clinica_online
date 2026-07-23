@@ -144,7 +144,7 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
               </div>
               <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Ocupación</label><Input {...field1('ocupacion')} /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-slate-600">F/N</label><Input {...field1('fn')} /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Teléfono</label><Input {...field1('telefono')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Teléfono</label><Input type="tel" inputMode="numeric" maxLength={10} {...field1('telefono')} onChange={(e) => set1({ telefono: e.target.value.replace(/\D/g, '') })} /></div>
               <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Dirección</label><Input {...field1('direccion')} /></div>
             </div>
           </FormSectionCard>

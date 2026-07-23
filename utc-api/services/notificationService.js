@@ -38,8 +38,11 @@ const {
 
 const {
   crearHtmlCitaCreada,
+  crearHtmlRecordatorioCita,
   crearHtmlAsignacionAutomatica,
-  crearHtmlReasignacion
+  crearHtmlReasignacion,
+  crearHtmlCambioHorarioOperacion,
+  crearHtmlConflictoHorarioOperacion
 } = require('./templates/citas.templates');
 
 const {
@@ -137,6 +140,33 @@ async function notificarCitaCreada(pacienteNombre, pacienteEmail, fecha, hora, a
   }
 }
 
+async function notificarRecordatorioCita(pacienteNombre, pacienteEmail, fecha, hora, area, practicanteNombre) {
+  try {
+    const html = crearHtmlRecordatorioCita(pacienteNombre, fecha, hora, area, practicanteNombre);
+    await enviarCorreo(pacienteEmail, 'Recordatorio de tu cita - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar recordatorio de cita:', error.message);
+  }
+}
+
+async function notificarCambioHorarioOperacion(pacienteNombre, pacienteEmail, fechaAnterior, fechaNueva, hora, area) {
+  try {
+    const html = crearHtmlCambioHorarioOperacion(pacienteNombre, fechaAnterior, fechaNueva, hora, area);
+    await enviarCorreo(pacienteEmail, 'Cambio en tu cita por horario de operación - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar cambio de horario de operación:', error.message);
+  }
+}
+
+async function notificarConflictoHorarioOperacion(pacienteNombre, pacienteEmail, fecha, hora, area) {
+  try {
+    const html = crearHtmlConflictoHorarioOperacion(pacienteNombre, fecha, hora, area);
+    await enviarCorreo(pacienteEmail, 'Acción requerida: tu cita necesita reagendarse - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar conflicto de horario de operación:', error.message);
+  }
+}
+
 async function notificarAsignacionAutomatica(practicanteNombre, practicanteEmail, pacienteNombre, fecha, hora, area) {
   try {
     const html = crearHtmlAsignacionAutomatica(practicanteNombre, pacienteNombre, fecha, hora, area);
@@ -205,8 +235,11 @@ module.exports = {
 
   // Citas — informativas
   notificarCitaCreada,
+  notificarRecordatorioCita,
   notificarAsignacionAutomatica,
   notificarReasignacion,
+  notificarCambioHorarioOperacion,
+  notificarConflictoHorarioOperacion,
 
   // Pacientes — informativa
   notificarBienvenidaPaciente,

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Clock, Check } from 'lucide-react';
+import { Clock, Check, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { horariosAPI, DiaSemana } from '../lib/api';
+import { horariosAPI, horariosAtencionAPI, DiaSemana, HorarioAtencionDia, Area } from '../lib/api';
 import TimeScrollPicker from './TimeScrollPicker';
 
 const DIAS = [
@@ -26,14 +26,31 @@ function estadoInicial(): DiaSemana[] {
 
 interface Props {
   usuarioId?: string | number | null;
+  area?: Area | '';
   onChange?: (dias: DiaSemana[]) => void;
   readOnly?: boolean;
 }
 
-export default function HorarioPracticas({ usuarioId, onChange, readOnly = false }: Props) {
+export default function HorarioPracticas({ usuarioId, area, onChange, readOnly = false }: Props) {
   const [dias, setDias] = useState<DiaSemana[]>(estadoInicial);
   const [guardando, setGuardando] = useState(false);
   const [cargando, setCargando] = useState(false);
+
+  // Horario de atención definido por el master para el área — el horario del
+  // practicante no puede salirse de ahí (no tendría sentido que un
+  // practicante esté disponible cuando la clínica no atiende ese día/hora).
+  const [reglasArea, setReglasArea] = useState<Record<number, HorarioAtencionDia>>({});
+
+  useEffect(() => {
+    if (!area) { setReglasArea({}); return; }
+    horariosAtencionAPI.getHorarios(area)
+      .then(data => {
+        const porDia: Record<number, HorarioAtencionDia> = {};
+        data.forEach(d => { porDia[d.dia_semana] = d; });
+        setReglasArea(porDia);
+      })
+      .catch(() => setReglasArea({}));
+  }, [area]);
 
   useEffect(() => {
     if (!usuarioId) return;
@@ -56,7 +73,14 @@ export default function HorarioPracticas({ usuarioId, onChange, readOnly = false
       .finally(() => setCargando(false));
   }, [usuarioId]);
 
+  const reglaDelDia = (num: number) => reglasArea[num];
+  const diaCerradoPorClinica = (num: number) => area && reglasArea[num] && !reglasArea[num].activo;
+
   const toggle = (num: number) => {
+    if (diaCerradoPorClinica(num)) {
+      toast.error('Ese día la clínica no atiende — cámbialo primero en el horario de atención del área.');
+      return;
+    }
     const nuevo = dias.map(d =>
       d.dia_semana === num ? { ...d, activo: !d.activo } : d
     );
@@ -64,9 +88,22 @@ export default function HorarioPracticas({ usuarioId, onChange, readOnly = false
     onChange?.(nuevo);
   };
 
+  // Recorta un valor 'HH:MM' al rango [min,max] si se sale del horario de
+  // atención de la clínica para ese día.
+  const acotarHora = (num: number, valor: string) => {
+    const regla = reglaDelDia(num);
+    if (!regla || !regla.activo) return valor;
+    const min = regla.hora_inicio.substring(0, 5);
+    const max = regla.hora_fin.substring(0, 5);
+    if (valor < min) { toast.error(`La clínica abre a las ${min} ese día — ajustado.`); return min; }
+    if (valor > max) { toast.error(`La clínica cierra a las ${max} ese día — ajustado.`); return max; }
+    return valor;
+  };
+
   const setHora = (num: number, campo: 'hora_inicio' | 'hora_fin', valor: string) => {
+    const valorAcotado = acotarHora(num, valor);
     const nuevo = dias.map(d =>
-      d.dia_semana === num ? { ...d, [campo]: valor } : d
+      d.dia_semana === num ? { ...d, [campo]: valorAcotado } : d
     );
     setDias(nuevo);
     onChange?.(nuevo);
@@ -99,16 +136,20 @@ export default function HorarioPracticas({ usuarioId, onChange, readOnly = false
         {DIAS.map(({ num, label, short }) => {
           const dia = dias.find(d => d.dia_semana === num)!;
           const activo = dia.activo;
+          const cerrado = diaCerradoPorClinica(num);
+          const regla = reglaDelDia(num);
 
           return (
             <div
               key={num}
-              onClick={() => !readOnly && toggle(num)}
+              onClick={() => !readOnly && !cerrado && toggle(num)}
               className={`
-                relative rounded-2xl border-2 p-4 cursor-pointer transition-all duration-200 select-none
-                ${activo
-                  ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                relative rounded-2xl border-2 p-4 transition-all duration-200 select-none
+                ${cerrado
+                  ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-60'
+                  : activo
+                  ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100 cursor-pointer'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 cursor-pointer'
                 }
                 ${readOnly ? 'cursor-default' : ''}
               `}
@@ -116,26 +157,28 @@ export default function HorarioPracticas({ usuarioId, onChange, readOnly = false
               {/* Indicador de activo */}
               <div className={`
                 absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center transition-all
-                ${activo ? 'bg-blue-500' : 'bg-slate-200'}
+                ${cerrado ? 'bg-slate-300' : activo ? 'bg-blue-500' : 'bg-slate-200'}
               `}>
-                {activo && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                {cerrado ? <Lock className="w-2.5 h-2.5 text-white" strokeWidth={3} /> : activo && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
               </div>
 
               {/* Día */}
               <div className="mb-3">
                 <span className={`
                   inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black mb-1
-                  ${activo ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-400'}
+                  ${activo && !cerrado ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-400'}
                 `}>
                   {short}
                 </span>
-                <p className={`text-sm font-bold ${activo ? 'text-blue-900' : 'text-slate-400'}`}>
+                <p className={`text-sm font-bold ${activo && !cerrado ? 'text-blue-900' : 'text-slate-400'}`}>
                   {label}
                 </p>
               </div>
 
               {/* Horario */}
-              {activo ? (
+              {cerrado ? (
+                <p className="text-[10px] text-slate-400 font-medium italic">Clínica cerrada este día</p>
+              ) : activo ? (
                 <div
                   className="space-y-2"
                   onClick={e => e.stopPropagation()}
@@ -155,6 +198,11 @@ export default function HorarioPracticas({ usuarioId, onChange, readOnly = false
                     onChange={v => setHora(num, 'hora_fin', v)}
                     disabled={readOnly}
                   />
+                  {regla && (
+                    <p className="text-[9px] text-slate-400 text-center">
+                      Clínica: {regla.hora_inicio.substring(0,5)}–{regla.hora_fin.substring(0,5)}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <p className="text-[11px] text-slate-400 font-medium italic">Sin prácticas</p>

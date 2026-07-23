@@ -118,7 +118,7 @@ async function refresh(req, res) {
     const tokenRow = tokenResult.rows[0];
 
     const userResult = await pool.query(
-      'SELECT id, nombre, email, rol, area, status, telefono, matricula FROM usuarios WHERE id = $1',
+      'SELECT id, nombre, email, rol, area, status, telefono, matricula, numero_empleado FROM usuarios WHERE id = $1',
       [tokenRow.usuario_id]
     );
 
@@ -171,6 +171,13 @@ async function logout(req, res) {
 async function preRegister(req, res) {
   console.log('🚨 PRE-REGISTER EJECUTADO');
   const { name, email, password } = req.body;
+
+  // VALIDACIÓN DE NOMBRE: solo letras y espacios (respaldo del lado del
+  // servidor a la validación que ya existe en el formulario de registro).
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,90}$/.test((name || '').trim())) {
+    return res.status(400).json({ error: 'El nombre solo puede contener letras y espacios.' });
+  }
+
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedPassword = await bcrypt.hash(password, 10);
 

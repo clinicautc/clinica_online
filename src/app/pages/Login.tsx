@@ -137,7 +137,7 @@
 
               {/* Campo para el Correo */}
               <div className="space-y-1">
-                <label htmlFor="email" className="block text-sm font-semibold text-slate-700">Correo institucional</label>
+                <label htmlFor="email" className="block text-sm font-semibold text-slate-700">Correo </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-[#002f6c] transition-colors" />

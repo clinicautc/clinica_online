@@ -13,6 +13,18 @@ function esFechaPasada(fecha) {
   return fechaStr < hoyStr;
 }
 
+// Las citas solo pueden agendarse hasta 90 días naturales a futuro — mismo límite
+// aplicado en el frontend (AppointmentForm.tsx), mantener ambos en sync.
+const DIAS_MAXIMOS_ANTICIPACION = 90;
+
+function esFechaMuyLejana(fecha) {
+  const fechaStr = new Date(fecha).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const limite = new Date();
+  limite.setDate(limite.getDate() + DIAS_MAXIMOS_ANTICIPACION);
+  const limiteStr = limite.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  return fechaStr > limiteStr;
+}
+
 function getFechaMexico() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
 }
@@ -213,6 +225,10 @@ async function create(req, res) {
   const { paciente_id, paciente_nombre, tipo, fecha, hora } = req.body;
   const area = tipo.toLowerCase();
 
+  if (esFechaMuyLejana(fecha)) {
+    return res.status(400).json({ error: `Las citas solo pueden agendarse con un máximo de ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación.` });
+  }
+
   try {
     const conflictoPaciente = await pool.query(
       "SELECT tipo FROM citas WHERE paciente_id = $1 AND fecha = $2 AND hora = $3 AND estado IN ('programada', 'en_atencion')",
@@ -307,6 +323,9 @@ async function update(req, res) {
       if (esFechaPasada(original.fecha)) {
         return res.status(409).json({ error: "No se puede reagendar una cita de una fecha pasada." });
       }
+      if (esFechaMuyLejana(nuevaFecha)) {
+        return res.status(400).json({ error: `Las citas solo pueden agendarse con un máximo de ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación.` });
+      }
 
       // Solo verificar conflicto de horario cuando realmente cambia fecha u hora
       const check = await pool.query(
@@ -388,7 +407,32 @@ async function asignar(req, res) {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "No se encontró la cita." });
     }
-    res.json(result.rows[0]);
+    const cita = result.rows[0];
+    res.json(cita);
+
+    // Notificaciones informativas — la cita ya se asignó, si el correo falla no
+    // se revierte nada. Mismo par de correos (paciente + practicante) que se
+    // manda en la reasignación automática por inasistencia (asistenciaController).
+    if (practicante_id) {
+      try {
+        const [pacResult, pracResult] = await Promise.all([
+          pool.query('SELECT email FROM usuarios WHERE id = $1', [cita.paciente_id]),
+          pool.query('SELECT email FROM usuarios WHERE id = $1', [practicante_id]),
+        ]);
+        if (pacResult.rows.length > 0) {
+          notificationService.notificarReasignacion(
+            cita.paciente_nombre, pacResult.rows[0].email, cita.fecha, cita.hora, practicante_nombre, cita.tipo
+          );
+        }
+        if (pracResult.rows.length > 0) {
+          notificationService.notificarAsignacionAutomatica(
+            practicante_nombre, pracResult.rows[0].email, cita.paciente_nombre, cita.fecha, cita.hora, cita.tipo
+          );
+        }
+      } catch (notifErr) {
+        console.error('[citas] Error al notificar asignación manual:', notifErr.message);
+      }
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
