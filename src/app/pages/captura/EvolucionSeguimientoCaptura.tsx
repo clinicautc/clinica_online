@@ -152,10 +152,7 @@ const EvolucionSeguimientoCaptura = forwardRef<FormClinicoHandle, Partial<FormCl
     ref
   );
 
-  const handleVolver = () => {
-    const confirmar = window.confirm("¿Deseas salir sin guardar los cambios?");
-    if (confirmar) navigate(-1);
-  };
+  const handleVolver = () => navigate(-1);
 
   const matrixProps = { formData, onChange: handleInputChange, onDateChange: handleDateInput, onNumberChange: handleNumberInput, onDaysChange: handleDaysInput };
 

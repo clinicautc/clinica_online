@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Save, FileText, Loader2, Calendar, User, MessageSquare } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';

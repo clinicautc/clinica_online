@@ -20,7 +20,7 @@ import {
   ArrowLeft, Plus, Trash2, UserCheck, UserMinus, Shield,
   Filter, CalendarClock, ClipboardCheck, CheckCircle2, XCircle, Lock, Search,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { practicantesAPI, usuariosAPI, asistenciaAPI, PracticanteAsistencia, AsistenciaMesEntry, DiaSemana } from '../lib/api';

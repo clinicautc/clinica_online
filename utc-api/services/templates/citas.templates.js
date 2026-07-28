@@ -637,7 +637,7 @@ function crearHtmlConflictoHorarioOperacion(pacienteNombre, fecha, hora, area) {
                 </tr>
               </table>
 
-              <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Por favor entra a tu portal y reagenda o cancela esta cita lo antes posible — de lo contrario podría quedar en un horario que ya no atendemos.</p>
+              <p style="color:#6b7280;font-size:14px;line-height:1.7;margin-top:20px;">Por favor entra a tu portal y reagenda o cancela esta cita lo antes posible — si no lo haces, se cancelará automáticamente cuando llegue la fecha.</p>
 
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
                 <tr>

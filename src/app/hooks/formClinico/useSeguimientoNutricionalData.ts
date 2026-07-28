@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { toast } from 'sonner';
+import { toast } from '../../lib/toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { notasAPI } from '../../lib/api';
 import type { FormClinicoCallbacks } from '../../lib/types/formClinico';
@@ -77,7 +77,7 @@ export function useSeguimientoNutricionalData(props: Partial<FormClinicoCallback
       if (props.onSaveSuccess) {
         props.onSaveSuccess(props.formKey ?? '');
       } else {
-        setTimeout(() => { navigate(-1); }, 1000);
+        setTimeout(() => navigate(`/forms/seguimiento-nutricional/${appointmentId}/documento`, { replace: true }), 1000);
       }
     } catch (error: any) {
       console.error("Error al guardar:", error);

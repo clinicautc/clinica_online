@@ -21,7 +21,7 @@ const HojaEvolutiva = () => {
   const { user } = useAuth();
   const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
-  const handleVolver = () => navigate(-1);
+  const handleVolver = () => navigate(`/historial/${formData.paciente_id}/fisioterapia`);
   const handleImprimir = () => window.print();
   const handleEditar = () => navigate(`/forms/seguimiento/${appointmentId}`);
 
@@ -126,6 +126,17 @@ const HojaEvolutiva = () => {
               align-items: center;
               padding: 20px;
               min-height: 100vh;
+          }
+          /* Zoom cosmético SOLO para pantalla (mismo criterio que
+             NutritionMasterForm.tsx): agranda visualmente el documento como
+             si el navegador estuviera a 150% de zoom. No toca --screen-scale
+             ni --print-scale — se anula explícitamente dentro de
+             @media print más abajo. Restringido a >=1024px: se verificó que
+             en portrait de tablet (hasta ~1023px) el problema se reproduce
+             igual que en móvil, desbordando el ancho real y empujando los
+             botones flotantes fuera de la pantalla. */
+          @media (min-width: 1024px) {
+            .hoja-evolutiva-wrapper { zoom: 1.5; }
           }
           .page {
               zoom: var(--screen-scale, 1);
@@ -532,7 +543,7 @@ const HojaEvolutiva = () => {
              ========================================================== */
         @page { size: 215.9mm 279.4mm; margin: 0; }
         @media print {
-              .hoja-evolutiva-wrapper { background: none; padding: 0; }
+              .hoja-evolutiva-wrapper { background: none; padding: 0; zoom: 1 !important; }
               .hoja-evolutiva-wrapper .page,
               .hoja-evolutiva-wrapper .page2,
               .hoja-evolutiva-wrapper .page3,

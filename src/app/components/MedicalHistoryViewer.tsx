@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch, citasAPI } from '../lib/api';
 import { formatExpediente } from '../lib/formatExpediente';

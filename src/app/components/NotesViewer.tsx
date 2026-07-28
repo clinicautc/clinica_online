@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { notasAPI } from '../lib/api';
 
 interface Reply {

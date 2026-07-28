@@ -51,15 +51,15 @@ const rowsPsicologicos: MatrixRowConfig[] = [
 const rowsSintomatologia: MatrixRowConfig[] = [
   "Gastritis", "Colitis", "Reflujo gastroesofágico", "Diarrea", "Estreñimiento", "Vómito",
   "Náuseas", "Disfagia", "Hiperfagia", "Flatulencias", "Distensión abdominal", "Hiporexia", "Escala de Bristol",
-].map((s, idx) => ({ label: s, name: (col: number) => `sint_${idx}_col${col}`, maxLength: 26 }));
+].map((s, idx) => ({ label: s, name: (col: number) => `sint_${idx}_col${col}`, maxLength: 25 }));
 
 const rowsEjercicio: MatrixRowConfig[] = [
   "Si/No", "Anaerobico/Aeróbico", "¿Cual?", "Frecuencia", "Intensidad", "Tiempo", "Volumen", "Progresion",
-].map((p, idx) => ({ label: p, name: (col: number) => `ejer_${idx}_col${col}`, maxLength: 26 }));
+].map((p, idx) => ({ label: p, name: (col: number) => `ejer_${idx}_col${col}`, maxLength: 22 }));
 
 const rowsDieteticos: MatrixRowConfig[] = [
   "Comidas al día", "Dieta especial", "Uso de laxantes", "Medicamentos ↓ peso",
-].map((p, idx) => ({ label: p, name: (col: number) => `diet_${idx}_col${col}`, maxLength: 26 }));
+].map((p, idx) => ({ label: p, name: (col: number) => `diet_${idx}_col${col}`, maxLength: 22 }));
 
 const rowsFrecuencia: MatrixRowConfig[] = ALIMENTOS.map((item, idx) => ({
   label: item, name: (col: number) => `freq_${idx}_col${col}`, type: 'days' as const,
@@ -79,11 +79,11 @@ const rowsCualitativo: MatrixRowConfig[] = [
 
 const rowsParametrosDieteticos: MatrixRowConfig[] = [
   ...["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"]
-    .map((r, idx) => ({ label: r, name: (col: number) => `eq_${idx}_col${col}`, maxLength: 21 })),
+    .map((r, idx) => ({ label: r, name: (col: number) => `eq_${idx}_col${col}`, maxLength: 17 })),
   ...["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"]
-    .map((r, idx) => ({ label: r, name: (col: number) => `cn_${idx}_col${col}`, maxLength: 21 })),
+    .map((r, idx) => ({ label: r, name: (col: number) => `cn_${idx}_col${col}`, maxLength: 17 })),
   ...["Energía", "Proteína", "HCO", "Lípidos"]
-    .map((r, idx) => ({ label: r, name: (col: number) => `int_${idx}_col${col}`, maxLength: 21 })),
+    .map((r, idx) => ({ label: r, name: (col: number) => `int_${idx}_col${col}`, maxLength: 17 })),
 ];
 const gruposParametrosDieteticos = [
   { beforeRow: 0, label: 'Equivalentes (rac)' },
@@ -115,7 +115,7 @@ const rowsExploracionFisica: MatrixRowConfig[] = [
   "Hallazgos generales", "Adiposidad", "Huesos", "Sistema CV-respiratorio", "Sistema digestivo", "Edema",
   "Extremidades", "Ojos", "Pelo", "Cabeza", "Manos y uñas", "Boca", "Músculos", "Cuello", "Piel", "Dientes",
   "Garganta y deglución", "Lengua",
-].map((h, idx) => ({ label: h, name: (col: number) => `explor_${idx}_col${col}`, maxLength: 26 }));
+].map((h, idx) => ({ label: h, name: (col: number) => `explor_${idx}_col${col}`, maxLength: 22 }));
 
 const rowsIntervencion: MatrixRowConfig[] = [
   { label: "Indicación de Alimentos/Nutrimentos", name: (col: number) => `interv_ind_col${col}`, type: 'textarea' as const, maxLength: 52 },
@@ -162,10 +162,7 @@ const SeguimientoNutricionalCaptura = forwardRef<FormClinicoHandle, Partial<Form
     ref
   );
 
-  const handleVolver = () => {
-    const confirmar = window.confirm("¿Deseas salir sin guardar los cambios?");
-    if (confirmar) navigate(-1);
-  };
+  const handleVolver = () => navigate(-1);
 
   const matrixProps = {
     formData, onChange: handleInputChange, onDateChange: handleDateInput, onNumberChange: handleNumberInput, onDaysChange: handleDaysInput,
@@ -230,8 +227,8 @@ const SeguimientoNutricionalCaptura = forwardRef<FormClinicoHandle, Partial<Form
               numRows={6}
               columns={[
                 { label: 'Fecha', name: row => `diag_fecha_${row}`, type: 'date' },
-                { label: 'Diagnóstico Matriz IMG/IMLG', name: row => `diag_matriz_${row}`, type: 'textarea', maxLength: 150 },
-                { label: 'Interpretación antropométrica', name: row => `diag_interp_${row}`, type: 'textarea', maxLength: 407 },
+                { label: 'Diagnóstico Matriz IMG/IMLG', name: row => `diag_matriz_${row}`, type: 'textarea', maxLength: 149 },
+                { label: 'Interpretación antropométrica', name: row => `diag_interp_${row}`, type: 'textarea', maxLength: 410 },
               ]}
               {...simpleProps}
             />
@@ -242,9 +239,9 @@ const SeguimientoNutricionalCaptura = forwardRef<FormClinicoHandle, Partial<Form
               numCols={6}
               fechaName={col => `bioq_fecha_${col}`}
               rows={Array.from({ length: 10 }, (_, idx) => ({
-                label: <Input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} maxLength={66} className="h-8 text-xs px-2" placeholder="Parámetro" />,
+                label: <Input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} maxLength={56} className="h-8 text-xs px-2" placeholder="Parámetro" />,
                 name: (col: number) => `bioq_${idx}_col${col}`,
-                maxLength: 19,
+                maxLength: 16,
               }))}
               {...matrixProps}
             />

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock, Check, Lock } from 'lucide-react';
 import { Button } from './ui/button';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { horariosAPI, horariosAtencionAPI, DiaSemana, HorarioAtencionDia, Area } from '../lib/api';
 import TimeScrollPicker from './TimeScrollPicker';
 
@@ -24,6 +24,32 @@ function estadoInicial(): DiaSemana[] {
   return DIAS.map(d => ({ dia_semana: d.num, ...DIA_DEFAULT }));
 }
 
+// Ajusta un horario ya cargado (del practicante o el default) contra las
+// reglas vigentes del área: si el día ahora está cerrado por la clínica se
+// desactiva, y si las horas quedaron fuera del rango vigente se recortan.
+// Necesario porque un horario guardado antes de que existiera (o cambiara)
+// el horario de atención puede quedar inválido en silencio — sin esto, con
+// solo abrir el editor y dar "Guardar" (sin tocar nada) el backend lo
+// rechaza con 400, sin que la persona entienda por qué.
+function reconciliarConReglas(dias: DiaSemana[], reglas: Record<number, HorarioAtencionDia>): DiaSemana[] {
+  return dias.map(d => {
+    const regla = reglas[d.dia_semana];
+    if (!regla) return d;
+    if (!regla.activo) return d.activo ? { ...d, activo: false } : d;
+    if (!d.activo) return d;
+    const min = regla.hora_inicio.substring(0, 5);
+    const max = regla.hora_fin.substring(0, 5);
+    let hora_inicio = d.hora_inicio ?? min;
+    let hora_fin = d.hora_fin ?? max;
+    if (hora_inicio < min) hora_inicio = min;
+    if (hora_inicio > max) hora_inicio = max;
+    if (hora_fin > max) hora_fin = max;
+    if (hora_fin < min) hora_fin = min;
+    if (hora_inicio === d.hora_inicio && hora_fin === d.hora_fin) return d;
+    return { ...d, hora_inicio, hora_fin };
+  });
+}
+
 interface Props {
   usuarioId?: string | number | null;
   area?: Area | '';
@@ -33,6 +59,9 @@ interface Props {
 
 export default function HorarioPracticas({ usuarioId, area, onChange, readOnly = false }: Props) {
   const [dias, setDias] = useState<DiaSemana[]>(estadoInicial);
+  // Última versión cargada/guardada — sirve para saber si hay cambios sin
+  // guardar y habilitar el botón solo entonces.
+  const [diasOriginal, setDiasOriginal] = useState<DiaSemana[]>(estadoInicial);
   const [guardando, setGuardando] = useState(false);
   const [cargando, setCargando] = useState(false);
 
@@ -40,6 +69,8 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
   // practicante no puede salirse de ahí (no tendría sentido que un
   // practicante esté disponible cuando la clínica no atiende ese día/hora).
   const [reglasArea, setReglasArea] = useState<Record<number, HorarioAtencionDia>>({});
+  const reglasAreaRef = useRef(reglasArea);
+  useEffect(() => { reglasAreaRef.current = reglasArea; }, [reglasArea]);
 
   useEffect(() => {
     if (!area) { setReglasArea({}); return; }
@@ -48,6 +79,10 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
         const porDia: Record<number, HorarioAtencionDia> = {};
         data.forEach(d => { porDia[d.dia_semana] = d; });
         setReglasArea(porDia);
+        // Las reglas pudieron llegar después que el horario del practicante
+        // (ya cargado) — se reconcilia también aquí para no depender del
+        // orden de las dos peticiones.
+        setDias(prev => reconciliarConReglas(prev, porDia));
       })
       .catch(() => setReglasArea({}));
   }, [area]);
@@ -57,17 +92,22 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
     setCargando(true);
     horariosAPI.getByUsuario(usuarioId)
       .then(data => {
-        if (data.length > 0) {
-          setDias(estadoInicial().map(d => {
-            const encontrado = data.find(r => r.dia_semana === d.dia_semana);
-            return encontrado ? {
-              dia_semana: d.dia_semana,
-              hora_inicio: encontrado.hora_inicio?.substring(0, 5) ?? '08:00',
-              hora_fin:    encontrado.hora_fin?.substring(0, 5)    ?? '14:00',
-              activo:      encontrado.activo,
-            } : d;
-          }));
-        }
+        const resultado = data.length > 0
+          ? reconciliarConReglas(
+              estadoInicial().map(d => {
+                const encontrado = data.find(r => r.dia_semana === d.dia_semana);
+                return encontrado ? {
+                  dia_semana: d.dia_semana,
+                  hora_inicio: encontrado.hora_inicio?.substring(0, 5) ?? '08:00',
+                  hora_fin:    encontrado.hora_fin?.substring(0, 5)    ?? '14:00',
+                  activo:      encontrado.activo,
+                } : d;
+              }),
+              reglasAreaRef.current,
+            )
+          : estadoInicial();
+        setDias(resultado);
+        setDiasOriginal(resultado);
       })
       .catch(() => {})
       .finally(() => setCargando(false));
@@ -89,7 +129,10 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
   };
 
   // Recorta un valor 'HH:MM' al rango [min,max] si se sale del horario de
-  // atención de la clínica para ese día.
+  // atención de la clínica para ese día. El wrapper de toast (lib/toast.ts)
+  // ya reutiliza el mismo toast cuando el mensaje se repite — sin eso, cada
+  // tick de scroll/flecha mientras se está en el límite apilaría un aviso
+  // encimado por encima del anterior.
   const acotarHora = (num: number, valor: string) => {
     const regla = reglaDelDia(num);
     if (!regla || !regla.activo) return valor;
@@ -115,12 +158,15 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
     try {
       await horariosAPI.upsert(usuarioId, dias);
       toast.success('Horario de prácticas guardado correctamente.');
+      setDiasOriginal(dias);
     } catch {
       toast.error('No se pudo guardar el horario.');
     } finally {
       setGuardando(false);
     }
   };
+
+  const hayCambios = JSON.stringify(dias) !== JSON.stringify(diasOriginal);
 
   if (cargando) {
     return (
@@ -231,8 +277,8 @@ export default function HorarioPracticas({ usuarioId, area, onChange, readOnly =
         <Button
           type="button"
           onClick={guardar}
-          disabled={guardando}
-          className="w-full bg-blue-900 hover:bg-blue-800 font-bold rounded-xl h-11 shadow-md mt-2"
+          disabled={guardando || !hayCambios}
+          className="w-full bg-blue-900 hover:bg-blue-800 font-bold rounded-xl h-11 shadow-md mt-2 disabled:bg-slate-300 disabled:shadow-none"
         >
           {guardando ? 'Guardando...' : 'Guardar Horario de Prácticas'}
         </Button>

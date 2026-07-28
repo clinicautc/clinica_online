@@ -2,6 +2,7 @@ const pool = require('../db');
 const { asignarPracticante } = require('../services/asignacionService');
 const notificationService = require('../services/notificationService');
 const { getTipoConsulta, getDocumentosRequeridos } = require('../services/consultaConfig');
+const { obtenerConsultorios, obtenerConfig, capacidadEnFecha } = require('../services/consultoriosService');
 
 // Compara solo la parte de fecha (yyyy-MM-dd) en zona horaria de México —
 // debe usar la misma zona que esCitaDeHoy/getFechaMexico; comparar contra la
@@ -23,6 +24,48 @@ function esFechaMuyLejana(fecha) {
   limite.setDate(limite.getDate() + DIAS_MAXIMOS_ANTICIPACION);
   const limiteStr = limite.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
   return fechaStr > limiteStr;
+}
+
+// dia_semana ISO (1=lunes…7=domingo), igual criterio que horarios_atencion
+// y horarioAtencionService.js — se calcula en calendario local, no UTC.
+function isoDow(fechaStr) {
+  const [y, m, d] = String(fechaStr).split('T')[0].split('-').map(Number);
+  const js = new Date(y, m - 1, d).getDay();
+  return js === 0 ? 7 : js;
+}
+
+// Respaldo del lado del servidor al horario de atención configurado por el
+// master (el frontend ya restringe qué horarios se pueden elegir en
+// AppointmentForm.tsx, pero sin esto una cita fuera de rango — o un día
+// cerrado — se podía guardar igual si esa validación de frontend fallaba o
+// se saltaba). Devuelve un mensaje de error si la fecha/hora no es válida
+// para el área, o null si sí lo es.
+async function validarHorarioDisponible(area, fechaStr, hora) {
+  const fechaSolo = String(fechaStr).split('T')[0];
+
+  const cierre = await pool.query(
+    'SELECT 1 FROM cierres_clinicos WHERE area = $1 AND fecha = $2',
+    [area, fechaSolo]
+  );
+  if (cierre.rows.length > 0) {
+    return 'La clínica no atiende ese día — está marcado como día cerrado.';
+  }
+
+  const regla = await pool.query(
+    'SELECT hora_inicio, hora_fin, activo FROM horarios_atencion WHERE area = $1 AND dia_semana = $2',
+    [area, isoDow(fechaSolo)]
+  );
+  if (regla.rows.length === 0 || !regla.rows[0].activo) {
+    return 'La clínica no atiende ese día de la semana.';
+  }
+
+  const horaStr = String(hora).substring(0, 5);
+  const hIni = regla.rows[0].hora_inicio.substring(0, 5);
+  const hFin = regla.rows[0].hora_fin.substring(0, 5);
+  if (horaStr < hIni || horaStr >= hFin) {
+    return `Ese horario está fuera del horario de atención (${hIni}–${hFin}).`;
+  }
+  return null;
 }
 
 function getFechaMexico() {
@@ -177,6 +220,9 @@ async function getByPaciente(req, res) {
 }
 
 // OBTENER DISPONIBILIDAD DE HORARIOS (BLOQUEO POR ÁREA)
+// Un horario solo cuenta como "ocupado" cuando ya tiene tantas citas como
+// consultorios configurados para el área — con más de un consultorio,
+// varias citas pueden compartir la misma hora (una por consultorio).
 async function getDisponibilidad(req, res) {
   const { fecha, tipo } = req.query; // tipo = 'nutricion' o 'fisioterapia'
 
@@ -185,12 +231,18 @@ async function getDisponibilidad(req, res) {
   }
 
   try {
+    const area = tipo.toLowerCase();
+    const consultorios = await obtenerConsultorios(area, fecha);
     const result = await pool.query(
-      `SELECT hora FROM citas WHERE fecha = $1 AND tipo = $2 AND estado IN ('programada', 'en_atencion')`,
-      [fecha, tipo.toLowerCase()]
+      `SELECT hora, COUNT(*) AS cantidad
+       FROM citas WHERE fecha = $1 AND tipo = $2 AND estado IN ('programada', 'en_atencion')
+       GROUP BY hora`,
+      [fecha, area]
     );
 
-    const horasOcupadas = result.rows.map(row => row.hora);
+    const horasOcupadas = result.rows
+      .filter(row => Number(row.cantidad) >= consultorios)
+      .map(row => row.hora);
 
     res.json(horasOcupadas);
   } catch (error) {
@@ -198,24 +250,61 @@ async function getDisponibilidad(req, res) {
   }
 }
 
-// Devuelve los días del mes que tienen todos los slots posibles (00:00-17:00, 18 slots) ocupados.
-const TOTAL_SLOTS_DIA = 18;
+// Devuelve los días del mes que tienen todos los slots posibles ocupados.
+// El total de slots depende del horario de atención vigente de cada día de
+// la semana (hora_fin - hora_inicio, en horas) — no es fijo, cambia por área
+// y por día (ej. fisioterapia lunes solo tiene 2 slots, miércoles puede
+// tener 16). Cada slot, a su vez, solo cuenta como lleno cuando alcanza la
+// cantidad de consultorios configurada para el área.
 async function getDiasCompletos(req, res) {
   const { mes, tipo } = req.query;
   if (!mes || !tipo) return res.status(400).json({ error: 'Faltan parámetros mes o tipo' });
+  const area = tipo.toLowerCase();
 
   try {
-    const result = await pool.query(
-      `SELECT fecha::date::text AS fecha
+    const consultoriosConfig = await obtenerConfig(area);
+
+    const reglasRes = await pool.query(
+      'SELECT dia_semana, hora_inicio, hora_fin, activo FROM horarios_atencion WHERE area = $1',
+      [area]
+    );
+    const reglasPorDia = {};
+    reglasRes.rows.forEach(r => { reglasPorDia[r.dia_semana] = r; });
+
+    const citasRes = await pool.query(
+      `SELECT fecha::date::text AS fecha, LEFT(hora::text, 5) AS hora, COUNT(*) AS cantidad
        FROM citas
        WHERE tipo = $1
          AND estado IN ('programada', 'en_atencion')
          AND TO_CHAR(fecha, 'YYYY-MM') = $2
-       GROUP BY fecha::date
-       HAVING COUNT(DISTINCT LEFT(hora::text, 5)) >= $3`,
-      [tipo.toLowerCase(), mes, TOTAL_SLOTS_DIA]
+       GROUP BY fecha::date, LEFT(hora::text, 5)`,
+      [area, mes]
     );
-    res.json(result.rows.map(r => r.fecha));
+
+    const porFecha = {};
+    citasRes.rows.forEach(row => {
+      (porFecha[row.fecha] ??= []).push(Number(row.cantidad));
+    });
+
+    const diasCompletos = Object.keys(porFecha)
+      .filter(fecha => {
+        const [y, m, d] = fecha.split('-').map(Number);
+        const js = new Date(y, m - 1, d).getDay();
+        const diaSemana = js === 0 ? 7 : js;
+        const regla = reglasPorDia[diaSemana];
+        if (!regla || !regla.activo) return false;
+
+        const hIni = parseInt(regla.hora_inicio.substring(0, 2), 10);
+        const hFin = parseInt(regla.hora_fin.substring(0, 2), 10);
+        const totalSlots = hFin - hIni;
+        if (totalSlots <= 0) return false;
+
+        const capacidad = capacidadEnFecha(consultoriosConfig, fecha);
+        const horasLlenas = porFecha[fecha].filter(cantidad => cantidad >= capacidad).length;
+        return horasLlenas >= totalSlots;
+      });
+
+    res.json(diasCompletos);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -230,6 +319,11 @@ async function create(req, res) {
   }
 
   try {
+    const errorHorario = await validarHorarioDisponible(area, fecha, hora);
+    if (errorHorario) {
+      return res.status(400).json({ error: errorHorario });
+    }
+
     const conflictoPaciente = await pool.query(
       "SELECT tipo FROM citas WHERE paciente_id = $1 AND fecha = $2 AND hora = $3 AND estado IN ('programada', 'en_atencion')",
       [paciente_id, fecha, hora]
@@ -241,13 +335,16 @@ async function create(req, res) {
       return res.status(409).json({ error: `Ya tienes una cita de ${areaFormateada} a esa hora. Selecciona un horario distinto.` });
     }
 
+    // "Ocupado" ya no es "existe una cita" — el área puede tener varios
+    // consultorios, cada uno cabe una cita simultánea en el mismo horario.
+    const consultoriosArea = await obtenerConsultorios(area, fecha);
     const check = await pool.query(
-      "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'en_atencion')",
+      "SELECT COUNT(*) FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'en_atencion')",
       [fecha, hora, area]
     );
 
-    if (check.rows.length > 0) {
-      return res.status(409).json({ error: "Este horario ya fue ocupado en esta área. Por favor elige otro." });
+    if (parseInt(check.rows[0].count, 10) >= consultoriosArea) {
+      return res.status(409).json({ error: "Este horario ya está lleno en esta área. Por favor elige otro." });
     }
 
     // Insertar la cita sin practicante todavía
@@ -327,18 +424,31 @@ async function update(req, res) {
         return res.status(400).json({ error: `Las citas solo pueden agendarse con un máximo de ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación.` });
       }
 
-      // Solo verificar conflicto de horario cuando realmente cambia fecha u hora
+      const errorHorario = await validarHorarioDisponible(nuevoTipo.toLowerCase(), nuevaFecha, nuevaHora);
+      if (errorHorario) {
+        return res.status(400).json({ error: errorHorario });
+      }
+
+      // Solo verificar conflicto de horario cuando realmente cambia fecha u hora.
+      // "Ocupado" ya no es "existe una cita" — puede haber varios consultorios.
+      const consultoriosNuevoTipo = await obtenerConsultorios(nuevoTipo.toLowerCase(), nuevaFecha);
       const check = await pool.query(
-        "SELECT id FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'en_atencion') AND id != $4",
+        "SELECT COUNT(*) FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'en_atencion') AND id != $4",
         [nuevaFecha, nuevaHora, nuevoTipo.toLowerCase(), id]
       );
-      if (check.rows.length > 0) {
-        return res.status(409).json({ error: "Este horario ya está ocupado. Elige otro." });
+      if (parseInt(check.rows[0].count, 10) >= consultoriosNuevoTipo) {
+        return res.status(409).json({ error: "Este horario ya está lleno. Elige otro." });
       }
     }
 
+    // Si el paciente reagenda por su cuenta una cita que había quedado
+    // marcada por un conflicto de horario de atención (ver
+    // horarioAtencionService.js), se limpia la marca — ya se resolvió y no
+    // debe seguir esperando el cierre automático por vencimiento.
     const result = await pool.query(
-      `UPDATE citas SET fecha = $1, hora = $2, estado = $3 WHERE id = $4 RETURNING *`,
+      esReagendamiento
+        ? `UPDATE citas SET fecha = $1, hora = $2, estado = $3, conflicto_horario_notificado = false WHERE id = $4 RETURNING *`
+        : `UPDATE citas SET fecha = $1, hora = $2, estado = $3 WHERE id = $4 RETURNING *`,
       [nuevaFecha, nuevaHora, estado ?? original.estado, id]
     );
 

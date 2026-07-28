@@ -1,5 +1,6 @@
 const pool = require('../db');
 const notificationService = require('./notificationService');
+const { obtenerConfig, capacidadEnFecha } = require('./consultoriosService');
 
 // Máximo de días hacia adelante en los que se busca un hueco de reemplazo —
 // mismo horizonte que el límite de anticipación para agendar (ver
@@ -56,10 +57,11 @@ function horaValida(hora, regla) {
 async function reconciliarCitasFuturas(area, usuarioId) {
   const reglas = await obtenerReglasArea(area);
   const cierres = await obtenerCierres(area);
+  const consultoriosConfig = await obtenerConfig(area);
   const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
 
   const { rows: citas } = await pool.query(
-    `SELECT id, paciente_id, paciente_nombre, hora, fecha
+    `SELECT id, paciente_id, paciente_nombre, hora, fecha, conflicto_horario_notificado
      FROM citas
      WHERE tipo = $1 AND estado = 'programada' AND fecha > $2`,
     [area, hoyStr]
@@ -75,7 +77,17 @@ async function reconciliarCitasFuturas(area, usuarioId) {
     const regla = reglas[dow];
 
     const sigueSiendoValida = !cierres.has(fechaStr) && horaValida(cita.hora, regla);
-    if (sigueSiendoValida) continue;
+    if (sigueSiendoValida) {
+      // Se había marcado por un conflicto anterior y el horario se reabrió
+      // antes de que el paciente actuara — ya no está en conflicto, así que
+      // se limpia la marca. Si no se hiciera esto, un conflicto nuevo y
+      // distinto más adelante se saltaría el aviso pensando que ya se había
+      // notificado.
+      if (cita.conflicto_horario_notificado) {
+        await pool.query('UPDATE citas SET conflicto_horario_notificado = false WHERE id = $1', [cita.id]);
+      }
+      continue;
+    }
 
     let candidata = null;
     for (let i = 1; i <= MAX_DIAS_BUSQUEDA; i++) {
@@ -84,20 +96,32 @@ async function reconciliarCitasFuturas(area, usuarioId) {
       const candDow = isoDow(cand.y, cand.m, cand.d);
       if (!horaValida(cita.hora, reglas[candDow])) continue;
 
+      // "Ocupado" es alcanzar la capacidad de consultorios del área, no que
+      // exista una sola cita — con varios consultorios el hueco puede seguir
+      // libre aunque ya haya alguna cita a esa hora.
       const ocupado = await pool.query(
-        `SELECT id FROM citas
+        `SELECT COUNT(*) FROM citas
          WHERE fecha = $1 AND hora = $2 AND tipo = $3
            AND estado IN ('programada', 'en_atencion') AND id != $4`,
         [cand.str, cita.hora, area, cita.id]
       );
-      if (ocupado.rows.length > 0) continue;
+      if (parseInt(ocupado.rows[0].count, 10) >= capacidadEnFecha(consultoriosConfig, cand.str)) continue;
 
       candidata = cand.str;
       break;
     }
 
     if (!candidata) {
+      // Ya se había avisado de este mismo conflicto en una reconciliación
+      // anterior y sigue sin resolverse — no repetir el correo ni el
+      // registro de auditoría en cada guardado de horario. El paciente
+      // sigue pudiendo reagendarla él mismo; si llega la fecha sin que lo
+      // haga, scheduledTasks.js la cancela (no la marca como inasistencia).
+      if (cita.conflicto_horario_notificado) continue;
+
       console.warn(`[horario-atencion] No se encontró fecha de reemplazo dentro de ${MAX_DIAS_BUSQUEDA} días para la cita #${cita.id}; se deja sin tocar, se notifica al paciente para que reagende manualmente.`);
+
+      await pool.query('UPDATE citas SET conflicto_horario_notificado = true WHERE id = $1', [cita.id]);
 
       await pool.query(
         `INSERT INTO citas_auditoria (cita_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, usuario_rol, motivo)
@@ -119,7 +143,13 @@ async function reconciliarCitasFuturas(area, usuarioId) {
       continue;
     }
 
-    await pool.query('UPDATE citas SET fecha = $1 WHERE id = $2', [candidata, cita.id]);
+    // Si venía marcada de un conflicto previo y ahora sí se le encontró
+    // hueco, se limpia la marca: si vuelve a romperse más adelante por otro
+    // cambio de horario, debe poder notificarse de nuevo.
+    await pool.query(
+      'UPDATE citas SET fecha = $1, conflicto_horario_notificado = false WHERE id = $2',
+      [candidata, cita.id]
+    );
 
     await pool.query(
       `INSERT INTO citas_auditoria (cita_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, usuario_rol, motivo)

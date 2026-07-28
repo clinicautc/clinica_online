@@ -199,6 +199,32 @@ async function enviarRecordatoriosCitas() {
 }
 
 // ---------------------------------------------------------------------------
+// REDUCCIÓN DE CONSULTORIOS DIFERIDA
+// Se ejecuta cada minuto. Aplica una reducción de consultorios que había
+// quedado programada (ver horariosAtencionController.js upsertConsultorios)
+// en cuanto llega su fecha — antes de eso las citas ya agendadas seguían
+// dependiendo de la cantidad anterior.
+// ---------------------------------------------------------------------------
+
+async function aplicarConsultoriosPendientes() {
+  try {
+    const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const { rows } = await pool.query(
+      `UPDATE consultorios_config
+          SET cantidad = cantidad_pendiente, cantidad_pendiente = NULL, vigente_desde = NULL
+        WHERE vigente_desde IS NOT NULL AND vigente_desde <= $1
+        RETURNING area, cantidad`,
+      [hoyStr]
+    );
+    if (rows.length > 0) {
+      console.log(`[consultorios] Reducción aplicada: ${rows.map(r => `${r.area} → ${r.cantidad}`).join(', ')}`);
+    }
+  } catch (error) {
+    console.error('[scheduledTasks] Error en aplicarConsultoriosPendientes:', error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // ARRANQUE
 // ---------------------------------------------------------------------------
 
@@ -206,6 +232,7 @@ async function tick() {
   await verificarYDesactivarPracticantes();
   await cerrarCitasNoAtendidas();
   await enviarRecordatoriosCitas();
+  await aplicarConsultoriosPendientes();
 }
 
 function iniciarTareasProgramadas() {

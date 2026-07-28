@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Clock, Check, CalendarOff, Trash2, Copy } from 'lucide-react';
+import { Clock, Check, CalendarOff, Trash2, Copy, Building2, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
-import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { toast } from '../lib/toast';
 import { horariosAtencionAPI, Area, HorarioAtencionDia, CierreClinico } from '../lib/api';
 import TimeScrollPicker from './TimeScrollPicker';
+
+function formatearFecha(fecha: string): string {
+  return new Date(fecha.split('T')[0] + 'T00:00:00').toLocaleDateString('es-MX', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+}
 
 const DIAS = [
   { num: 1, label: 'Lunes',     short: 'L' },
@@ -28,6 +35,9 @@ function estadoInicial(): HorarioAtencionDia[] {
 export default function HorarioAtencionPanel() {
   const [area, setArea] = useState<Area>('nutricion');
   const [dias, setDias] = useState<HorarioAtencionDia[]>(estadoInicial);
+  // Última versión cargada/guardada — sirve para saber si hay cambios sin
+  // guardar y habilitar el botón solo entonces.
+  const [diasOriginal, setDiasOriginal] = useState<HorarioAtencionDia[]>(estadoInicial);
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
@@ -36,11 +46,24 @@ export default function HorarioAtencionPanel() {
   const [nuevoMotivoCierre, setNuevoMotivoCierre] = useState('');
   const [guardandoCierre, setGuardandoCierre] = useState(false);
 
+  // Cantidad de consultorios: cuántas citas simultáneas caben en el mismo
+  // horario (una por consultorio, cada una con su propio practicante).
+  const [consultorios, setConsultorios] = useState(1);
+  const [consultoriosOriginal, setConsultoriosOriginal] = useState(1);
+  const [guardandoConsultorios, setGuardandoConsultorios] = useState(false);
+  // Reducción ya programada (si la hay) para cuando ninguna fecha inmediata
+  // estaba libre de conflicto con citas ya agendadas.
+  const [cantidadPendiente, setCantidadPendiente] = useState<number | null>(null);
+  const [vigenteDesde, setVigenteDesde] = useState<string | null>(null);
+  // Modal: reducir chocó con citas ya agendadas, se propone la primera
+  // fecha sin conflicto y se deja elegir esa u otra posterior.
+  const [modalConflicto, setModalConflicto] = useState<{ fechaSugerida: string; fechaElegida: string } | null>(null);
+
   const cargarHorarios = () => {
     setCargando(true);
     horariosAtencionAPI.getHorarios(area)
       .then(data => {
-        setDias(estadoInicial().map(d => {
+        const cargado = estadoInicial().map(d => {
           const encontrado = data.find(r => r.dia_semana === d.dia_semana);
           return encontrado ? {
             dia_semana: d.dia_semana,
@@ -48,7 +71,9 @@ export default function HorarioAtencionPanel() {
             hora_fin: encontrado.hora_fin.substring(0, 5),
             activo: encontrado.activo,
           } : d;
-        }));
+        });
+        setDias(cargado);
+        setDiasOriginal(cargado);
       })
       .catch(() => toast.error('No se pudo cargar el horario de atención.'))
       .finally(() => setCargando(false));
@@ -60,9 +85,21 @@ export default function HorarioAtencionPanel() {
       .catch(() => {});
   };
 
+  const cargarConsultorios = () => {
+    horariosAtencionAPI.getConsultorios(area)
+      .then(data => {
+        setConsultorios(data.cantidad);
+        setConsultoriosOriginal(data.cantidad);
+        setCantidadPendiente(data.cantidadPendiente);
+        setVigenteDesde(data.vigenteDesde);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     cargarHorarios();
     cargarCierres();
+    cargarConsultorios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [area]);
 
@@ -93,12 +130,46 @@ export default function HorarioAtencionPanel() {
     try {
       await horariosAtencionAPI.upsertHorarios(area, dias);
       toast.success('Horario de atención guardado. Las citas futuras que ya no encajen se reagendarán automáticamente y se notificará al paciente.');
+      setDiasOriginal(dias);
     } catch {
       toast.error('No se pudo guardar el horario de atención.');
     } finally {
       setGuardando(false);
     }
   };
+
+  const hayCambiosHorario = JSON.stringify(dias) !== JSON.stringify(diasOriginal);
+
+  const guardarConsultorios = async (fechaConfirmada?: string) => {
+    setGuardandoConsultorios(true);
+    try {
+      const resultado = await horariosAtencionAPI.upsertConsultorios(area, consultorios, fechaConfirmada);
+
+      if ('requiereFecha' in resultado) {
+        // No se aplicó nada — se le pide al master confirmar la fecha
+        // sugerida (o elegir una posterior) antes de programar el cambio.
+        setModalConflicto({ fechaSugerida: resultado.fechaSugerida, fechaElegida: resultado.fechaSugerida });
+        return;
+      }
+
+      setConsultoriosOriginal(consultorios);
+      setCantidadPendiente(resultado.cantidadPendiente);
+      setVigenteDesde(resultado.vigenteDesde);
+      setModalConflicto(null);
+
+      if (resultado.cantidadPendiente != null && resultado.vigenteDesde) {
+        toast.success(`Se reducirá a ${resultado.cantidadPendiente} consultorio(s) a partir del ${formatearFecha(resultado.vigenteDesde)} — las citas ya agendadas antes de esa fecha no se ven afectadas.`);
+      } else {
+        toast.success('Cantidad de consultorios actualizada.');
+      }
+    } catch {
+      toast.error('No se pudo actualizar la cantidad de consultorios.');
+    } finally {
+      setGuardandoConsultorios(false);
+    }
+  };
+
+  const hayCambiosConsultorios = consultorios !== consultoriosOriginal;
 
   const crearCierre = async () => {
     if (!nuevaFechaCierre) {
@@ -217,13 +288,64 @@ export default function HorarioAtencionPanel() {
           <Button
             type="button"
             onClick={guardarHorarios}
-            disabled={guardando}
-            className="w-full bg-blue-900 hover:bg-blue-800 font-bold rounded-xl h-11 shadow-md"
+            disabled={guardando || !hayCambiosHorario}
+            className="w-full bg-blue-900 hover:bg-blue-800 font-bold rounded-xl h-11 shadow-md disabled:bg-slate-300 disabled:shadow-none"
           >
             {guardando ? 'Guardando...' : 'Guardar Horario de Atención'}
           </Button>
         </>
       )}
+
+      <div className="pt-6 border-t border-slate-100 space-y-4">
+        <div>
+          <h4 className="text-base font-black text-blue-950 flex items-center gap-2">
+            <Building2 className="w-4.5 h-4.5 text-blue-600" /> Consultorios disponibles
+          </h4>
+          <p className="text-xs text-slate-500 font-medium">
+            Cuántas citas simultáneas caben en el mismo horario — cada consultorio atiende una a la vez, con un practicante distinto.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-1.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => setConsultorios(c => Math.max(1, c - 1))}
+              disabled={consultorios <= 1}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-blue-900 hover:bg-blue-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="w-10 text-center text-lg font-black text-blue-950 tabular-nums">{consultorios}</span>
+            <button
+              type="button"
+              onClick={() => setConsultorios(c => Math.min(10, c + 1))}
+              disabled={consultorios >= 10}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-blue-900 hover:bg-blue-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 font-medium">Máximo 10 · por defecto 1.</p>
+          <Button
+            type="button"
+            onClick={() => guardarConsultorios()}
+            disabled={guardandoConsultorios || !hayCambiosConsultorios}
+            className="ml-auto bg-blue-900 hover:bg-blue-800 font-bold rounded-xl h-10 px-6 shadow-md disabled:bg-slate-300 disabled:shadow-none"
+          >
+            {guardandoConsultorios ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </div>
+
+        {cantidadPendiente != null && vigenteDesde && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <p className="text-xs text-amber-700 font-medium">
+              Cambio pendiente: bajará a <strong>{cantidadPendiente}</strong> consultorio(s) a partir del <strong>{formatearFecha(vigenteDesde)}</strong>.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="pt-6 border-t border-slate-100 space-y-4">
         <div>
@@ -267,7 +389,7 @@ export default function HorarioAtencionPanel() {
               <div key={c.id} className="flex items-center justify-between gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
                 <div>
                   <p className="text-sm font-bold text-red-800">
-                    {new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    {new Date(c.fecha.split('T')[0] + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                   {c.motivo && <p className="text-xs text-red-600/80 font-medium">{c.motivo}</p>}
                 </div>
@@ -285,6 +407,59 @@ export default function HorarioAtencionPanel() {
           <p className="text-xs text-slate-400 font-medium italic">No hay días cerrados próximamente.</p>
         )}
       </div>
+
+      <Dialog open={!!modalConflicto} onOpenChange={(open) => !open && setModalConflicto(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-blue-900 text-xl font-black flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-amber-500" />
+              No se puede reducir de inmediato
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 font-medium mt-1">
+              Ya hay citas agendadas que ocupan más consultorios de los {consultorios} que quieres dejar. La primera fecha en la que no hay conflicto es:
+            </DialogDescription>
+          </DialogHeader>
+
+          {modalConflicto && (
+            <>
+              <div className="mt-3 p-4 rounded-xl bg-blue-50 border border-blue-100 space-y-1">
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-widest">Fecha sugerida</p>
+                <p className="text-blue-900 font-black text-lg capitalize">{formatearFecha(modalConflicto.fechaSugerida)}</p>
+              </div>
+
+              <div className="mt-3 space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">O elige una fecha posterior</label>
+                <input
+                  type="date"
+                  value={modalConflicto.fechaElegida}
+                  min={modalConflicto.fechaSugerida}
+                  onChange={e => setModalConflicto(prev => prev && { ...prev, fechaElegida: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  type="button"
+                  onClick={() => guardarConsultorios(modalConflicto.fechaElegida)}
+                  disabled={guardandoConsultorios}
+                  className="w-full bg-blue-900 hover:bg-blue-800 font-bold rounded-xl shadow-md"
+                >
+                  {guardandoConsultorios ? 'Guardando...' : `Aplicar a partir del ${formatearFecha(modalConflicto.fechaElegida)}`}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setModalConflicto(null)}
+                  className="w-full text-slate-500 font-bold"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

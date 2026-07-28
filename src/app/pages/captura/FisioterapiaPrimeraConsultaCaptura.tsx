@@ -84,10 +84,7 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
     ref
   );
 
-  const handleVolver = () => {
-    const confirmar = window.confirm('¿Deseas salir sin guardar los cambios?');
-    if (confirmar) navigate(-1);
-  };
+  const handleVolver = () => navigate(-1);
 
   const p1 = formData.pagina_1 || {};
   const p2 = formData.pagina_2 || {};

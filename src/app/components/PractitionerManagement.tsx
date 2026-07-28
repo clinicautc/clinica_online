@@ -20,7 +20,7 @@ import {
   Trash2 
 } from 'lucide-react';
 import { Input } from './ui/input';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { usuariosAPI } from '../lib/api';
 
 interface Practitioner {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check,Mail,KeyRound,Eye,EyeOff } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { useNavigate } from 'react-router';
 
 import { Input } from '../components/ui/input';

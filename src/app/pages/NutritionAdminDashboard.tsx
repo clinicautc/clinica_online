@@ -32,7 +32,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 
 import PatientList from '../components/PatientList';
 import DateFilterPicker from '../components/DateFilterPicker';
@@ -68,7 +68,7 @@ export default function NutritionAdminDashboard() {
   const [isLoadingCitas, setIsLoadingCitas] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('month');
   
   // --- ESTADO PARA RE-AGENDAR (IDÉNTICO AL PACIENTE) ---
   const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
@@ -89,7 +89,7 @@ export default function NutritionAdminDashboard() {
   const [isNotaModalOpen, setIsNotaModalOpen] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
+  const [estadoFilter, setEstadoFilter] = useState<string>('programada');
   const [revertirCita, setRevertirCita] = useState<Appointment | null>(null);
   const [motivoRevertir, setMotivoRevertir] = useState('');
   const [recuperandoCitaId, setRecuperandoCitaId] = useState<number | null>(null);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { AlertTriangle, ArrowLeft, CheckCircle, Clock, FileText, Info, Loader2, Upload, UserX } from 'lucide-react';
 import { citasAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';

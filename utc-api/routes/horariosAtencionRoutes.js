@@ -12,4 +12,7 @@ router.get('/cierres-clinicos/:area', requireAuth, horariosAtencionController.ge
 router.post('/cierres-clinicos', requireAuth, requireRole(['master']), horariosAtencionController.crearCierre);
 router.delete('/cierres-clinicos/:id', requireAuth, requireRole(['master']), horariosAtencionController.eliminarCierre);
 
+router.get('/consultorios/:area', requireAuth, horariosAtencionController.getConsultorios);
+router.put('/consultorios/:area', requireAuth, requireRole(['master']), horariosAtencionController.upsertConsultorios);
+
 module.exports = router;

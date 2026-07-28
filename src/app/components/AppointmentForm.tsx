@@ -5,7 +5,8 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useDayRender, type DayProps } from 'react-day-picker';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -13,9 +14,10 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Calendar } from './ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Tooltip } from './ui/tooltip';
 import { format, isBefore, isAfter, startOfDay, addDays, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { Calendar as CalendarIcon, Clock, Loader2 } from 'lucide-react';
 import { apiFetch, citasAPI, horariosAtencionAPI, HorarioAtencionDia } from '../lib/api';
 
@@ -85,24 +87,35 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
   }, [currentUser, isAdmin, isRescheduling]);
 
   // Trae el horario de atención (por día de la semana) y los días cerrados
-  // configurados por el master para el área elegida.
+  // configurados por el master para el área elegida. Sondeo cada 30s (mismo
+  // patrón que los dashboards de admin/practicante) para que un cambio de
+  // horario hecho por el master mientras el paciente tiene este formulario
+  // abierto se refleje sin recargar la página — la hora/día que acaba de
+  // cerrarse debe dejar de ofrecerse de inmediato.
   useEffect(() => {
     if (!type) {
       setReglasHorario({});
       setDiasCerrados(new Set());
       return;
     }
-    horariosAtencionAPI.getHorarios(type)
-      .then(dias => {
-        const porDia: Record<number, HorarioAtencionDia> = {};
-        dias.forEach(d => { porDia[d.dia_semana] = d; });
-        setReglasHorario(porDia);
-      })
-      .catch(() => setReglasHorario({}));
 
-    horariosAtencionAPI.getCierres(type)
-      .then(cierres => setDiasCerrados(new Set(cierres.map(c => c.fecha.substring(0, 10)))))
-      .catch(() => setDiasCerrados(new Set()));
+    const fetchHorario = () => {
+      horariosAtencionAPI.getHorarios(type)
+        .then(dias => {
+          const porDia: Record<number, HorarioAtencionDia> = {};
+          dias.forEach(d => { porDia[d.dia_semana] = d; });
+          setReglasHorario(porDia);
+        })
+        .catch(() => setReglasHorario({}));
+
+      horariosAtencionAPI.getCierres(type)
+        .then(cierres => setDiasCerrados(new Set(cierres.map(c => c.fecha.substring(0, 10)))))
+        .catch(() => setDiasCerrados(new Set()));
+    };
+
+    fetchHorario();
+    const interval = setInterval(fetchHorario, 30_000);
+    return () => clearInterval(interval);
   }, [type]);
 
   const generateAvailableSlots = (forDate: Date | undefined) => {
@@ -113,8 +126,11 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
     const [hIni] = regla.hora_inicio.split(':').map(Number);
     const [hFin] = regla.hora_fin.split(':').map(Number);
 
+    // hora_fin es un límite exclusivo (la clínica atiende HASTA esa hora,
+    // sin incluirla) — con <= se ofrecía "24:00" como horario seleccionable
+    // cuando el área cierra a medianoche, una hora de cita que no existe.
     const slots = [];
-    for (let hour = hIni; hour <= hFin; hour++) {
+    for (let hour = hIni; hour < hFin; hour++) {
       const hh = hour.toString().padStart(2, '0');
       slots.push(`${hh}:00`);
     }
@@ -264,6 +280,37 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
     return false;
   };
 
+  // Motivo por el que un día no se puede seleccionar, solo para los dos casos
+  // que no son obvios por contexto (hoy/pasado/fuera del límite de 90 días ya
+  // se explican solos): día cerrado (fin de semana según el horario de
+  // atención, o cierre puntual) vs. todos los horarios de ese día ya ocupados.
+  const getDiaDeshabilitadoTitle = (d: Date): string | undefined => {
+    const fechaStr = format(d, 'yyyy-MM-dd');
+    if (!reglasHorario[isoDow(d)]?.activo) return 'No laboral';
+    if (diasCerrados.has(fechaStr)) return 'Cerrado por la clínica';
+    if (diasCompletos.includes(fechaStr)) return 'Sin citas disponibles — todos los horarios ocupados';
+    return undefined;
+  };
+
+  // useDayRender conserva el render por defecto de react-day-picker; el
+  // <Tooltip> reemplaza el `title` nativo (que no se ve en botones
+  // disabled ni en mobile, donde no hay hover).
+  const DiaConTooltip = (props: DayProps) => {
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const dayRender = useDayRender(props.date, props.displayMonth, buttonRef as React.RefObject<HTMLButtonElement>);
+
+    if (dayRender.isHidden) return <div role="gridcell" />;
+    if (!dayRender.isButton) return <div {...dayRender.divProps} />;
+
+    const title = dayRender.buttonProps.disabled ? getDiaDeshabilitadoTitle(props.date) : undefined;
+
+    return (
+      <Tooltip content={title}>
+        <button type="button" ref={buttonRef} {...dayRender.buttonProps} />
+      </Tooltip>
+    );
+  };
+
   const isSelectedDateToday = date ? isToday(date) : false;
 
   return (
@@ -314,6 +361,7 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
                 onMonthChange={setVisibleMonth}
                 locale={es}
                 className="rounded-md"
+                components={{ Day: DiaConTooltip }}
               />
             </div>
             {isSelectedDateToday && (
@@ -343,28 +391,41 @@ export default function AppointmentForm({ patientId, existingAppointment, onSucc
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md shadow-inner bg-slate-50">
                   {availableTimeSlots.map((slot) => {
                     const isBlockedByTime = isSelectedDateToday;
-                    const isOccupied = horasOcupadas.includes(slot) || isBlockedByTime;
+                    const isYaOcupada = horasOcupadas.includes(slot);
+                    const isOccupied = isYaOcupada || isBlockedByTime;
                     const isSelected = time === slot;
 
+                    // El slot siempre cae dentro del horario de atención (ya
+                    // filtrado por generateAvailableSlots) — si aparece gris es
+                    // por otra razón, no porque el horario esté cerrado. El
+                    // tooltip aclara cuál para no confundir "ya la tomaron" con
+                    // "el horario está cerrado".
+                    const title = isYaOcupada
+                      ? 'Consultas Agotadas'
+                      : isBlockedByTime
+                      ? 'No se puede agendar el mismo día — mínimo 24 horas de anticipación'
+                      : undefined;
+
                     return (
-                      <Button
-                        key={slot}
-                        type="button"
-                        variant={isSelected ? "default" : "outline"}
-                        className={`
-                          text-xs transition-all duration-200
-                          ${isOccupied
-                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60 border-dashed border-gray-300 hover:bg-gray-200'
-                            : isSelected
-                            ? 'bg-blue-900 text-white shadow-md scale-105'
-                            : 'border-blue-900/20 text-blue-900 hover:bg-blue-50'
-                          }
-                        `}
-                        onClick={() => !isOccupied && setTime(slot)}
-                        disabled={isOccupied || isSaving}
-                      >
-                        {slot}
-                      </Button>
+                      <Tooltip key={slot} content={title} side="bottom" className="w-full">
+                        <Button
+                          type="button"
+                          variant={isSelected ? "default" : "outline"}
+                          className={`
+                            w-full text-xs transition-all duration-200
+                            ${isOccupied
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60 border-dashed border-gray-300 hover:bg-gray-200'
+                              : isSelected
+                              ? 'bg-blue-900 text-white shadow-md scale-105'
+                              : 'border-blue-900/20 text-blue-900 hover:bg-blue-50'
+                            }
+                          `}
+                          onClick={() => !isOccupied && setTime(slot)}
+                          disabled={isOccupied || isSaving}
+                        >
+                          {slot}
+                        </Button>
+                      </Tooltip>
                     );
                   })}
                 </div>

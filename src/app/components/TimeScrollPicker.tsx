@@ -139,6 +139,7 @@ interface Props {
 export default function TimeScrollPicker({ value, onChange, disabled }: Props) {
   const [open, setOpen]       = useState(false);
   const [textVal, setTextVal] = useState('');
+  const [syncTick, setSyncTick] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
   const parts = value.split(':');
@@ -166,7 +167,21 @@ export default function TimeScrollPicker({ value, onChange, disabled }: Props) {
     return m;
   })();
 
-  useEffect(() => { setTextVal(`${pad(h)}:${pad(m)}`); }, [h, m]);
+  // AM/PM meramente informativo junto a la hora en formato 24h — el valor
+  // que se guarda y se compara (onChange/value) sigue siendo 24h siempre.
+  const meridiano = displayH < 12 ? 'AM' : 'PM';
+
+  // syncTick fuerza este efecto a re-ejecutarse incluso cuando el valor
+  // recortado por el padre (ver acotarHora en HorarioPracticas.tsx) coincide
+  // con el que ya tenía antes de la edición — sin esto, si el usuario
+  // escribe un valor fuera de rango que el padre recorta de vuelta al mismo
+  // límite ya vigente, h/m no cambian entre renders y este efecto nunca se
+  // disparaba, dejando el recuadro mostrando el valor inválido tecleado
+  // aunque el estado real (y lo que se guarda) ya estuviera corregido.
+  // Sin cero a la izquierda en la hora mostrada (8:00, no 08:00) — el valor
+  // interno que se guarda y se compara (onChange/value) sigue usando
+  // pad(h) siempre, esto solo cambia lo que se ve en el recuadro.
+  useEffect(() => { setTextVal(`${h}:${pad(m)}`); }, [h, m, syncTick]);
 
   useEffect(() => {
     if (!open) return;
@@ -177,37 +192,55 @@ export default function TimeScrollPicker({ value, onChange, disabled }: Props) {
     return () => document.removeEventListener('mousedown', handle);
   }, [open]);
 
+  // Formatea los dígitos crudos que lleva tecleados el usuario (máx. 4:
+  // HHMM), decidiendo cuántos son hora y cuántos minuto según cuántos haya
+  // en total — así "800" se lee como 1 dígito de hora + 2 de minuto ("8:00")
+  // y "1430" como 2+2 ("14:30"), sin que la persona tenga que escribir el
+  // cero inicial ni los dos puntos a mano.
+  const formatDigits = (digits: string) => {
+    if (digits.length <= 2) return digits;
+    if (digits.length === 3) return `${digits.slice(0, 1)}:${digits.slice(1)}`;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newRaw = e.target.value;
-    const isDeleting = newRaw.length < textVal.length;
+    // Solo dígitos: cualquier otra tecla (incluyendo ':' escrito a mano) se
+    // descarta en vez de dejar que el usuario arme un valor raro.
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
+    setTextVal(formatDigits(digits));
 
-    let val = newRaw.replace(/[^0-9:]/g, '');
-
-    if (!isDeleting) {
-      const digits = val.replace(/:/g, '');
-      if (digits.length >= 2 && !val.includes(':')) {
-        val = digits.slice(0, 2) + ':' + digits.slice(2);
-      }
-    }
-
-    val = val.slice(0, 5);
-    setTextVal(val);
-
-    // Llamar onChange solo con tiempo completo y válido
-    const match = val.match(/^(\d{1,2}):(\d{2})$/);
-    if (match) {
-      const newH = parseInt(match[1], 10);
-      const newM = parseInt(match[2], 10);
-      if (newH >= 0 && newH <= 23 && newM >= 0 && newM <= 59) {
-        const snap = MINS.reduce((a, b) => Math.abs(b - newM) < Math.abs(a - newM) ? b : a, 0);
-        onChange(`${pad(newH)}:${pad(snap)}`);
-      }
+    // Confirmar (onChange, que dispara el recorte contra el horario de
+    // atención en HorarioPracticas.tsx) SOLO al completar los 4 dígitos —
+    // antes de eso el valor es ambiguo/a medio escribir (ej. "1:43" mientras
+    // se sigue tecleando "1430"), y confirmarlo de más recortaría el buffer
+    // a medias contra el horario vigente, arruinando lo que la persona
+    // seguía escribiendo. El resto de los casos (1-3 dígitos) se confirman
+    // hasta que el campo pierde el foco, en handleBlur.
+    if (digits.length === 4) {
+      const newH = parseInt(digits.slice(0, 2), 10);
+      const newM = parseInt(digits.slice(2), 10);
+      const snap = MINS.reduce((a, b) => Math.abs(b - newM) < Math.abs(a - newM) ? b : a, 0);
+      onChange(`${pad(Math.min(23, newH))}:${pad(snap)}`);
+      setSyncTick(t => t + 1);
     }
   };
 
   const handleBlur = () => {
-    const match = textVal.match(/^(\d{1,2}):(\d{2})$/);
-    if (!match) setTextVal(`${pad(h)}:${pad(m)}`);
+    const digits = textVal.replace(/\D/g, '');
+    if (digits.length === 0) return;
+
+    // 1-2 dígitos = solo la hora (minutos en :00); 3 = 1 dígito de hora + 2
+    // de minuto ("800" -> 8:00); 4 = 2 y 2 ("1430" -> 14:30).
+    const hh = digits.length <= 2 ? parseInt(digits, 10)
+      : digits.length === 3 ? parseInt(digits.slice(0, 1), 10)
+      : parseInt(digits.slice(0, 2), 10);
+    const mm = digits.length <= 2 ? 0 : parseInt(digits.slice(digits.length === 3 ? 1 : 2), 10);
+
+    const snap = MINS.reduce((a, b) => Math.abs(b - mm) < Math.abs(a - mm) ? b : a, 0);
+    const hhClamped = Math.min(23, Math.max(0, hh));
+    setTextVal(`${hhClamped}:${pad(snap)}`);
+    onChange(`${pad(hhClamped)}:${pad(snap)}`);
+    setSyncTick(t => t + 1);
   };
 
   return (
@@ -232,6 +265,9 @@ export default function TimeScrollPicker({ value, onChange, disabled }: Props) {
           maxLength={5}
           className="text-xs font-bold text-blue-900 bg-transparent border-none outline-none w-full tabular-nums placeholder-slate-300 disabled:cursor-not-allowed min-w-0 cursor-text"
         />
+        <span className="flex-shrink-0 mr-1.5 text-[10px] font-bold text-slate-300 select-none pointer-events-none">
+          {meridiano}
+        </span>
         {/* Ícono de reloj más llamativo: fondo al hover, borde suave, más grande */}
         <button
           type="button"
@@ -260,13 +296,13 @@ export default function TimeScrollPicker({ value, onChange, disabled }: Props) {
             <Drum
               items={HOURS}
               selected={displayH}
-              onSelect={v => onChange(`${pad(v)}:${pad(displayM)}`)}
+              onSelect={v => { onChange(`${pad(v)}:${pad(displayM)}`); setSyncTick(t => t + 1); }}
             />
             <span className="text-slate-300 font-black text-2xl select-none self-center pb-0.5">:</span>
             <Drum
               items={MINS}
               selected={displayM}
-              onSelect={v => onChange(`${pad(displayH)}:${pad(v)}`)}
+              onSelect={v => { onChange(`${pad(displayH)}:${pad(v)}`); setSyncTick(t => t + 1); }}
             />
           </div>
         </div>

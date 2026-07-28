@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { useSeguimientoNutricionalData } from '../hooks/formClinico/useSeguimientoNutricionalData';
@@ -24,7 +24,7 @@ const SeguimientoNutricional = () => {
   const { user } = useAuth();
   const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
-  const handleVolver = () => navigate(-1);
+  const handleVolver = () => navigate(`/historial/${formData.paciente_id}/nutricion`);
   const handleImprimir = () => window.print();
   const handleEditar = () => navigate(`/forms/seguimiento-nutricional/${appointmentId}`);
 
@@ -43,6 +43,58 @@ const SeguimientoNutricional = () => {
   usePrintFitScale(['.page', '.page2', '.page3', '.page4', '.page5', '.page6']);
   // Ajuste de pantalla en móvil (no impresión) — ver useScreenFitScale.ts.
   useScreenFitScale(['.page', '.page2', '.page3', '.page4', '.page5', '.page6']);
+
+  // Página 1: cada sección (A. Psicológicos, Sintomatología, Ejercicio, A.
+  // Dietéticos) tiene una franja lateral (.tab-vertical) con el título
+  // rotado; para textos largos ("A. Dietéticos") esa franja necesita más
+  // alto que el propio contenido de tablas cortas (solo 4 filas), y como la
+  // fila se estira para igualar esa altura (align-items: stretch), la tabla
+  // se queda más chica que su contenedor. Repartir esa diferencia con
+  // height:100% en CSS puro no funciona de forma confiable en Chromium (todo
+  // el espacio extra termina en una sola fila en vez de repartirse parejo),
+  // así que se calcula aquí a mano: alto natural de cada fila + el
+  // excedente dividido en partes iguales. Se usa getComputedStyle (no
+  // getBoundingClientRect) para leer/escribir en píxeles lógicos, ya que
+  // .page tiene zoom aplicado (cosmético + ajuste de pantalla) y mezclar
+  // ambas unidades duplica el resultado.
+  useEffect(() => {
+    const igualarAlturaFilas = () => {
+      document.querySelectorAll<HTMLElement>('.page .page-content > .section-row').forEach(sr => {
+        const tab = sr.querySelector<HTMLElement>('.tab-vertical');
+        const table = sr.querySelector<HTMLTableElement>('.table-wrap table');
+        const tbody = table?.querySelector<HTMLElement>('tbody');
+        if (!tab || !table || !tbody) return;
+        const filas = Array.from(tbody.querySelectorAll<HTMLElement>(':scope > tr'));
+        if (filas.length === 0) return;
+
+        const alturaLogica = (el: HTMLElement) => parseFloat(getComputedStyle(el).height) || 0;
+
+        table.style.height = 'auto';
+        filas.forEach(f => { f.style.height = ''; });
+
+        const thead = table.querySelector<HTMLElement>('thead');
+        const altoEncabezado = thead ? alturaLogica(thead) : 0;
+        const altosNaturales = filas.map(alturaLogica);
+        const totalNatural = altoEncabezado + altosNaturales.reduce((a, b) => a + b, 0);
+        const altoObjetivo = alturaLogica(tab);
+        const excedente = Math.max(0, altoObjetivo - totalNatural);
+        const excedentePorFila = excedente / filas.length;
+
+        filas.forEach((f, i) => { f.style.height = `${altosNaturales[i] + excedentePorFila}px`; });
+        table.style.height = '';
+      });
+    };
+
+    igualarAlturaFilas();
+    window.addEventListener('resize', igualarAlturaFilas);
+    window.addEventListener('orientationchange', igualarAlturaFilas);
+    window.addEventListener('beforeprint', igualarAlturaFilas);
+    return () => {
+      window.removeEventListener('resize', igualarAlturaFilas);
+      window.removeEventListener('orientationchange', igualarAlturaFilas);
+      window.removeEventListener('beforeprint', igualarAlturaFilas);
+    };
+  }, [formData]);
 
   // Lista dinámica para la página 2
   const alimentos: string[] = [
@@ -164,6 +216,17 @@ const SeguimientoNutricional = () => {
           .tab-vertical span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
           .table-wrap { flex-grow: 1; border: var(--borde-grueso); border-radius: 0 8px 8px 0; overflow: hidden; background-color: white; }
           .page table, .page2 table, .page3 table, .page4 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          /* La franja lateral (.tab-vertical) de cada sección de la página 1
+             necesita más alto que el propio contenido de tablas cortas (p.
+             ej. "A. Dietéticos", solo 4 filas) para caber su texto rotado.
+             Como .table-wrap se estira (align-items: stretch) para igualar
+             esa altura, sin esto la tabla se queda más chica que su
+             contenedor y deja espacio en blanco debajo de la última fila.
+             Repartir ese excedente con height:100% en CSS puro no sirve:
+             Chromium lo mete entero en una sola fila en vez de repartirlo
+             parejo. Por eso el reparto se calcula en JS (ver useEffect
+             "igualarAlturaFilas" más arriba en este componente), que asigna
+             una altura explícita e igual a cada fila. */
           .page th, .page td { border: var(--borde-fino); padding: 0; vertical-align: middle; height: 100%; }
           .page tr:first-child th, .page tr:first-child td { border-top: none; }
           .page tr:last-child td { border-bottom: none; }
@@ -172,6 +235,10 @@ const SeguimientoNutricional = () => {
           .th-fecha { color: var(--azul-utc); font-size: 11px; font-weight: bold; text-align: center; padding: 4px; }
           .td-label { color: var(--azul-utc); font-size: 8px; font-weight: bold; text-align: left; padding: 3px 6px; line-height: 1.2; }
           .td-label.psi-label { font-size: 6.5px; padding: 5px 8px; line-height: 1.35; }
+          /* Celdas de solo lectura con altura fija (56px): si el texto no
+             cabe, se recorta sin mostrar la barra de scroll del textarea
+             (el contenido excedente simplemente no es visible). */
+          .psi-table textarea { overflow: hidden; }
           .hoja-evolutiva-wrapper input[type="text"], .hoja-evolutiva-wrapper input[type="number"], .hoja-evolutiva-wrapper textarea { width: 100%; height: 100%; min-height: 12px; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 8px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; box-sizing: border-box; display: block; }
           .hoja-evolutiva-wrapper textarea { text-align: left; min-height: 20px; padding: 3px; }
           .hoja-evolutiva-wrapper input:focus, .hoja-evolutiva-wrapper textarea:focus { background-color: var(--azul-claro) !important; }
@@ -387,6 +454,12 @@ const SeguimientoNutricional = () => {
           }
           .page4 .tabla-t1 textarea, .page4 .tabla-t4 textarea { padding: 1px; }
           .page4 .tabla-t1 thead tr, .page4 .tabla-t4 thead tr { height: 18px !important; }
+          /* Tablas "Interpretación antropométrica" (Diagnóstico Matriz
+             IMG/IMLG + Interpretación antropométrica) e "Interpretación
+             bioquímica": celdas de solo lectura con altura fija; si el
+             texto no cabe se recorta sin mostrar la barra de scroll del
+             textarea. */
+          .page4 .tabla-t1 textarea, .page4 .tabla-t4 textarea { overflow: hidden; }
 
 
             /* ==========================================================
@@ -512,7 +585,7 @@ const SeguimientoNutricional = () => {
           .page6 .cell-flex-col { display: flex; flex-direction: column; height: 100%; width: 100%; }
           .page6 .cell-half { flex: 1; display: flex; flex-direction: column; border-bottom: var(--borde-fino); }
           .page6 .cell-half:last-child { border-bottom: none; }
-          .page6 .cell-half textarea { flex: 1; }
+          .page6 .cell-half textarea { flex: 1; overflow: hidden; }
           .page6 .text-mini { font-size: 8px; color: var(--azul-utc); text-align: left; padding: 2px 4px 0 4px; flex-shrink: 0; }
           .page6 .estado-label { color: var(--azul-utc); font-size: 10px; text-align: left; padding-left: 6px; }
           
@@ -532,12 +605,27 @@ const SeguimientoNutricional = () => {
 
 
 
+          /* Zoom cosmético SOLO para la vista en pantalla (mismo criterio que
+             NutritionMasterForm.tsx): agranda visualmente el documento como
+             si el navegador estuviera a 150% de zoom. No toca --screen-scale
+             (el ajuste de cada hoja al alto físico Carta) ni --print-scale —
+             se anula explícitamente dentro de @media print, así que Ctrl+P
+             nunca se ve afectado por esto. Restringido a >=1024px: se
+             verificó que en portrait de tablet (hasta ~1023px) el problema
+             se reproduce igual que en móvil, desbordando el ancho real y
+             empujando los botones flotantes fuera de la pantalla —
+             mobile/tablet ya tienen su propio ajuste (--screen-scale), no
+             necesitan este zoom extra. */
+          @media (min-width: 1024px) {
+            .hoja-evolutiva-wrapper { zoom: 1.5; }
+          }
+
           /* ==========================================================
              REGLAS DE IMPRESIÓN
              ========================================================== */
         @page { size: 215.9mm 279.4mm; margin: 0; }
         @media print {
-              .hoja-evolutiva-wrapper { background: none; padding: 0; }
+              .hoja-evolutiva-wrapper { background: none; padding: 0; zoom: 1 !important; }
               .hoja-evolutiva-wrapper .page,
               .hoja-evolutiva-wrapper .page2,
               .hoja-evolutiva-wrapper .page3,
@@ -605,7 +693,7 @@ const SeguimientoNutricional = () => {
           {/* A. Psicológicos */}
           <div className="section-row">
             <div className="tab-vertical"><span>A. Psicologicos</span></div>
-            <div className="table-wrap">
+            <div className="table-wrap psi-table">
               <table>
                 <thead>
                   <tr>
@@ -628,7 +716,7 @@ const SeguimientoNutricional = () => {
                     <tr key={idx}>
                       <td className="td-label psi-label" style={{ height: '56px' }}>{pregunta}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
-                        <td key={col} style={{ height: '56px' }}><textarea name={`psi_q${idx}_col${col}`} value={(formData[`psi_q${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} style={{ height: '56px' }}></textarea></td>
+                        <td key={col} style={{ height: '56px' }}><textarea name={`psi_q${idx}_col${col}`} value={(formData[`psi_q${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={99} style={{ height: '56px' }}></textarea></td>
                       ))}
                     </tr>
                   ))}
@@ -657,7 +745,7 @@ const SeguimientoNutricional = () => {
                     <tr key={idx}>
                       <td className="td-label">{sintoma}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
-                        <td key={col}><input type="text" name={`sint_${idx}_col${col}`} value={(formData[`sint_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
+                        <td key={col}><input type="text" name={`sint_${idx}_col${col}`} value={(formData[`sint_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={25} /></td>
                       ))}
                     </tr>
                   ))}
@@ -686,7 +774,7 @@ const SeguimientoNutricional = () => {
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
-                        <td key={col}><input type="text" name={`ejer_${idx}_col${col}`} value={(formData[`ejer_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
+                        <td key={col}><input type="text" name={`ejer_${idx}_col${col}`} value={(formData[`ejer_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={22} /></td>
                       ))}
                     </tr>
                   ))}
@@ -715,7 +803,7 @@ const SeguimientoNutricional = () => {
                     <tr key={idx}>
                       <td className="td-label">{param}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
-                        <td key={col}><input type="text" name={`diet_${idx}_col${col}`} value={(formData[`diet_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
+                        <td key={col}><input type="text" name={`diet_${idx}_col${col}`} value={(formData[`diet_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={22} /></td>
                       ))}
                     </tr>
                   ))}
@@ -804,7 +892,7 @@ const SeguimientoNutricional = () => {
                       <tr key={idx} className="t2-row">
                         <td>{item.q}<br/><b>{item.r}</b></td>
                         {[1, 2, 3, 4, 5, 6].map(col => (
-                          <td key={col}><input type="text" name={`cual_${idx}_col${col}`} value={(formData[`cual_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
+                          <td key={col}><input type="text" name={`cual_${idx}_col${col}`} value={(formData[`cual_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={19} /></td>
                         ))}
                       </tr>
                     ))}
@@ -849,7 +937,7 @@ const SeguimientoNutricional = () => {
                     {["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"].map((row, idx) => (
                       <tr key={`eq_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`eq_${idx}_col${col}`} value={(formData[`eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`eq_${idx}_col${col}`} value={(formData[`eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={17} /></td>)}
                       </tr>
                     ))}
 
@@ -857,7 +945,7 @@ const SeguimientoNutricional = () => {
                     {["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"].map((row, idx) => (
                       <tr key={`cn_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`cn_${idx}_col${col}`} value={(formData[`cn_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`cn_${idx}_col${col}`} value={(formData[`cn_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={17} /></td>)}
                       </tr>
                     ))}
 
@@ -865,7 +953,7 @@ const SeguimientoNutricional = () => {
                     {["Energía", "Proteína", "HCO", "Lípidos"].map((row, idx) => (
                       <tr key={`int_${idx}`}>
                         <td>{row}</td>
-                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`int_${idx}_col${col}`} value={(formData[`int_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                        {[1, 2, 3, 4, 5, 6].map(col => <td key={col}><input type="text" name={`int_${idx}_col${col}`} value={(formData[`int_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={17} /></td>)}
                       </tr>
                     ))}
                   </tbody>
@@ -961,8 +1049,8 @@ const SeguimientoNutricional = () => {
                 {[1, 2, 3, 4, 5, 6].map(row => (
                   <tr key={row}>
                     <td><input type="text" name={`diag_fecha_${row}`} value={(formData[`diag_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
-                    <td><textarea name={`diag_matriz_${row}`} value={(formData[`diag_matriz_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
-                    <td><textarea name={`diag_interp_${row}`} value={(formData[`diag_interp_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
+                    <td><textarea name={`diag_matriz_${row}`} value={(formData[`diag_matriz_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={149}></textarea></td>
+                    <td><textarea name={`diag_interp_${row}`} value={(formData[`diag_interp_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={410}></textarea></td>
                   </tr>
                 ))}
               </tbody>
@@ -995,7 +1083,7 @@ const SeguimientoNutricional = () => {
                       <td className="td-label">{sig}</td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col} style={col === 6 ? { borderRight: 'none' } : {}}>
-                          <input type="text" name={`sig_${idx}_col${col}`} value={(formData[`sig_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                          <input type="text" name={`sig_${idx}_col${col}`} value={(formData[`sig_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={26} />
                         </td>
                       ))}
                     </tr>
@@ -1028,10 +1116,10 @@ const SeguimientoNutricional = () => {
                 <tbody>
                   {[...Array(10)].map((_, idx) => (
                     <tr key={idx}>
-                      <td><input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>
+                      <td><input type="text" name={`bioq_param_${idx}`} value={(formData[`bioq_param_${idx}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={56} /></td>
                       {[1, 2, 3, 4, 5, 6].map(col => (
                         <td key={col} style={col === 6 ? { borderRight: 'none' } : {}}>
-                          <input type="text" name={`bioq_${idx}_col${col}`} value={(formData[`bioq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                          <input type="text" name={`bioq_${idx}_col${col}`} value={(formData[`bioq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={16} />
                         </td>
                       ))}
                     </tr>
@@ -1054,7 +1142,7 @@ const SeguimientoNutricional = () => {
                 {[1, 2, 3, 4, 5, 6].map(row => (
                   <tr key={row}>
                     <td><input type="text" name={`int_bioq_fecha_${row}`} value={(formData[`int_bioq_fecha_${row}`] as string) || ''} onChange={handleDateInput} readOnly tabIndex={-1} placeholder="DD/MM/AAAA" maxLength={10} /></td>
-                    <td><textarea name={`int_bioq_desc_${row}`} value={(formData[`int_bioq_desc_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>
+                    <td><textarea name={`int_bioq_desc_${row}`} value={(formData[`int_bioq_desc_${row}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={352}></textarea></td>
                   </tr>
                 ))}
               </tbody>
@@ -1116,7 +1204,7 @@ const SeguimientoNutricional = () => {
                             ...(isLast ? { borderBottom: 'none !important' } : {}),
                             ...(col === 6 ? { borderRight: 'none !important' } : {})
                           }}>
-                            <input type="text" name={`explor_${idx}_col${col}`} value={(formData[`explor_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} />
+                            <input type="text" name={`explor_${idx}_col${col}`} value={(formData[`explor_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={22} />
                           </td>
                         ))}
                       </tr>
@@ -1236,20 +1324,20 @@ const SeguimientoNutricional = () => {
                 <tbody>
                   <tr style={{ height: '40px' }}>
                     <td className="td-label" style={{ fontSize: '8.5px' }}>Indicación de<br/>Alimentos/Nutrimentos</td>
-                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></td>)}
+                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><textarea name={`interv_ind_col${col}`} value={(formData[`interv_ind_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={52}></textarea></td>)}
                   </tr>
                   <tr><td colSpan={7} className="subtitulo-p6">Contenido Nutrimental</td></tr>
                   {["Energía (kcal y kcal/kg)", "Hidrato de carbono (%/g)", "Proteína (%/g y g/kg/d)", "Lípidos (%/g)"].map((macro, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{macro}</td>
-                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_macro_${idx}_col${col}`} value={(formData[`interv_macro_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={29} /></td>)}
                     </tr>
                   ))}
                   <tr><td colSpan={7} className="subtitulo-p6">Equivalentes (rac)</td></tr>
                   {["Frutas", "Verduras", "Cereales", "Leguminosas", "POAs _ _ _", "POAs _ _ _", "Lácteos", "Aceites s/p", "Aceites c/p", "Azúcares"].map((eq, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{eq}</td>
-                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`interv_eq_${idx}_col${col}`} value={(formData[`interv_eq_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={29} /></td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -1287,14 +1375,14 @@ const SeguimientoNutricional = () => {
                         <tr>
                           <td rowSpan={3} style={{ padding: 0, borderTop: 'var(--borde-grueso) !important', borderRight: 'var(--borde-grueso) !important', ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }) }}>
                             <div className="cell-flex-col">
-                              <div className="cell-half"><span className="text-mini">Contenido (E-1___)</span><textarea name={`edu_cont_${rowBlock}`} value={(formData[`edu_cont_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
-                              <div className="cell-half"><span className="text-mini">Aplicación (E-2___)</span><textarea name={`edu_apl_${rowBlock}`} value={(formData[`edu_apl_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Contenido (E-1___)</span><textarea name={`edu_cont_${rowBlock}`} value={(formData[`edu_cont_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={141}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Aplicación (E-2___)</span><textarea name={`edu_apl_${rowBlock}`} value={(formData[`edu_apl_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={141}></textarea></div>
                             </div>
                           </td>
                           <td rowSpan={3} style={{ padding: 0, borderTop: 'var(--borde-grueso) !important', borderLeft: 'var(--borde-grueso) !important', borderRight: 'var(--borde-grueso) !important', ...(isLastBlock ? { borderBottom: 'none !important' } : { borderBottom: 'var(--borde-grueso) !important' }) }}>
                             <div className="cell-flex-col">
-                              <div className="cell-half"><span className="text-mini">Bases/Acercamiento Teórico (C-1___)</span><textarea name={`cons_base_${rowBlock}`} value={(formData[`cons_base_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
-                              <div className="cell-half"><span className="text-mini">Estrategias (C-2___)</span><textarea name={`cons_est_${rowBlock}`} value={(formData[`cons_est_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Bases/Acercamiento Teórico (C-1___)</span><textarea name={`cons_base_${rowBlock}`} value={(formData[`cons_base_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={141}></textarea></div>
+                              <div className="cell-half"><span className="text-mini">Estrategias (C-2___)</span><textarea name={`cons_est_${rowBlock}`} value={(formData[`cons_est_${rowBlock}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={141}></textarea></div>
                             </div>
                           </td>
                           <td className="estado-label" style={{ borderTop: 'var(--borde-grueso) !important', borderLeft: 'var(--borde-grueso) !important' }}>Logrado</td>
@@ -1333,12 +1421,12 @@ const SeguimientoNutricional = () => {
                   {["PLN.", "Matrícula", "Firma", "LN.", "Céd. Prof."].map((label, idx) => (
                     <tr key={idx}>
                       <td className="td-label">{label}</td>
-                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                      {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={col === 6 ? { borderRight: 'none !important' } : {}}><input type="text" name={`firma_${idx}_col${col}`} value={(formData[`firma_${idx}_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={29} /></td>)}
                     </tr>
                   ))}
                   <tr>
                     <td className="td-label" style={{ borderBottom: 'none !important' }}>Firma</td>
-                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 6 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} /></td>)}
+                    {[1, 2, 3, 4, 5, 6].map(col => <td key={col} style={{ borderBottom: 'none !important', ...(col === 6 ? { borderRight: 'none !important' } : {}) }}><input type="text" name={`firma_final_col${col}`} value={(formData[`firma_final_col${col}`] as string) || ''} onChange={handleInputChange} readOnly tabIndex={-1} maxLength={29} /></td>)}
                   </tr>
                 </tbody>
               </table>

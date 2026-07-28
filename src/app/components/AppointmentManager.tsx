@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Clock, Activity, Utensils, Trash2, CheckCircle, XCircle, Edit } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 
 // IMPORTANTE: Importamos el formulario híbrido que hicimos antes
 import AppointmentForm from './AppointmentForm'; 

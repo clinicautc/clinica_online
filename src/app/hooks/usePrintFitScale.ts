@@ -46,9 +46,16 @@ const PX_POR_MM = 96 / 25.4; // 96 CSS px por pulgada (constante del navegador)
 // hoja mide unos pocos px menos bajo zoom real que bajo la medición previa
 // con zoom reseteado a 1). Sin este colchón, una hoja calculada justo al
 // límite puede terminar derramando su pie de página a una hoja extra casi
-// en blanco. 6px (~1.6mm) absorbe ese margen de redondeo sin afectar
-// visualmente el resultado.
-const COLCHON_REDONDEO_PX = 6;
+// en blanco.
+//
+// 2026-07-22: el valor original de 6px resultó insuficiente — verificado con
+// un PDF real (page.pdf()) contra Historia Clínica Nutricional que, incluso
+// con el factor de escala ya aplicado, 2 de las 4 hojas seguían desbordando
+// (hasta ~10.6px), derramando su pie de página a una hoja extra casi en
+// blanco exactamente como describe este comentario. Subido a 24px (~6.3mm)
+// para dar margen real de sobra sin afectar visualmente el resultado (el
+// factor de escala ya reduce la hoja completa de forma uniforme).
+const COLCHON_REDONDEO_PX = 24;
 
 export function usePrintFitScale(selectores: string[]) {
   const clave = selectores.join('|');

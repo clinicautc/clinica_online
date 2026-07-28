@@ -55,7 +55,7 @@ const PhysiotherapyMasterForm = () => {
     <div className="min-h-screen bg-zinc-600">
       <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/historial/${formData.pagina_1.paciente_id}/fisioterapia`)}
           className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
@@ -136,6 +136,20 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
+        /* Botones de navegación del wizard de captura (Salir/Anterior/
+           Siguiente/Finalizar/borrador de firma) no tienen sentido en la
+           vista de solo lectura del documento (PhysiotherapyMasterForm la
+           envuelve en <fieldset disabled>) — ya estaban ocultos para
+           impresión pero seguían apareciendo en pantalla, encima
+           desbordando el ancho real en móvil. */
+        fieldset:disabled .btn-salir-fixed,
+        fieldset:disabled .btn-siguiente-fixed,
+        fieldset:disabled .btn-anterior-fixed,
+        fieldset:disabled .controls-bar-p2,
+        fieldset:disabled .btn-anterior-p3,
+        fieldset:disabled .btn-finalizar-p3,
+        fieldset:disabled .eraser-container-p3 { display: none !important; }
+
         /* Configuraciones Generales */
         .hc-container * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -150,12 +164,40 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             padding: 20px 180px;
             min-height: 100vh;
         }
+        /* El padding lateral de 180px nunca se pensó para móvil: junto con
+           el zoom aplicado a la hoja (achicada por useScreenFitScale para
+           caber en pantallas angostas), dejaba una caja de contenido de
+           apenas unos px de ancho — el centrado (flex o margin:auto) sobre
+           un elemento con zoom en una caja tan angosta daba resultados
+           inconsistentes en Chromium y desbordaba el viewport real,
+           empujando los botones flotantes fuera de la pantalla. La misma
+           regla se repite en el <style> de .hc-body-p2/.hc-body-p3 (en vez
+           de agruparla aquí con selector combinado) porque en CSS, a
+           igual especificidad, gana la declaración que aparece más abajo en
+           el documento — puesta solo aquí, la regla base de cada página 2/3
+           (definida en un <style> posterior) la habría sobreescrito
+           igualmente aunque el media query calzara. */
+        @media (max-width: 1023px) {
+          .hc-body { padding: 20px 8px; }
+        }
+        /* Zoom cosmético SOLO para pantalla (mismo criterio que
+           NutritionMasterForm.tsx): agranda visualmente el documento como si
+           el navegador estuviera a 150% de zoom. No toca --screen-scale ni
+           --print-scale — se anula explícitamente dentro de @media print más
+           abajo. Restringido a >=1024px: se verificó que en portrait de
+           tablet (hasta ~1023px) el problema se reproduce igual que en
+           móvil, desbordando el ancho real y empujando los botones
+           flotantes fuera de la pantalla visible. */
+        @media (min-width: 1024px) {
+          .hc-body { zoom: 1.5; }
+        }
 
         /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
         .page {
             zoom: var(--screen-scale, 1);
             background-color: #fff;
-            width: var(--print-width, 215.9mm);
+            width: var(--screen-width, 215.9mm);
+            flex-shrink: 0;
             min-height: 279.4mm;
             padding: 10mm 14mm 8mm 14mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
@@ -294,7 +336,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                — eso recorta TODO el documento a la altura de una sola página
                e impide que las hojas 2 y 3 lleguen a paginarse. */
             body, html { background-color: #fff; }
-            .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: flex !important; justify-content: center !important; }
+            .hc-body { padding: 0 !important; margin: 0 !important; background: white; display: flex !important; justify-content: center !important; zoom: 1 !important; }
             .page {
                 box-shadow: none !important;
                 border: none !important;
@@ -527,11 +569,27 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .hc-body-p2 {
             font-family: Arial, sans-serif;
             background-color: #525659;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            /* display:block (no flex): centrar con flexbox (align-items) un
+               hijo con zoom aplicado da resultados inconsistentes en
+               Chromium — el hijo terminaba centrado según su ancho SIN
+               zoom, pero pintado ya reducido, desalineándolo y desbordando
+               el viewport real en móvil. .page-p2 ya tiene
+               margin-left/right:auto, que sí centra de forma correcta y
+               estable con zoom en un contenedor de bloque normal. */
+            display: block;
             padding: 20px 180px;
             min-height: 100vh;
+        }
+        /* Ver .hc-body en Page1 para la explicación completa. */
+        @media (max-width: 1023px) {
+          .hc-body-p2 { padding: 20px 8px; }
+        }
+        /* Zoom cosmético SOLO para pantalla — ver .hc-body arriba. Se anula
+           en @media print más abajo. Restringido a >=1024px por la misma
+           razón que .hc-body (desbordaba el viewport real en portrait de
+           tablet y en móvil). */
+        @media (min-width: 1024px) {
+          .hc-body-p2 { zoom: 1.5; }
         }
 
         .controls-bar-p2 {
@@ -609,7 +667,8 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .page-p2 {
             zoom: var(--screen-scale, 1);
             background-color: #fff;
-            width: var(--print-width, 215.9mm);
+            width: var(--screen-width, 215.9mm);
+            flex-shrink: 0;
             margin-left: auto;
             margin-right: auto;
             min-height: 279.4mm;
@@ -758,7 +817,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
 
         @media print {
             @page { size: 215.9mm 279.4mm; margin: 0; }
-            .hc-body-p2 { padding: 0; background: white; }
+            .hc-body-p2 { padding: 0; background: white; zoom: 1 !important; }
             .controls-bar-p2, .btn-anterior-fixed, .btn-siguiente-fixed { display: none !important; }
             .eraser-container { display: none !important; }
             .page-p2 {
@@ -1071,11 +1130,24 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .hc-body-p3 {
             font-family: Arial, Helvetica, sans-serif;
             background-color: #525659;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            /* display:block (no flex) — ver .hc-body-p2 para la explicación
+               completa: centrar con align-items un hijo con zoom aplicado
+               desalineaba y desbordaba el viewport real en móvil.
+               .page-p3 ya tiene margin-left/right:auto para centrarse. */
+            display: block;
             padding: 20px 180px;
             min-height: 100vh;
+        }
+        /* Ver .hc-body en Page1 para la explicación completa. */
+        @media (max-width: 1023px) {
+          .hc-body-p3 { padding: 20px 8px; }
+        }
+        /* Zoom cosmético SOLO para pantalla — ver .hc-body arriba. Se anula
+           en @media print más abajo. Restringido a >=1024px por la misma
+           razón que .hc-body (desbordaba el viewport real en portrait de
+           tablet y en móvil). */
+        @media (min-width: 1024px) {
+          .hc-body-p3 { zoom: 1.5; }
         }
 
         .btn-anterior-p3 {
@@ -1135,7 +1207,8 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .page-p3 {
             zoom: var(--screen-scale, 1);
             background-color: #fff;
-            width: var(--print-width, 215.9mm);
+            width: var(--screen-width, 215.9mm);
+            flex-shrink: 0;
             margin-left: auto;
             margin-right: auto;
             min-height: 279.4mm;
@@ -1240,7 +1313,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
 
         @media print {
             @page { size: 215.9mm 279.4mm; margin: 0; }
-            .hc-body-p3 { padding: 0; background: white; }
+            .hc-body-p3 { padding: 0; background: white; zoom: 1 !important; }
             .btn-anterior-p3, .btn-finalizar-p3, .eraser-container-p3 { display: none !important; }
             /* Escala calculada en tiempo real por usePrintFitScale — NUNCA un
                valor fijo. */

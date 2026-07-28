@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Check,X} from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { authAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { useAuth } from '../contexts/AuthContext';

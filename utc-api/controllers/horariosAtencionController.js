@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { reconciliarCitasFuturas } = require('../services/horarioAtencionService');
+const { obtenerConfig, calcularFechaSinConflicto } = require('../services/consultoriosService');
 
 const AREAS_VALIDAS = ['nutricion', 'fisioterapia'];
 
@@ -136,4 +137,95 @@ async function eliminarCierre(req, res) {
   }
 }
 
-module.exports = { getHorarios, upsertHorarios, getCierres, crearCierre, eliminarCierre };
+// ==========================================================
+// CONSULTORIOS (capacidad de citas simultáneas por horario)
+// Lectura: cualquier usuario autenticado. Escritura: solo master.
+// ==========================================================
+
+async function getConsultorios(req, res) {
+  const { area } = req.params;
+  if (!areaValida(area)) return res.status(400).json({ error: 'Área inválida.' });
+
+  try {
+    const config = await obtenerConfig(area);
+    res.json({
+      area,
+      cantidad: config.cantidad,
+      cantidadPendiente: config.cantidad_pendiente,
+      vigenteDesde: config.vigente_desde,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function aplicarConsultorios(area, cantidad) {
+  await pool.query(
+    `INSERT INTO consultorios_config (area, cantidad, cantidad_pendiente, vigente_desde)
+     VALUES ($1, $2, NULL, NULL)
+     ON CONFLICT (area) DO UPDATE SET cantidad = EXCLUDED.cantidad, cantidad_pendiente = NULL, vigente_desde = NULL`,
+    [area, cantidad]
+  );
+}
+
+// Reducir consultorios no puede dejar citas ya agendadas por encima de la
+// nueva capacidad. Si hay conflicto, el cambio no se aplica todavía: se
+// informa la primera fecha segura (`fechaSugerida`) para que el cliente
+// confirme esa fecha u ofrezca una posterior; solo entonces se programa
+// (cantidad_pendiente/vigente_desde) para que el cron de scheduledTasks.js
+// lo aplique cuando llegue. Aumentar (o dejar igual) nunca genera conflicto,
+// así que se aplica siempre de inmediato.
+async function upsertConsultorios(req, res) {
+  const { area } = req.params;
+  const { cantidad, vigenteDesde } = req.body;
+
+  if (!areaValida(area)) return res.status(400).json({ error: 'Área inválida.' });
+  if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 10) {
+    return res.status(400).json({ error: 'cantidad debe ser un entero entre 1 y 10.' });
+  }
+  if (vigenteDesde !== undefined && vigenteDesde !== null && !/^\d{4}-\d{2}-\d{2}$/.test(vigenteDesde)) {
+    return res.status(400).json({ error: 'vigenteDesde inválida (formato YYYY-MM-DD).' });
+  }
+
+  try {
+    const actual = await obtenerConfig(area);
+
+    if (cantidad >= actual.cantidad) {
+      await aplicarConsultorios(area, cantidad);
+      return res.json({ area, cantidad, cantidadPendiente: null, vigenteDesde: null });
+    }
+
+    // Es una reducción.
+    const fechaSinConflicto = await calcularFechaSinConflicto(area, cantidad);
+
+    if (!fechaSinConflicto) {
+      await aplicarConsultorios(area, cantidad);
+      return res.json({ area, cantidad, cantidadPendiente: null, vigenteDesde: null });
+    }
+
+    if (!vigenteDesde || vigenteDesde < fechaSinConflicto) {
+      return res.status(409).json({ requiereFecha: true, fechaSugerida: fechaSinConflicto });
+    }
+
+    const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    if (vigenteDesde <= hoyStr) {
+      await aplicarConsultorios(area, cantidad);
+      return res.json({ area, cantidad, cantidadPendiente: null, vigenteDesde: null });
+    }
+
+    await pool.query(
+      `INSERT INTO consultorios_config (area, cantidad, cantidad_pendiente, vigente_desde)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (area) DO UPDATE SET cantidad_pendiente = EXCLUDED.cantidad_pendiente, vigente_desde = EXCLUDED.vigente_desde`,
+      [area, actual.cantidad, cantidad, vigenteDesde]
+    );
+    res.json({ area, cantidad: actual.cantidad, cantidadPendiente: cantidad, vigenteDesde });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = {
+  getHorarios, upsertHorarios, getCierres, crearCierre, eliminarCierre,
+  getConsultorios, upsertConsultorios,
+};

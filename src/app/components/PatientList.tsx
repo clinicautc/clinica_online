@@ -14,7 +14,7 @@ import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Button } from './ui/button';
 import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { usuariosAPI } from '../lib/api';
 import { formatExpediente } from '../lib/formatExpediente';
 

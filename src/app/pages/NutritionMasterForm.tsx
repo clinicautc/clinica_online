@@ -4,7 +4,7 @@
    * PROPÓSITO: Formulario Multi-pasos con persistencia de datos local.
    * ============================================================================
    */
-  import React, { useState, useEffect } from 'react';
+  import React, { useEffect } from 'react';
   import { useNavigate } from 'react-router';
   import { useNutritionHistoriaData } from '../hooks/formClinico/useNutritionHistoriaData';
   import { usePrintFitScale } from '../hooks/usePrintFitScale';
@@ -72,19 +72,70 @@
     // palabra sin pisarle su propio ajuste de ancho.
     useEffect(() => {
       const CARTA_ALTO_MM = 279.4;
+      const CARTA_ANCHO_MM = 215.9;
       const PX_POR_MM = 96 / 25.4;
       const COLCHON_REDONDEO_PX = 6;
+      const MARGEN_LATERAL_PX = 16; // debe coincidir con useScreenFitScale.ts
       const altoDisponiblePx = CARTA_ALTO_MM * PX_POR_MM - COLCHON_REDONDEO_PX;
+      const anchoDisponiblePx = CARTA_ANCHO_MM * PX_POR_MM;
 
+      // Igual que usePrintFitScale: si una hoja necesita reducirse más que
+      // las demás por ALTO (más contenido, factor de alto menor que el de
+      // ancho), se ensancha su --screen-width ANTES del zoom para que, tras
+      // reducirla, el rectángulo final vuelva a medir el ancho Carta
+      // completo — así todas las hojas se ven del mismo tamaño en pantalla
+      // sin importar cuánto contenido tenga cada una. Usa su propia
+      // variable (--screen-width, nunca --print-width) para que abrir/
+      // cancelar Ctrl+P no dependa de ni dañe el tamaño en pantalla.
+      //
+      // Cuando en cambio el ANCHO es la restricción activa (viewport angosto
+      // / móvil, factor puesto por useScreenFitScale), NO se ensancha: ahí
+      // sí se busca que la hoja se achique de verdad para caber en la
+      // pantalla, no que mantenga su footprint completo. Ensanchar también
+      // en ese caso desbordaba el ancho real del documento y el navegador
+      // terminaba reportando un viewport más ancho de lo real en móvil,
+      // empujando los botones flotantes (Volver/Imprimir/Editar) fuera de
+      // la pantalla visible.
       const ajustarPorAlto = () => {
+        // Se recalcula el factor de ANCHO aquí mismo (misma fórmula que
+        // useScreenFitScale.ts) en vez de leerlo de vuelta desde
+        // --screen-scale: esa variable ya trae escrito el resultado
+        // COMBINADO de la corrida anterior de este mismo efecto, así que
+        // leerla de vuelta perdía la señal de "cuál factor puro puso
+        // useScreenFitScale" en cuanto este efecto corría una segunda vez
+        // (p. ej. al recargar datos del historial), y dejaba de ensanchar.
+        const anchoViewportDisponible = document.documentElement.clientWidth - MARGEN_LATERAL_PX;
+        const factorAncho = Math.min(1, anchoViewportDisponible / anchoDisponiblePx);
+        // El ensanchado (igualar el tamaño visual de las 4 hojas) es una
+        // mejora cosmética pensada solo para escritorio — igual que el zoom
+        // de 1.5x. Se verificó que en portrait de tablet (hasta ~1023px) el
+        // ensanchado también desbordaba el ancho real del documento y
+        // empujaba los botones flotantes fuera de la pantalla, así que se
+        // desactiva por debajo de 1024px: ahí cada hoja solo se ajusta a su
+        // propio alto (factorAlto) sin ensanchar, priorizando que quepa en
+        // la pantalla sobre que se vea del mismo tamaño que las demás.
+        const permitirEnsanchado = document.documentElement.clientWidth >= 1024;
+
         document.querySelectorAll<HTMLElement>('.p1-paper').forEach(hoja => {
-          const factorAncho = parseFloat(hoja.style.getPropertyValue('--screen-scale') || '1');
           const zoomPrevio = hoja.style.zoom;
           hoja.style.zoom = '1';
+          hoja.style.removeProperty('--screen-width');
           const altoNatural = hoja.scrollHeight;
-          hoja.style.zoom = zoomPrevio;
           const factorAlto = Math.min(1, altoDisponiblePx / altoNatural);
-          hoja.style.setProperty('--screen-scale', String(Math.min(factorAncho, factorAlto)));
+
+          let factor: number;
+          if (permitirEnsanchado && factorAlto < factorAncho) {
+            factor = factorAlto;
+            hoja.style.setProperty('--screen-width', `${anchoDisponiblePx / factor}px`);
+            const altoTrasEnsanchar = hoja.scrollHeight;
+            factor = Math.min(1, altoDisponiblePx / altoTrasEnsanchar);
+            hoja.style.setProperty('--screen-width', `${anchoDisponiblePx / factor}px`);
+          } else {
+            factor = Math.min(factorAncho, factorAlto);
+          }
+
+          hoja.style.zoom = zoomPrevio;
+          hoja.style.setProperty('--screen-scale', String(factor));
         });
       };
 
@@ -103,22 +154,71 @@
         @page { size: 215.9mm 279.4mm; margin: 0; }
         @media print {
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
-          .p1-outer { background: white !important; padding: 0 !important; margin: 0 !important; gap: 0 !important; }
+          .p1-outer { background: white !important; padding: 0 !important; margin: 0 !important; zoom: 1 !important; }
+          .p1-outer > div { margin-bottom: 0 !important; }
           .p1-paper {
             box-shadow: none !important;
             /* Escala calculada en tiempo real (ver useEffect de escala de
                impresión, más abajo en este componente) — NUNCA un valor
                fijo. Si la hoja cabe al 100%, --print-scale vale 1 y no pasa
                nada; solo se reduce si el contenido real excede el alto
-               físico de la hoja. */
+               físico de la hoja. --print-width es exclusiva de impresión
+               (nunca se usa en pantalla — ver --screen-width más abajo) para
+               que abrir e imprimir/cancelar Ctrl+P no deje residuos que
+               cambien el tamaño en pantalla después. */
             zoom: var(--print-scale, 1) !important;
+            width: var(--print-width, 215.9mm) !important;
           }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
+        /* Zoom cosmético SOLO para la vista en pantalla (se ve "muy lejos" a
+           tamaño real 96dpi): agranda visualmente todo el documento como si
+           el navegador estuviera a 150% de zoom. No toca --screen-scale (el
+           factor de ajuste de cada hoja al alto físico Carta) ni
+           --print-scale — se anula explícitamente arriba dentro de
+           @media print, así que Ctrl+P nunca se ve afectado por esto.
+           Restringido a >=1024px: en tablets y móvil, aplicar este zoom por
+           encima del ajuste de useScreenFitScale desbordaba el ancho real
+           de la hoja y el navegador terminaba reportando un viewport más
+           ancho de lo real, empujando los botones flotantes
+           (Volver/Imprimir/Editar) fuera de la pantalla visible.
+           Verificado que en portrait de tablet (hasta ~1023px) el problema
+           se reproduce igual que en móvil, mientras que en landscape/
+           escritorio (1024px+) no. Mobile/tablet ya tienen su propio
+           mecanismo de ajuste (--screen-scale), no necesitan este zoom
+           extra. */
+        @media (min-width: 1024px) {
+          .p1-outer { zoom: 1.5; }
+        }
+        /* .p1-outer ya NO es un contenedor flex (era flex flex-col
+           items-center): centrar con align-items un hijo con zoom aplicado
+           da resultados inconsistentes en Chromium (el hijo se centraba
+           según su ancho SIN zoom pero se pintaba ya reducido,
+           desalineándolo y desbordando el viewport real en tablet/móvil).
+           Los 4 hijos directos (uno por hoja) ya son bloques w-full, así
+           que apilan solos; este margen reemplaza el gap-8 que traía el
+           flex. */
+        .p1-outer > div { margin-bottom: 32px; }
+        .p1-outer > div:last-child { margin-bottom: 0; }
         /* Tamaño de hoja y escala igual a la vista de Seguimiento Nutricional
            (HojaEvolutiva.tsx): ancho/alto fijos en mm, sin escalado responsive,
-           para que se vea como una hoja física real en pantalla. */
-        .p1-paper { zoom: var(--screen-scale, 1); width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; margin: 0 auto !important; border-radius: 0 !important; }
+           para que se vea como una hoja física real en pantalla.
+           Centrado con left:50%+transform en vez de margin:0 auto: en
+           Chromium, margin:auto sobre un elemento con zoom se resuelve de
+           forma inconsistente según el factor de zoom exacto (confirmado con
+           0.92/0.9075 rotos vs 0.745 correcto, con el mismo CSS), produciendo
+           un margen derecho negativo y desbordando el viewport en tablet
+           portrait. transform:translateX(-50%) se resuelve contra el ancho
+           final ya renderizado del propio elemento, no contra su ancho
+           previo al zoom, así que es estable para cualquier factor. En
+           impresión se vuelve a margin:0 auto porque --print-width siempre
+           es un valor fijo en mm (nunca queda en un factor de zoom
+           intermedio problemático) y position:static es más simple/segura
+           para el motor de impresión. */
+        .p1-paper { zoom: var(--screen-scale, 1); width: var(--screen-width, 215.9mm) !important; min-height: 279.4mm !important; position: relative !important; left: 50% !important; transform: translateX(-50%) !important; margin: 0 !important; border-radius: 0 !important; }
+        @media print {
+          .p1-paper { position: static !important; left: auto !important; transform: none !important; margin: 0 auto !important; }
+        }
         .p1-paper input:not([type="checkbox"]), .p1-paper textarea {
           word-break: break-word;
           overflow-wrap: break-word;
@@ -180,7 +280,7 @@
           "Volver" / "Imprimir" / "Editar", fuera del fieldset deshabilitado. */}
       <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/historial/${formData.pagina_1.paciente_id}/nutricion`)}
           className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">
@@ -214,7 +314,7 @@
           (páginas 1-4) sin tener que tocar cada input individualmente;
           display:contents lo hace invisible en el layout calibrado en mm. */}
       <fieldset disabled={isReadOnly} className="contents">
-      <div className="p1-outer bg-zinc-600 min-h-screen flex flex-col items-center gap-8 px-2 pt-20 pb-24 font-sans sm:px-6 md:px-12 lg:px-24 xl:px-[220px] print:bg-white print:p-0 relative">
+      <div className="p1-outer bg-zinc-600 min-h-screen px-2 pt-20 pb-24 font-sans sm:px-6 md:px-12 lg:px-24 xl:px-[220px] print:bg-white print:p-0 relative">
 
 {/* --- PÁGINA 1 --- */}
         <div className="block w-full">
@@ -531,7 +631,7 @@
                 </div>
               </SectionBox>
 
-              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-[11px]" className="pb-0" pill={false} style={{ marginLeft: '-8px', width: 'calc(100% + 8px)' }}>
+              <SectionBox title="Antecedentes personales no patológicos" paddingX="px-0" marginTop="mt-[11px]" className="pb-0" pill={false} style={{ marginLeft: '-8px', width: 'calc(100% + 8px)' }} titleClassName="text-[8.5px]">
                 <table className="w-full text-[8.5px] font-bold border-collapse table-fixed mt-0 h-full">
                   <thead>
                     <tr className="border-b-[1.5px] border-[#2c5392] bg-slate-50/50">
@@ -761,7 +861,9 @@
     pill?: boolean,
     /** Override puntual (margin/width) para desplazar una caja dentro de su celda de grid sin tocar grid-template-columns — ver "Antecedentes personales no patológicos"/"Medicamentos". */
     style?: React.CSSProperties,
-  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3", pill = true, style }) => (
+    /** Override puntual del tamaño de fuente del título (barra pill=false) para que quepa en una sola línea sin crecer la caja — ver "Antecedentes personales no patológicos". */
+    titleClassName?: string,
+  }> = ({ title, children, className = "", paddingX = "px-3", marginTop = "mt-3", pill = true, style, titleClassName = "text-[11px]" }) => (
     <section
       className={`relative rounded-[10px] border-[2px] border-[#2c5697] ${marginTop} flex w-full flex-col bg-white ${className}`}
       style={{ ...(title && pill ? { paddingTop: '11px' } : undefined), ...style }}
@@ -772,7 +874,7 @@
             {title}
           </span>
         ) : (
-          <div className="flex min-h-6 items-center rounded-t-[8px] bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+          <div className={`flex min-h-6 items-center whitespace-nowrap rounded-t-[8px] bg-[#2c5697] px-3 py-1 font-bold tracking-wide text-white ${titleClassName}`}>
             {title}
           </div>
         )
@@ -802,7 +904,7 @@
           height: `${totalHeight}px`
         }}
         autoCapitalize="sentences"
-        className="w-full resize-none border-none outline-none text-[#333] text-[9px] bg-repeat-y bg-transparent px-1 m-0 p-0 block overflow-y-auto box-border break-words"
+        className="w-full resize-none border-none outline-none text-[#333] text-[9px] bg-repeat-y bg-transparent px-1 m-0 p-0 block overflow-hidden box-border break-words"
       />
     );
   };
@@ -831,1723 +933,6 @@
     </label>
   );
   
-  /* --- DECLARACIONES DE FUNCIONES (Páginas 2, 3 y 4) --- */
-  // Las llenaremos conforme me pases los códigos.
-
-  function NutritionPage2Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly }: PageProps) {
-    const capFirst2 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
-    const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const { name, value, type } = e.target;
-      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
-      const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : (isText ? capFirst2(value) : value);
-      onUpdate('pagina_2', { [name]: val });
-    };
-
-    return (
-      <>
-        <style>{`
-          :root {
-            --primary-blue: #1d4d96;
-            --light-blue: #f2f7ff;
-            --border-blue: #1d4d96;
-            --pdf-grey: #525659;
-            --btn-cobalt: #1d4d96;
-          }
-
-          .nav-button {
-            position: fixed;
-            bottom: 30px;
-            padding: 14px 32px;
-            border-radius: 50px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            transition: all 0.2s;
-            color: white;
-            background-color: var(--btn-cobalt);
-            text-transform: uppercase;
-            font-size: 13px;
-            letter-spacing: 0.5px;
-            z-index: 1000;
-          }
-
-          .btn-back { left: 40px; }
-          .btn-next { right: 40px; }
-
-          .page {
-            width: 100%;
-            background-color: white;
-            padding: 20px;
-            box-sizing: border-box;
-            border: 3.5px solid #2c5392;
-            border-radius: 25px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            position: relative;
-          }
-
-          .section-header {
-            background-color: var(--primary-blue);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 8px 8px 0 0;
-            font-weight: bold;
-            font-size: 13px;
-            display: inline-block;
-            margin-left: 5px;
-          }
-
-          .section-box {
-            border: 1.5px solid var(--primary-blue);
-            border-radius: 8px;
-            padding: 8px;
-            margin-top: -1.5px;
-            margin-bottom: 8px;
-          }
-
-          .dieteticos-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1.5px;
-            font-size: 9px;
-            gap: 4px;
-          }
-
-          .dieteticos-row label {
-            font-size: 9px;
-            font-weight: 600;
-            color: var(--primary-blue);
-          }
-
-          .dieteticos-line {
-            flex-grow: 1;
-            border-bottom: 1px solid var(--primary-blue);
-            height: 14px;
-            margin-left: 2px;
-            display: flex;
-            align-items: flex-end;
-          }
-
-          .dieteticos-line input {
-            width: 100%;
-            border: none;
-            outline: none;
-            font-size: 8px;
-            padding: 0 3px;
-            background: transparent;
-          }
-
-          .freq-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            column-gap: 8px;
-            row-gap: 0px;
-          }
-
-          .freq-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 7.8px; 
-            border-bottom: 0.5px solid #d1d1d1;
-            padding: 1px 0;
-            color: var(--primary-blue);
-          }
-
-          .freq-val {
-            color: var(--primary-blue);
-            font-weight: bold;
-            font-size: 7.5px;
-            display: flex;
-            align-items: center;
-          }
-
-          .freq-val input {
-            width: 20px; 
-            border: none;
-            text-align: right;
-            font-weight: bold;
-            color: var(--primary-blue);
-            outline: none;
-            background: transparent;
-            font-size: 8px;
-            margin-right: 6px; 
-          }
-
-          .solicitud-wrapper {
-            position: relative;
-            margin-top: 12px;
-            width: 100%;
-          }
-
-          .solicitud-box {
-            border: 2px solid var(--primary-blue);
-            border-radius: 15px;
-            padding: 10px 8px 6px 8px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px;
-            min-height: 40px;
-          }
-
-          .solicitud-tag {
-            position: absolute;
-            top: -10px;
-            left: -2px;
-            background-color: var(--primary-blue);
-            color: white;
-            padding: 1px 12px;
-            border-radius: 8px 8px 8px 0;
-            font-weight: bold;
-            font-size: 11px;
-          }
-
-          .sol-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 8px;
-            color: var(--primary-blue);
-          }
-
-          .sol-line {
-            flex-grow: 1;
-            border-bottom: 1.2px solid var(--primary-blue);
-            height: 12px;
-            display: flex;
-            align-items: flex-end;
-            margin-left: 2px;
-          }
-
-          .sol-line input {
-            width: 100%;
-            border: none;
-            outline: none;
-            font-size: 8px;
-            background: transparent;
-          }
-
-          .interpret-box {
-            border: 1.5px solid var(--primary-blue);
-            border-radius: 8px;
-            min-height: 28px;
-            margin-bottom: 5px;
-          }
-          
-          .interpret-box textarea {
-            width: 100%;
-            border: none;
-            outline: none;
-            resize: none;
-            padding: 3px 5px;
-            box-sizing: border-box;
-            font-family: inherit;
-            font-size: 8px;
-            line-height: 1.2;
-            background: transparent;
-          }
-
-          .tables-container {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 5px;
-          }
-
-          .col-left { flex: 1.1; }
-          .col-right { flex: 1; }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 8.5px;
-          }
-
-          th {
-            background-color: var(--primary-blue);
-            color: white;
-            padding: 2px;
-            font-weight: bold;
-            border: 1px solid var(--primary-blue);
-            text-align: center;
-          }
-
-          td {
-            border: 1px solid var(--primary-blue);
-            padding: 0;
-            height: 14px; 
-          }
-
-          td input {
-            width: 100%;
-            height: 100%;
-            border: none;
-            outline: none;
-            padding: 0 3px;
-            box-sizing: border-box;
-            font-size: 8px;
-            background: transparent;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            text-transform: capitalize;
-          }
-          td textarea {
-            width: 100%;
-            height: 100%;
-            min-height: 14px;
-            border: none;
-            outline: none;
-            padding: 0 3px;
-            box-sizing: border-box;
-            font-size: 8px;
-            background: transparent;
-            resize: none;
-            white-space: pre-wrap;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            overflow: hidden;
-            font-family: inherit;
-            line-height: 1.2;
-            display: block;
-          }
-          input[type="text"], textarea {
-            word-break: break-word;
-            overflow-wrap: break-word;
-          }
-          textarea {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-          }
-          @media print {
-            /* overflow:visible/height:auto no funciona en <textarea> (ver
-               nota igual en la página 1) — se quita para que impresión
-               coincida con pantalla en vez de achicar el textarea. */
-            td { height: auto !important; }
-            tr { break-inside: avoid; }
-          }
-
-          .label-cell {
-            color: var(--primary-blue);
-            font-weight: 500;
-            padding-left: 3px;
-          }
-
-          .dark-cell { background-color: var(--primary-blue); }
-
-          .footer {
-            margin-top: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            font-size: 8px;
-            color: var(--primary-blue);
-            border-top: 1px solid #eee;
-            padding-top: 4px;
-          }
-
-          @page { size: A4 portrait; margin: 0; }
-          @media print {
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .nav-button { display: none !important; }
-            html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
-            .page { width: 100% !important; box-shadow: none !important; transform: scale(0.87); transform-origin: top center; }
-          }
-        `}</style>
-
-        <div className="w-full">
-          <div className="page">
-            <div className="section-header">Aspectos dietéticos</div>
-            <div className="section-box">
-              {[
-                { label: 'Alergias alimentarias:', name: 'alergias' },
-                { label: 'Intolerancias alimentarias:', name: 'intolerancias' },
-                { label: 'Alimentos de preferencia:', name: 'preferencias' }
-              ].map((item) => (
-                <div className="dieteticos-row" key={item.name}>
-                  <label>{item.label}</label> 
-                  <input type="checkbox" name={`${item.name}_no`} checked={accumulatedData.pagina_2[`${item.name}_no`] || false} onChange={handleLocalChange} /> No 
-                  <input type="checkbox" name={`${item.name}_si`} checked={accumulatedData.pagina_2[`${item.name}_si`] || false} onChange={handleLocalChange} /> Sí 
-                  <label>Cuál</label> 
-                  <div className="dieteticos-line">
-                    <input type="text" name={`${item.name}_txt`} value={accumulatedData.pagina_2[`${item.name}_txt`] || ''} onChange={handleLocalChange} />
-                  </div>
-                </div>
-              ))}
-              <div className="dieteticos-row">
-                <label>Alimentos que no le agradan o no acostumbre</label> 
-                <div className="dieteticos-line">
-                  <input type="text" name="desagrados" value={accumulatedData.pagina_2.desagrados || ''} onChange={handleLocalChange} />
-                </div>
-              </div>
-              <div className="dieteticos-row">
-                <label>Comidas al día</label> 
-                <div style={{ width: '25px' }} className="dieteticos-line">
-                  <input type="number" name="comidas_dia" value={accumulatedData.pagina_2.comidas_dia || ''} onChange={handleLocalChange} />
-                </div>
-                <label>Fuertes</label> 
-                <div style={{ width: '25px' }} className="dieteticos-line">
-                  <input type="number" name="comidas_fuertes" value={accumulatedData.pagina_2.comidas_fuertes || ''} onChange={handleLocalChange} />
-                </div>
-                <label>Colaciones</label> 
-                <div style={{ width: '25px' }} className="dieteticos-line">
-                  <input type="number" name="comidas_col" value={accumulatedData.pagina_2.comidas_col || ''} onChange={handleLocalChange} />
-                </div>
-                <label>¿Quién prepara sus alimentos?</label> 
-                <div className="dieteticos-line">
-                  <input type="text" name="quien_prepara" value={accumulatedData.pagina_2.quien_prepara || ''} onChange={handleLocalChange} />
-                </div>
-              </div>
-              {[
-                { label: 'Modificó alimentación últimos 6 meses', name: 'modifico_alim' },
-                { label: 'Dieta especial/recomendada previa', name: 'dieta_previa' },
-                { label: 'Alimentación según estado de ánimo', name: 'alim_animo' },
-                { label: 'Uso de laxantes', name: 'laxantes' },
-                { label: 'Medicamentos para bajar de peso', name: 'meds_peso' }
-              ].map((item) => (
-                <div className="dieteticos-row" key={item.name}>
-                  <label>{item.label}</label> 
-                  <input type="checkbox" name={`${item.name}_no`} checked={accumulatedData.pagina_2[`${item.name}_no`] || false} onChange={handleLocalChange} /> No 
-                  <input type="checkbox" name={`${item.name}_si`} checked={accumulatedData.pagina_2[`${item.name}_si`] || false} onChange={handleLocalChange} /> Sí 
-                  <label>Cuál</label> 
-                  <div className="dieteticos-line">
-                    <input type="text" name={`${item.name}_txt`} value={accumulatedData.pagina_2[`${item.name}_txt`] || ''} onChange={handleLocalChange} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="section-header">Frecuencia de consumo</div>
-            <div className="section-box">
-              <div className="freq-grid">
-                {[
-                  "Verduras", "Fruta²", "Cereal s/g", "Pan dulce nat", "Pan dulce UP", "Galletas", "Leguminosas", "Carne de res",
-                  "Carne de cerdo", "Carne de pollo", "Pavo", "Pescados", "Mariscos", "Huevo", "Prod. anim UP", "Quesos bcos",
-                  "Quesos amr", "Embutidos", "Leche s/sab", "Yogurt s/sab", "Leche UP", "Yogurt UP", "Oleaginosas", "Aceites",
-                  "Mantequilla", "Margarina", "Refresco", "Agua sab UP", "Jugos nat", "Jugos UP", "Helado", "Nieve", "Gelatinas",
-                  "Aguas frutas", "Té", "Café", "Agua natural", "Papas fritas", "Garnachas com", "Garnachas fri"
-                ].map((f) => (
-                  <div className="freq-item" key={f}>
-                    <span>{f}</span> 
-                    <span className="freq-val">
-                      <input type="number" name={`freq_${f}`} value={accumulatedData.pagina_2[`freq_${f}`] || ''} onChange={handleLocalChange} />/7d
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="tables-container">
-              <div className="col-left">
-                <table>
-                  <thead>
-                    <tr><th>Antropometría</th><th>VO</th><th>Interpretación</th></tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { l: "Talla (m)", n: "talla", d: false }, { l: "Peso (kg)", n: "peso", d: false }, { l: "IMC (kg/m²)", n: "imc", d: true },
-                      { l: "Peso Ideal/FAO (kg)", n: "peso_fao", d: false }, { l: "Circ. Muñeca (cm)", n: "muneca", d: true }, { l: "Diámetro codo (cm)", n: "codo", d: true },
-                      { l: "Circ. Brazo (cm)", n: "brazo", d: true }, { l: "Circ. Abd (cm)", n: "abd", d: true }, { l: "Circ. Cintura (cm)", n: "cintura", d: false },
-                      { l: "Circ. Cadera (cm)", n: "cadera", d: false }, { l: "ICC", n: "icc", d: true }, { l: "PCB (mm)", n: "pcb", d: true },
-                      { l: "PCT (mm)", n: "pct", d: true }, { l: "PCSe (mm)", n: "pcse", d: true }, { l: "PCSi (mm)", n: "pcsi", d: true },
-                      { l: "% Grasa SIRI", n: "grasa_siri", d: true }, { l: "% Grasa InBody", n: "grasa_inb", d: true }, { l: "IMG InBody", n: "img_inb", d: true },
-                      { l: "MLG (kg)", n: "mlg", d: false }, { l: "IMLG (kg/m²)", n: "imlg", d: true }, { l: "cAMB (cm²)", n: "camb", d: true },
-                      { l: "MMT InBody", n: "mmt_inb", d: true }, { l: "IMEA InBody", n: "imea_inb", d: true }, { l: "ACT (L)", n: "act", d: false },
-                      { l: "Grasa Visc (L)", n: "grasa_visc", d: true }
-                    ].map((row, i) => (
-                      <tr key={i}>
-                        <td className="label-cell">{row.l}</td>
-                        <td>
-                          <input 
-                            type="number" 
-                            step="0.01" 
-                            name={`antrop_${row.n}_vo`} 
-                            value={accumulatedData.pagina_2?.[`antrop_${row.n}_vo`] || ''} 
-                            onChange={handleLocalChange} 
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                        <td className={row.d ? "" : "dark-cell"}>
-                          {row.d && (
-                            <textarea
-                              name={`antrop_${row.n}_int`}
-                              value={accumulatedData.pagina_2?.[`antrop_${row.n}_int`] || ''}
-                              onChange={handleLocalChange}
-                              disabled={isReadOnly}
-                            />
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="section-header" style={{ marginTop: '8px' }}>Interpretación antropométrica</div>
-                <div className="interpret-box">
-                  <textarea 
-                    name="int_antrop" 
-                    value={accumulatedData.pagina_2?.int_antrop || ''} 
-                    onChange={handleLocalChange} 
-                    rows={2}
-                    disabled={isReadOnly}
-                  ></textarea>
-                </div>
-
-                <div className="section-header">Signos Vitales</div>
-                <table>
-                  <thead>
-                    <tr><th>Parámetro</th><th>VO</th><th>Interpretación</th></tr>
-                  </thead>
-                  <tbody>
-                    {["T. Arterial", "F. Resp (rpm)", "F. Card (lpm)", "Temp (°C)", "SO₂"].map((p, i) => (
-                      <tr key={i}>
-                        <td className="label-cell">{p}</td>
-                        <td>
-                          <input 
-                            type="text" 
-                            name={`sv_${p}_vo`} 
-                            value={accumulatedData.pagina_2?.[`sv_${p}_vo`] || ''} 
-                            onChange={handleLocalChange} 
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                        <td>
-                          <input 
-                            type="text" 
-                            name={`sv_${p}_int`} 
-                            value={accumulatedData.pagina_2?.[`sv_${p}_int`] || ''} 
-                            onChange={handleLocalChange} 
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="col-right">
-                <table>
-                  <thead>
-                    <tr><th>Parámetros bioquímicos</th><th>VO</th><th>Interpretación</th></tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: 28 }).map((_, i) => (
-                      <tr key={i}>
-                        <td>
-                          <textarea
-                            name={`bq_${i}_nom`}
-                            value={accumulatedData.pagina_2?.[`bq_${i}_nom`] || ''}
-                            onChange={handleLocalChange}
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            name={`bq_${i}_vo`}
-                            value={accumulatedData.pagina_2?.[`bq_${i}_vo`] || ''}
-                            onChange={handleLocalChange}
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                        <td>
-                          <textarea
-                            name={`bq_${i}_int`}
-                            value={accumulatedData.pagina_2?.[`bq_${i}_int`] || ''}
-                            onChange={handleLocalChange}
-                            disabled={isReadOnly}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="section-header" style={{ marginTop: '8px' }}>Interpretación bioquímica</div>
-                <div className="interpret-box">
-                  <textarea 
-                    name="int_bioq" 
-                    value={accumulatedData.pagina_2?.int_bioq || ''} 
-                    onChange={handleLocalChange} 
-                    rows={2}
-                    disabled={isReadOnly}
-                  ></textarea>
-                </div>
-
-                <div className="solicitud-wrapper">
-                  <div className="solicitud-tag">Solicitud de análisis</div>
-                  <div className="solicitud-box">
-                    {['Química Sanguínea', 'EGO', 'Biometría hemática'].map(s => (
-                      <div className="sol-item" key={s}>
-                        <input 
-                          type="checkbox" 
-                          name={`sol_${s}`} 
-                          checked={accumulatedData.pagina_2?.[`sol_${s}`] || false} 
-                          onChange={handleLocalChange} 
-                          disabled={isReadOnly}
-                        /> {s}
-                      </div>
-                    ))}
-                    <div className="sol-item">
-                      <input 
-                        type="checkbox" 
-                        name="sol_otro" 
-                        checked={accumulatedData.pagina_2?.sol_otro || false} 
-                        onChange={handleLocalChange} 
-                        disabled={isReadOnly}
-                      /> Otro: 
-                      <div className="sol-line">
-                        <input 
-                          type="text" 
-                          name="sol_otro_txt" 
-                          value={accumulatedData.pagina_2?.sol_otro_txt || ''} 
-                          onChange={handleLocalChange} 
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="footer">
-              <div>ESA: Explorado y sin alteraciones; N/A: No Aplica; PN: Preguntado y negado; ✓ Adecuado</div>
-              <div className="page-num" style={{fontSize:'14px', fontWeight:'bold'}}>2</div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  function NutritionPage3Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly: _isReadOnly }: PageProps) {
-    // --- LÓGICA DE NAVEGACIÓN POR TECLADO (FLECHAS) ---
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const currentInput = e.currentTarget;
-        const inputs = Array.from(document.querySelectorAll('input:not([type="checkbox"])')) as HTMLInputElement[];
-        const currentIndex = inputs.indexOf(currentInput);
-
-        if (e.key === 'ArrowDown' && currentIndex < inputs.length - 1) {
-          inputs[currentIndex + 1].focus();
-        } else if (e.key === 'ArrowUp' && currentIndex > 0) {
-          inputs[currentIndex - 1].focus();
-        }
-      }
-    };
-
-    const capFirst3 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
-    const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-      const { name, value, type } = target;
-      const checked = (target as HTMLInputElement).checked;
-      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
-      const newValue = type === 'checkbox' ? checked : (isText ? capFirst3(value) : value);
-      onUpdate('pagina_3', { [name]: newValue });
-    };
-
-    const styles: { [key: string]: React.CSSProperties } = {
-      contenedorMaestro: {
-        backgroundColor: '#ffffff',
-        width: '100%',
-        minHeight: '279mm',
-        border: '3.5px solid #2c5392',
-        borderRadius: '25px',
-        padding: '12px',
-        boxSizing: 'border-box',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.5)', 
-      },
-      tablaGeneral: {
-        width: '100%',
-        borderCollapse: 'collapse',
-        marginBottom: '8px',
-        tableLayout: 'fixed',
-      },
-      thTd: {
-        border: '1.5px solid #2c5697',
-        padding: '2.5px',
-        textAlign: 'center',
-        verticalAlign: 'middle',
-        fontSize: '7.8px',
-        lineHeight: '1.1',
-      },
-      tituloSeccionAzul: {
-        backgroundColor: '#2c5697',
-        color: '#ffffff',
-        fontWeight: 'bold',
-        fontSize: '12px',
-        padding: '4px 20px',
-        borderRadius: '15px',
-        display: 'inline-block',
-        marginBottom: '8px',
-        marginTop: '2px',
-        width: 'fit-content'
-      },
-      encabezadoTablaAzul: {
-        backgroundColor: '#2c5697',
-        color: '#ffffff',
-        fontWeight: 'bold',
-        fontSize: '8.5px',
-      },
-      celdaEnfasisGris: {
-        backgroundColor: '#f2f5f9',
-        fontWeight: 'bold',
-      },
-      layoutFilaSuperior: {
-        display: 'grid',
-        gridTemplateColumns: '2.1fr 1fr',
-        gap: '12px',
-        width: '100%',
-      },
-      layoutFilaMediaRecortada: {
-        display: 'grid',
-        gridTemplateColumns: '3fr 1.1fr',
-        gap: '10px',
-        marginTop: '2px',
-        marginBottom: '0',
-        height: '185px',
-        overflow: 'visible',
-      },
-      cajaRecordatorioPrincipalRecortada: {
-        border: '2px solid #2c5697',
-        borderRadius: '18px',
-        height: '100%',
-        overflow: 'hidden',
-      },
-      headerDatosRecordatorio: {
-        borderBottom: '1.5px solid #2c5697',
-        padding: '6px',
-        display: 'flex',
-        fontSize: '9px',
-        gap: '15px',
-      },
-      contenedorAlimentosOlvidadosVertical: {
-        border: '2px solid #2c5697',
-        borderRadius: '15px',
-        padding: '8px',
-        backgroundColor: '#ffffff',
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'fit-content',
-        boxSizing: 'border-box',
-      },
-      layoutFilaInferiorAcomodada: {
-        display: 'grid',
-        gridTemplateColumns: '1.6fr 1fr',
-        gap: '12px',
-        marginTop: '65px', 
-      },
-      seccionEvaluacionCualitativa: {
-        border: '2px solid #2c5697',
-        borderRadius: '15px',
-        padding: '8px',
-        marginTop: '2px',
-      },
-      lineaChecklist: {
-        display: 'flex',
-        alignItems: 'center',
-        marginBottom: '3px',
-        fontSize: '9px',
-      },
-      piePaginaTexto: {
-        marginTop: 'auto',
-        fontSize: '7.5px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        paddingBottom: '2px',
-      },
-      alignLeftPadding: {
-        textAlign: 'left',
-        paddingLeft: '6px',
-      }
-    };
-
-    return (
-      <>
-        <style>
-          {`
-            :root {
-              --pdf-grey: #525659;
-              --primary-blue: #1d4d96;
-              --btn-cobalt: #1d4d96;
-              --brand-blue: #2c5697;
-            }
-
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-
-            @media print {
-              html, body {
-                background-color: #ffffff !important;
-              }
-
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-              }
-
-              .contenedor-maestro-perimetral {
-                box-shadow: none !important;
-                border: 3.5px solid #2c5392 !important;
-                margin: 0 !important;
-                background-color: #ffffff !important;
-                -webkit-print-color-adjust: exact !important;
-                transform: scale(0.87);
-                transform-origin: top center;
-              }
-
-              div[style*="backgroundColor: rgb(44, 86, 151)"],
-              div[style*="background-color: #2c5697"],
-              tr[style*="backgroundColor: rgb(44, 86, 151)"],
-              .encabezado-azul-print {
-                background-color: #2c5697 !important;
-                color: white !important;
-              }
-
-              tr[style*="backgroundColor: rgb(242, 245, 249)"],
-              td[style*="backgroundColor: rgb(242, 245, 249)"] {
-                background-color: #f2f5f9 !important;
-              }
-
-              input { border: none !important; outline: none !important; }
-              .nav-button { display: none !important; }
-            }
-
-            .nav-button {
-              position: fixed;
-              bottom: 30px;
-              padding: 14px 32px;
-              border-radius: 50px;
-              font-weight: bold;
-              cursor: pointer;
-              border: none;
-              box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-              transition: all 0.2s;
-              color: white;
-              background-color: var(--btn-cobalt);
-              text-transform: uppercase;
-              font-size: 13px;
-              letter-spacing: 0.5px;
-              z-index: 1000;
-            }
-            .btn-back { left: 40px; }
-            .btn-next { right: 40px; }
-            .nav-button:hover {
-              transform: translateY(-3px);
-              background-color: #153a71; 
-              box-shadow: 0 8px 20px rgba(0,0,0,0.7);
-            }
-
-            input {
-              width: 100%;
-              border: none;
-              background: transparent;
-              font-family: inherit;
-              font-size: inherit;
-              color: #2c5697;
-              outline: none;
-              padding: 0;
-              margin: 0;
-              word-break: break-word;
-              overflow-wrap: break-word;
-            }
-            input[type="text"], textarea {
-              word-break: break-word;
-              overflow-wrap: break-word;
-            }
-            textarea {
-              white-space: pre-wrap;
-              word-wrap: break-word;
-            }
-            textarea.ta-cell {
-              width: 100%;
-              height: 100%;
-              min-height: 14px;
-              border: none;
-              outline: none;
-              padding: 0 2px;
-              box-sizing: border-box;
-              background: transparent;
-              resize: none;
-              white-space: pre-wrap;
-              word-break: break-word;
-              overflow-wrap: break-word;
-              overflow: hidden;
-              font-family: inherit;
-              font-size: 8px;
-              line-height: 1.2;
-              color: #2c5697;
-              display: block;
-              text-align: left;
-            }
-            textarea.ta-linea {
-              width: 100%;
-              height: 22px;
-              border: none;
-              border-bottom: 1px solid #2c5697;
-              outline: none;
-              padding: 2px 5px;
-              box-sizing: border-box;
-              background: transparent;
-              resize: none;
-              white-space: pre-wrap;
-              word-break: break-word;
-              overflow-wrap: break-word;
-              overflow: hidden;
-              font-family: inherit;
-              font-size: inherit;
-              color: #2c5697;
-              display: block;
-              line-height: 1.2;
-            }
-            @media print {
-              /* overflow:visible/height:auto no funciona en <textarea> (ver
-                 nota igual en la página 1) — se quita para que impresión
-                 coincida con pantalla en vez de achicar el textarea. */
-              tr { break-inside: avoid; }
-              td { height: auto !important; }
-            }
-            input[type="number"] { text-align: center; -moz-appearance: textfield; }
-            input[type="number"]::-webkit-inner-spin-button,
-            input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-
-            .linea-escritura {
-              border-bottom: 1px solid #2c5697;
-              text-align: left;
-              padding: 2px 5px;
-              height: 22px;
-              box-sizing: border-box;
-            }
-            .espacio-blanco-separador {
-              height: 15px; 
-            }
-            input[type="checkbox"] {
-              cursor: pointer;
-              width: 13px;
-              height: 13px;
-              accent-color: #2c5697;
-            }
-            .celda-hallazgo-compacta {
-              padding: 1px 2px !important;
-              height: 14px !important;
-              font-size: 8px !important;
-            }
-            .contenedor-redondeado-azul {
-              border: 2px solid #2c5697;
-              border-radius: 15px;
-              overflow: hidden;
-              margin-bottom: 8px;
-            }
-            .input-unidad {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 2px;
-            }
-          `}
-        </style>
-        
-        <div className="w-full">
-
-          <div className="contenedor-maestro-perimetral" style={styles.contenedorMaestro}>
-            
-            {/* LAYOUT SUPERIOR - MATRIZ IMLO/IMG */}
-            <div style={styles.layoutFilaSuperior}>
-              <div id="columna-izquierda-matriz">
-                <table style={styles.tablaGeneral}>
-                  <thead>
-                    <tr style={styles.encabezadoTablaAzul} className="encabezado-azul-print">
-                      <th style={{ ...styles.thTd, width: '16%' }}>IMLO (kg/sc/est²)</th>
-                      <th style={{ ...styles.thTd, width: '16%' }}>IMG (Z muscular) (-1 H / -1 M)</th>
-                      <th style={{ ...styles.thTd, width: '22%' }}>IMG Adecuada (0-4 H / 7-11 M)</th>
-                      <th style={{ ...styles.thTd, width: '22%' }}>IMG Adecuada (5-8 H / 12-15 M)</th>
-                      <th style={{ ...styles.thTd, width: '24%' }}>IMG Excesiva ({'>'}8 H / {'>'}15 M)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ ...styles.thTd, ...styles.celdaEnfasisGris }}>IMLO Bajo ( {'<'} 17 H / {'<'} 15 M )</td>
-                      <td style={styles.thTd}>Caquexia</td>
-                      <td style={styles.thTd}>Desnutrición proteico-energética / Si la grasa es normal pero bajo masa muscular</td>
-                      <td style={styles.thTd}>Desnutrición proteico-energética / Si la grasa es normal pero bajo masa muscular</td>
-                      <td style={styles.thTd}>Obesidad sarcopénica (si no hay Dx de previo) / Obesidad abdominal (hay Dx previo)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ ...styles.thTd, ...styles.celdaEnfasisGris }}>IMLO Normal ( 17 - 22 H / 15 - 21 M )</td>
-                      <td style={styles.thTd}>Bajo en grasa</td>
-                      <td style={styles.thTd}>Normolipidad</td>
-                      <td style={styles.thTd}>Normolipidad</td>
-                      <td style={styles.thTd}>Obesidad sarcopénica (si no hay Dx de previo) / Obesidad abdominal (hay Dx previo)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ ...styles.thTd, ...styles.celdaEnfasisGris }}>IMLO Alto ( 22 - 25 H / 21 - 23 M )</td>
-                      <td style={styles.thTd}>Atleta con alto nivel muscular</td>
-                      <td style={styles.thTd}>Persona físicamente activa</td>
-                      <td style={styles.thTd}>Persona físicamente activa</td>
-                      <td style={styles.thTd}>Sano, metabólicamente funcional (Sin Dx previo) / Obesidad clínica (Con Dx previo)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ ...styles.thTd, ...styles.celdaEnfasisGris }}>IMLO Muy Alto ( 25 - 28 H / 23 - 25 M )</td>
-                      <td colSpan={4} style={styles.thTd}><b>Sospecha de uso de esteroides / Obesidad mórbida</b></td>
-                    </tr>
-                    <tr>
-                      <td style={{ ...styles.thTd, ...styles.celdaEnfasisGris }}>IMLO Muy Alto ( {'>'} 28 H / {'>'} 25 M )</td>
-                      <td colSpan={4} style={styles.thTd}><b>Diagnóstico de uso de esteroides / Obesidad mórbida</b></td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div style={{ fontSize: '9.5px' }}>
-                  <b>Diagnóstico Matriz IMLO/IMG:</b> <input type="text" name="diag_matriz_imlo_img" value={accumulatedData.pagina_3?.diag_matriz_imlo_img || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '60%', borderBottom: '1px solid #2c5697', textAlign: 'left'}} />
-                </div>
-              </div>
-
-              <div id="columna-derecha-hallazgos">
-                <table style={{ ...styles.tablaGeneral, marginBottom: 0 }}>
-                  <thead>
-                    <tr style={styles.encabezadoTablaAzul} className="encabezado-azul-print">
-                      <th colSpan={2} style={{ ...styles.thTd, textAlign: 'left', paddingLeft: '10px', fontSize: '8px' }}>Hallazgos físicos</th>
-                      <th style={{ ...styles.thTd, width: '22%', textAlign: 'center' }}>DEN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      "Hallazgos grales", "Adiposidad", "Músculo", "Cardiovascular",
-                      "Respiratorio", "Digestivo", "Edema", "Extremidades",
-                      "Ojos", "Pelo", "Cabeza", "Manos y uñas", "Boca / Lengua",
-                      "Cuello / Piel", "Dientes", "Garganta"
-                    ].map((item, idx) => {
-                      const itemKey = item.replace(/\s+/g, '_').replace(/\//g, '_').toLowerCase();
-                      return (
-                      <tr key={idx}>
-                        <td className="celda-hallazgo-compacta" style={{ ...styles.thTd, ...styles.alignLeftPadding, width: '40%' }}>{item}</td>
-                        <td className="celda-hallazgo-compacta" style={styles.thTd}><textarea className="ta-cell" name={`hallazgo_${itemKey}_desc`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_desc`] || ''} onChange={handleLocalChange} style={{textAlign: 'left'}} /></td>
-                        <td className="celda-hallazgo-compacta" style={styles.thTd}><textarea className="ta-cell" name={`hallazgo_${itemKey}_den`} value={accumulatedData.pagina_3?.[`hallazgo_${itemKey}_den`] || ''} onChange={handleLocalChange} /></td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div style={styles.tituloSeccionAzul} className="encabezado-azul-print">Recordatorio de 24 horas</div>
-            
-            <div style={styles.layoutFilaMediaRecortada}>
-              <div style={styles.cajaRecordatorioPrincipalRecortada}>
-                <div style={styles.headerDatosRecordatorio}>
-                  <span><b>Fecha:</b> <input type="text" name="rec_fecha" value={accumulatedData.pagina_3?.rec_fecha || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
-                  <span><b>Hora:</b> <input type="text" name="rec_hora" value={accumulatedData.pagina_3?.rec_hora || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} style={{width: '100px', borderBottom: '1px solid #2c5697', textAlign: 'left'}} /></span>
-                </div>
-                <div style={{ display: 'flex', backgroundColor: '#f2f5f9', borderBottom: '1.5px solid #2c5697' }}>
-                  <div style={{ width: '20%', padding: '4px', borderRight: '1.5px solid #2c5697', textAlign: 'center', fontWeight: 'bold', fontSize: '8.5px' }}>Hora</div>
-                  <div style={{ width: '80%', padding: '4px', textAlign: 'center', fontWeight: 'bold', fontSize: '8.5px' }}>Contenido (platillo: cantidad y alimento)</div>
-                </div>
-                
-                <div className="espacio-blanco-separador"></div>
-
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} style={{ display: 'flex' }}>
-                      <div style={{ width: '20%', borderRight: '1.5px solid #2c5697' }}><input name={`rec_hora_${i}`} value={accumulatedData.pagina_3?.[`rec_hora_${i}`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} className="linea-escritura" style={{textAlign: 'center'}} /></div>
-                      <div style={{ width: '80%' }}><textarea name={`rec_contenido_${i}`} value={accumulatedData.pagina_3?.[`rec_contenido_${i}`] || ''} onChange={handleLocalChange} className="ta-linea" /></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={styles.contenedorAlimentosOlvidadosVertical}>
-                <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '8.5px', marginBottom: '5px', textAlign: 'center' }}>Alimentos olvidados:</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '7.5px', lineHeight: '1.1' }}>
-                  <span>• Agua</span><span>• Café / Té</span><span>• Leche</span><span>• Azúcar / Endulzante</span>
-                  <span>• Jugos / Refresco</span><span>• Agua de sabor</span><span>• Sal</span><span>• Chile / Salsas</span>
-                  <span>• Caramelos / Chicle</span><span>• Galletas / Pastel</span><span>• Aguacate</span>
-                  <span>• Gelatina</span><span>• Nieve / Helado</span><span>• Oleaginosas</span><span>• Chocolates</span>
-                  <span>• Papas / Palomitas</span><span>• Frutas</span><span>• TORTILLAS</span>
-                  <span>• Aceite / Crema</span><span>• Mantequilla</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={styles.layoutFilaInferiorAcomodada}>
-              <div id="col-porciones">
-                <div style={{ ...styles.tituloSeccionAzul, width: '100%', boxSizing: 'border-box', fontSize: '11px', padding: '3px 20px' }} className="encabezado-azul-print">Consumo de porciones</div>
-                <table style={styles.tablaGeneral}>
-                  <tbody>
-                    <tr style={styles.celdaEnfasisGris}>
-                      <th style={{ ...styles.thTd, width: '30%' }}>Grupo alimentario</th>
-                      <th style={styles.thTd}>Porciones</th><th style={styles.thTd}>Energía</th><th style={styles.thTd}>Proteína</th><th style={styles.thTd}>Lípidos</th><th style={styles.thTd}>HCO</th>
-                    </tr>
-                    {["Verduras", "Frutas", "Cereales s/g", "Leguminosas", "POA ___", "Lácteo ___", "Aceites s/p", "Aceites c/p", "Azúcares"].map((grupo, idx) => {
-                      const grupoKey = grupo.replace(/\s+/g, '_').replace(/___/g, '').toLowerCase();
-                      return (
-                      <tr key={idx}>
-                        <td style={{ ...styles.thTd, ...styles.alignLeftPadding }}>{grupo}</td>
-                        <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_porciones`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_porciones`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                        <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_energia`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_energia`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                        <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_proteina`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_proteina`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                        <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_lipidos`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_lipidos`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                        <td style={styles.thTd}><input type="number" name={`porcion_${grupoKey}_hco`} value={accumulatedData.pagina_3?.[`porcion_${grupoKey}_hco`] || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                      </tr>
-                      );
-                    })}
-                    <tr style={styles.celdaEnfasisGris}>
-                      <td style={styles.thTd}>Total</td>
-                      <td style={styles.thTd}><input type="number" name="porcion_total_porciones" value={accumulatedData.pagina_3?.porcion_total_porciones || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /></td>
-                      <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_energia" value={accumulatedData.pagina_3?.porcion_total_energia || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="kcal" style={{fontSize: '7px'}} /></div></td>
-                      <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_proteina" value={accumulatedData.pagina_3?.porcion_total_proteina || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
-                      <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_lipidos" value={accumulatedData.pagina_3?.porcion_total_lipidos || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
-                      <td style={styles.thTd}><div className="input-unidad"><input type="number" name="porcion_total_hco" value={accumulatedData.pagina_3?.porcion_total_hco || ''} onChange={handleLocalChange} onKeyDown={handleKeyDown} /><input type="text" placeholder="g" style={{fontSize: '7px'}} /></div></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div id="col-macros">
-                <div className="contenedor-redondeado-azul">
-                  <div style={{ ...styles.encabezadoTablaAzul, padding: '4px', textAlign: 'center' }} className="encabezado-azul-print">Distribución nutrimental actual</div>
-                  <table style={{ ...styles.tablaGeneral, marginBottom: 0 }}>
-                    <tbody>
-                      <tr style={styles.celdaEnfasisGris}>
-                        <th style={styles.thTd}>Macronutrimento</th><th style={styles.thTd}>%</th><th style={styles.thTd}>Kcal</th><th style={styles.thTd}>Gramos</th><th style={styles.thTd}>g/kg</th>
-                      </tr>
-                      {["Proteína", "HCO", "Lípidos"].map((macro) => (
-                        <tr key={macro}>
-                          <td style={{ ...styles.thTd, ...styles.alignLeftPadding }}>{macro}</td>
-                          <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                          <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                          <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                          <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                        </tr>
-                      ))}
-                      <tr style={styles.celdaEnfasisGris}>
-                        <td style={styles.thTd}>Totales</td><td style={styles.thTd}>100%</td>
-                        <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                        <td style={styles.thTd}><input type="number" onKeyDown={handleKeyDown} /></td>
-                        <td style={{ ...styles.thTd, fontSize: '6px' }}>Ideal 1.2-2.0 g/kg</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="contenedor-redondeado-azul">
-                  <div style={{ ...styles.encabezadoTablaAzul, padding: '4px', textAlign: 'center' }} className="encabezado-azul-print">Interpretación % IAN</div>
-                  <table style={{ ...styles.tablaGeneral, marginBottom: 0 }}>
-                    <tbody>
-                      {["Energía", "Proteína", "HCO", "Lípidos"].map((item) => (
-                        <tr key={item}>
-                          <td style={{ ...styles.thTd, ...styles.alignLeftPadding }}>{item}</td>
-                          <td style={{ ...styles.thTd, fontSize: '7px' }}>Dieta <input type="text" onKeyDown={handleKeyDown} style={{display: 'inline', width: '40px', borderBottom: '1px solid #2c5697'}} /></td>
-                          <td style={styles.thTd}>
-                            <div className="input-unidad">
-                              <input type="number" onKeyDown={handleKeyDown} style={{width: '35px'}} />
-                              <span style={{fontSize: '8px'}}>%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ ...styles.tituloSeccionAzul, fontSize: '11px', marginTop: '10px' }} className="encabezado-azul-print">Evaluación Cualitativa</div>
-            <div style={styles.seccionEvaluacionCualitativa}>
-              {[
-                { text: "¿Incluye todos los nutrimentos esenciales (HC, proteínas, lípidos, vitaminas, minerales y agua)?", res: "Completa" },
-                { text: "¿Los nutrimentos están en proporciones apropiadas entre sí?", res: "Equilibrada" },
-                { text: "¿Los alimentos están libres de microorganismos patógenos, toxinas o contaminantes?", res: "Inocua" },
-                { text: "¿No se consumen en cantidades excesivas de sodio, azúcares o grasas trans?", res: "Equilibrada" },
-                { text: "¿Cubre los requerimientos energéticos y nutrimentales del individuo?", res: "Suficiente" },
-                { text: "¿Incluye diferentes alimentos dentro de cada grupo alimenticio?", res: "Variada" },
-                { text: "¿Es acorde a los gustos, cultura, hábitos y disponibilidad económica?", res: "Adecuada" }
-              ].map((item, idx) => (
-                <div key={idx} style={styles.lineaChecklist}>
-                  <input type="checkbox" /> No &nbsp; <input type="checkbox" /> Sí &nbsp; {item.text} &rarr; <b>{item.res}</b>
-                </div>
-              ))}
-            </div>
-
-            <div style={styles.piePaginaTexto}>
-              <div>EEA: Explorada y sin alteraciones; N/A: No Aplica; PN: Preguntado y negado; ✔ Adecuado.</div>
-              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>3</div>
-            </div>
-
-          </div>
-        </div>
-      </>
-    );
-  }
-  /**
-   * ============================================================================
-   * COMPONENTE: NutritionPage4Component (Adaptación Visual Exacta)
-   * PROPÓSITO: Coincidir visualmente con el diseño de ingeniería.
-   * ============================================================================
-   */
-
-function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, onNext: _onNext, isReadOnly, historialId: _historialId, onGuardarDirecto, isYaGuardado, isSaving, onFinalizarDirecto }: PageProps) {
-  const [showConfirm, setShowConfirm] = useState(false);
-
-    const capFirst4 = (v: string) => v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
-    const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-      const { name, value, type } = target;
-      const checked = (target as HTMLInputElement).checked;
-      const isText = type !== 'checkbox' && type !== 'number' && type !== 'radio';
-      const newValue = type === 'checkbox' ? checked : (isText ? capFirst4(value) : value);
-      onUpdate('pagina_4', { [name]: newValue });
-    };
-
-    // El guardado real (antes duplicado aquí y en el componente padre) ahora
-    // vive únicamente en useNutritionHistoriaData — este componente solo
-    // dispara onFinalizarDirecto (modo standalone) u onGuardarDirecto (modo
-    // workspace, no persiste), igual que decide handleFinalizar() más abajo.
-    const handleFinalizar = async () => {
-      await onFinalizarDirecto?.();
-    };
-    const styles: { [key: string]: React.CSSProperties } = {
-      bodyWrapper: {
-        fontFamily: 'Segoe UI, Arial, sans-serif',
-        backgroundColor: '#525659',
-        minHeight: '100vh',
-        padding: '40px 180px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        boxSizing: 'border-box',
-      },
-      container: {
-        backgroundColor: '#ffffff',
-        width: '100%',
-        minHeight: '279mm',
-        border: '3.5px solid #2c5392',
-        borderRadius: '25px',
-        padding: '15px',
-        boxSizing: 'border-box',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-      },
-      btnNavigation: {
-        position: 'fixed',
-        bottom: '30px',
-        left: '40px',
-        backgroundColor: '#1a428a',
-        color: 'white',
-        padding: '14px 32px',
-        borderRadius: '50px',
-        border: 'none',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-        fontSize: '13px',
-        textTransform: 'uppercase',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
-        zIndex: 1000,
-      },
-      btnFinalizar: {
-        position: 'fixed',
-        bottom: '30px',
-        right: '40px',
-        backgroundColor: isSaving ? '#95a5a6' : '#27ae60',
-        color: 'white',
-        padding: '14px 32px',
-        borderRadius: '50px',
-        border: 'none',
-        fontWeight: 'bold',
-        cursor: isSaving ? 'not-allowed' : 'pointer',
-        fontSize: '13px',
-        textTransform: 'uppercase',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
-        zIndex: 1000,
-      },
-      table: {
-        width: '100%',
-        borderCollapse: 'collapse',
-        marginBottom: '15px',
-      },
-      headerCell: {
-        backgroundColor: '#1a428a',
-        color: 'white',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        padding: '6px',
-        border: '1px solid #1a428a',
-      },
-      seccionSuperior: {
-        border: '2px solid #1a428a',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr 1fr',
-        marginBottom: '15px',
-      },
-      colHeader: {
-        backgroundColor: '#1a428a',
-        color: 'white',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        padding: '6px',
-        fontSize: '11px',
-        borderRight: '1px solid white',
-      },
-      cellContent: {
-        borderRight: '1.5px solid #1a428a',
-        minHeight: '250px',
-        padding: '8px',
-        position: 'relative',
-      },
-      subCell: {
-        height: '50%',
-        borderBottom: '1.5px solid #1a428a',
-        padding: '5px',
-        display: 'flex',
-        flexDirection: 'column',
-      },
-      labelBlue: {
-        color: '#1a428a',
-        fontWeight: 'bold',
-        fontSize: '10px',
-        textAlign: 'center',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center', gap: '4px',
-        marginBottom: '4px',
-      },
-      smartList: {
-        fontSize: '8.5px',
-        color: '#1a428a',
-        listStyle: 'none',
-        padding: '0',
-        margin: '0',
-        position: 'absolute',
-        bottom: '8px',
-        left: '8px',
-      },
-      smartListLi: {
-        position: 'relative',
-        paddingLeft: '10px',
-        marginBottom: '2px',
-      },
-      smartListBullet: {
-        position: 'absolute',
-        left: 0,
-        fontWeight: 'bold',
-      },
-      intervencionContainer: {
-        border: '2px solid #1a428a',
-        borderRadius: '8px',
-        marginBottom: '15px',
-        overflow: 'hidden',
-      },
-      intervencionTitle: {
-        backgroundColor: '#1a428a',
-        color: 'white',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        padding: '2px',
-        fontSize: '11px',
-        textTransform: 'uppercase',
-      },
-      grid3Columns: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1.2fr',
-        gap: '8px',
-        padding: '6px',
-      },
-      card: {
-        border: '2px solid #1a428a',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100px',
-      },
-      cardHeader: {
-        backgroundColor: '#1a428a',
-        color: 'white',
-        padding: '3px',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        fontSize: '10px',
-      },
-      calculoPorcionesContainer: {
-        border: '1.5px solid #1a428a',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        marginBottom: '8px',
-      },
-      calculoPorcionesHeader: {
-        backgroundColor: '#1a428a',
-        color: 'white',
-        padding: '2px 10px',
-        fontWeight: 'bold',
-        fontSize: '10px',
-        display: 'inline-block',
-        borderBottomRightRadius: '10px',
-      },
-      tablaPorciones: {
-        width: '100%',
-        borderCollapse: 'collapse',
-      },
-      tablaPorcionesTh: {
-        color: '#1a428a',
-        fontSize: '7px',
-        textAlign: 'center',
-        border: '0.5px solid #1a428a',
-        padding: '2px 1px',
-      },
-      tablaPorcionesTd: {
-        border: '0.5px solid #1a428a',
-        padding: '0',
-      },
-      inputInvisible: {
-        border: 'none',
-        width: '100%',
-        height: '100%',
-        fontFamily: 'inherit',
-        fontSize: 'inherit',
-        outline: 'none',
-        background: 'transparent',
-        resize: 'none',
-        padding: '4px',
-        boxSizing: 'border-box',
-        wordBreak: 'break-word',
-        overflowWrap: 'break-word',
-        whiteSpace: 'pre-wrap',
-      },
-      inputLine: {
-        border: 'none',
-        borderBottom: '1px solid #1a428a',
-        outline: 'none',
-        flexGrow: 1,
-        fontSize: '9px',
-        padding: '0 4px',
-        background: 'transparent',
-      },
-      inputHeaderInline: {
-        border: 'none',
-        borderBottom: '1px solid #1a428a',
-        outline: 'none',
-        fontSize: '10px',
-        width: '40px',
-        textAlign: 'center',
-        color: '#1a428a',
-        fontWeight: 'bold',
-        background: 'transparent',
-      }
-    };
-
-    return (
-      <div className="w-full">
-        <style>
-          {`
-            @page { size: A4 portrait; margin: 0; }
-            @media print {
-              .no-print { display: none !important; }
-              html, body {
-                background-color: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-              .body-wrapper { background-color: white !important; padding: 0 !important; }
-              .printable-page {
-                box-shadow: none !important;
-                border: 3.5px solid #2c5392 !important;
-                width: 100% !important;
-                margin: 0 !important;
-                border-radius: 25px !important;
-                transform: scale(0.87);
-                transform-origin: top center;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-            }
-            .printable-page input[type="text"], .printable-page textarea {
-              word-break: break-word;
-              overflow-wrap: break-word;
-            }
-            .printable-page textarea {
-              white-space: pre-wrap;
-              word-wrap: break-word;
-            }
-            @media print {
-              /* overflow:visible/height:auto no funciona en <textarea> (ver
-                 nota igual en la página 1) — se quita para que impresión
-                 coincida con pantalla en vez de achicar el textarea. */
-              .printable-page tr { break-inside: avoid; }
-              .printable-page td { height: auto !important; }
-            }
-          `}
-        </style>
-
-
-        {/* En modo solo lectura no se renderiza — un botón "Guardar" visible
-            (aunque inerte vía fieldset) es una señal visual engañosa sobre
-            un documento ya finalizado; mejor ausente que aparentemente activo. */}
-        {!isReadOnly && (
-          <button
-            className="no-print"
-            style={styles.btnFinalizar}
-            onClick={() => !isYaGuardado && setShowConfirm(true)}
-            disabled={isSaving || isYaGuardado}
-          >
-            {isYaGuardado ? 'Guardado ✓' : isSaving ? 'Guardando...' : 'Guardar'}
-          </button>
-        )}
-
-        {showConfirm && (
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a', fontSize: '18px' }}>¿Guardar expediente?</h3>
-              <p style={{ color: '#555', marginBottom: '24px', fontSize: '14px', lineHeight: '1.5' }}>
-                Al confirmar, el expediente quedará guardado para esta consulta. Podrás revisarlo o editarlo antes de dar por finalizada la sesión.
-              </p>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', background: 'white', fontWeight: '500' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowConfirm(false);
-                    if (onGuardarDirecto) {
-                      onGuardarDirecto();
-                    } else {
-                      handleFinalizar();
-                    }
-                  }}
-                  style={{ padding: '10px 20px', borderRadius: '8px', background: '#27AE60', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  Sí, guardar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={styles.container} className="printable-page">
-          {/* SECCIÓN SUPERIOR */}
-          <div style={styles.seccionSuperior}>
-            <div style={styles.colHeader}>Diagnósticos Nutricios</div>
-            <div style={styles.colHeader}>Objetivo general</div>
-            <div style={styles.colHeader}>Educación Nutricia</div>
-            <div style={{...styles.colHeader, borderRight: 'none'}}>Consejería Nutricia</div>
-
-            <div style={styles.cellContent}><textarea name="diag" value={accumulatedData.pagina_4?.diag || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
-            
-            <div style={styles.cellContent}>
-              <textarea className="objetivo-textarea" name="objetivo" value={accumulatedData.pagina_4?.objetivo || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, height: '140px'}}></textarea>
-              <ul style={styles.smartList}>
-                <li style={{listStyle: 'none', marginLeft: '-10px', marginBottom: '4px', color: '#1a428a'}}>En formato SMART (por sus siglas en inglés):</li>
-                <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Specific:</strong> Definición del fenómeno</li>
-                <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Measurable:</strong> Selección del indicador</li>
-                <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Achievable:</strong> Evaluación de factibilidad</li>
-                <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Relevant:</strong> Relación con el problema clínico</li>
-                <li style={styles.smartListLi}><span style={styles.smartListBullet}>•</span><strong style={{color: '#1a428a'}}>Time-bound:</strong> Dinámica temporal de adaptación</li>
-              </ul>
-            </div>
-
-            <div style={{...styles.cellContent, padding: 0}}>
-              <div style={styles.subCell}><span style={styles.labelBlue}>Contenido (E-1.<input type="text" className="edu-cont-input" name="edu_cont_num" value={accumulatedData.pagina_4?.edu_cont_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="edu_contenido" value={accumulatedData.pagina_4?.edu_contenido || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
-              <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Aplicación (E-2.<input type="text" className="edu-app-input" name="edu_app_num" value={accumulatedData.pagina_4?.edu_app_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="edu_aplicacion" value={accumulatedData.pagina_4?.edu_aplicacion || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
-            </div>
-
-            <div style={{...styles.cellContent, padding: 0, borderRight: 'none'}}>
-              <div style={styles.subCell}><span style={styles.labelBlue}>Bases/Acercamiento Teórico (C-1.<input type="text" className="cons-bases-input" name="cons_bases_num" value={accumulatedData.pagina_4?.cons_bases_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="cons_bases" value={accumulatedData.pagina_4?.cons_bases || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
-              <div style={{...styles.subCell, borderBottom: 'none'}}><span style={styles.labelBlue}>Estrategias (C-2.<input type="text" className="cons-est-input" name="cons_est_num" value={accumulatedData.pagina_4?.cons_est_num || ''} onChange={handleLocalChange} style={styles.inputHeaderInline} />)</span><textarea name="cons_estrategias" value={accumulatedData.pagina_4?.cons_estrategias || ''} onChange={handleLocalChange} style={styles.inputInvisible}></textarea></div>
-            </div>
-          </div>
-
-          <div style={styles.intervencionContainer}>
-            <div style={styles.intervencionTitle}>Intervención</div>
-            <div style={styles.grid3Columns}>
-              
-              <div style={styles.card}>
-                <div style={styles.cardHeader}>Indicación de Alimentos/Nutrimentos</div>
-                <div style={{padding: '5px'}}>
-                  {(['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'] as const).map((key) => (
-                    <textarea
-                      key={key}
-                      name={key}
-                      value={accumulatedData.pagina_4?.[key] || ''}
-                      onChange={handleLocalChange}
-                      style={{
-                        ...styles.inputLine,
-                        width: '100%',
-                        marginBottom: '4px',
-                        fontSize: '8px',
-                        resize: 'none',
-                        overflow: 'hidden',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word',
-                        minHeight: '18px',
-                        height: 'auto',
-                        display: 'block',
-                        fontFamily: 'inherit',
-                        lineHeight: '1.3',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div style={styles.card}>
-                <div style={styles.cardHeader}>Requerimiento calórico</div>
-                <div style={{padding: '3px 8px', color: '#1a428a', fontSize: '9px'}}>
-                  <div style={{display: 'flex', marginBottom: '2px'}}>
-                    <input type="checkbox" name="req_ec_pred" checked={accumulatedData.pagina_4?.req_ec_pred || false} onChange={handleLocalChange} style={{marginRight: '6px', width: '11px', height: '11px'}} />
-                    <div style={{flexGrow: 1}}><span style={{fontSize: '9px'}}>Ecuación predictiva</span>
-                      <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Nombre:</span><input type="text" name="req_ec_pred_nombre" value={accumulatedData.pagina_4?.req_ec_pred_nombre || ''} onChange={handleLocalChange} style={styles.inputLine} /></div>
-                    </div>
-                  </div>
-                  <div style={{display: 'flex', marginBottom: '2px'}}>
-                    <input type="checkbox" name="req_ec_rapida" checked={accumulatedData.pagina_4?.req_ec_rapida || false} onChange={handleLocalChange} style={{marginRight: '6px', width: '11px', height: '11px'}} />
-                    <div style={{flexGrow: 1}}><span style={{fontSize: '9px'}}>Ecuación rápida</span>
-                      <div style={{display: 'flex', alignItems: 'center'}}><span style={{fontSize: '7px'}}>Peso:</span><input type="text" name="req_ec_rapida_peso" value={accumulatedData.pagina_4?.req_ec_rapida_peso || ''} onChange={handleLocalChange} style={{...styles.inputLine, width:'30px'}} /><span style={{fontSize: '7px'}}>kg</span> <span style={{fontSize: '7px', marginLeft:'5px'}}>kcal/kg:</span><input type="text" name="req_ec_rapida_kcal_kg" value={accumulatedData.pagina_4?.req_ec_rapida_kcal_kg || ''} onChange={handleLocalChange} style={styles.inputLine} /></div>
-                    </div>
-                  </div>
-                  <div style={{marginTop: '3px', display: 'flex', alignItems: 'baseline', fontWeight: 'bold'}}>
-                    <span style={{fontSize: '9px'}}>Total</span><input type="text" name="req_total_kcal" value={accumulatedData.pagina_4?.req_total_kcal || ''} onChange={handleLocalChange} style={{...styles.inputLine, fontWeight: 'bold', textAlign: 'center'}} /><span style={{fontSize: '9px'}}>kcal</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.card}>
-                <div style={styles.cardHeader}>Cuadro dietosintético</div>
-                <table style={{...styles.table, marginBottom: 0, border: 'none'}}>
-                  <thead>
-                    <tr style={{backgroundColor: '#f0f4fa', fontSize: '6.5px'}}>
-                      <th style={{...styles.tablaPorcionesTh, border: '1px solid #1a428a'}}>Macro</th>
-                      <th style={{...styles.tablaPorcionesTh, border: '1px solid #1a428a'}}>%</th>
-                      <th style={{...styles.tablaPorcionesTh, border: '1px solid #1a428a'}}>Kcal</th>
-                      <th style={{...styles.tablaPorcionesTh, border: '1px solid #1a428a'}}>G</th>
-                      <th style={{...styles.tablaPorcionesTh, border: '1px solid #1a428a'}}>g/kg</th>
-                    </tr>
-                  </thead>
-                  <tbody style={{fontSize: '8px'}}>
-                    {["Proteína", "HCO", "Lípidos"].map(m => {
-                      const macroKey = m.toLowerCase().replace('í', 'i');
-                      return (
-                      <tr key={m}>
-                        <td style={{fontWeight: 'bold', color: '#1a428a', border: '1px solid #1a428a', padding: '1px 2px'}}>{m}</td>
-                        <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_porc`} value={accumulatedData.pagina_4?.[`${macroKey}_porc`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                        <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_kcal`} value={accumulatedData.pagina_4?.[`${macroKey}_kcal`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                        <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_g`} value={accumulatedData.pagina_4?.[`${macroKey}_g`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                        <td style={{border: '1px solid #1a428a'}}><input type="text" name={`${macroKey}_g_kg`} value={accumulatedData.pagina_4?.[`${macroKey}_g_kg`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                      </tr>
-                      );
-                    })}
-                    <tr style={{backgroundColor: '#f0f4fa'}}>
-                      <td style={{fontWeight: 'bold', color: '#1a428a', border: '1px solid #1a428a', padding: '1px 2px'}}>Tot.</td>
-                      <td style={{textAlign: 'center', fontWeight: 'bold', border: '1px solid #1a428a'}}>100%</td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" name="total_kcal" value={accumulatedData.pagina_4?.total_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                      <td style={{border: '1px solid #1a428a'}}><input type="text" name="total_g" value={accumulatedData.pagina_4?.total_g || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>
-                      <td style={{fontSize: '5px', textAlign: 'right', border: '1px solid #1a428a'}}>kcal/kg/d</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div style={styles.calculoPorcionesContainer}>
-            <div style={styles.calculoPorcionesHeader}>Cálculo de porciones</div>
-            <table style={styles.tablaPorciones}>
-              <thead>
-                <tr>
-                  <th style={styles.tablaPorcionesTh}>Grupo alimentario</th>
-                  <th style={styles.tablaPorcionesTh}>DES</th><th style={styles.tablaPorcionesTh}>CM</th>
-                  <th style={styles.tablaPorcionesTh}>COM</th><th style={styles.tablaPorcionesTh}>CV</th>
-                  <th style={styles.tablaPorcionesTh}>CENA</th><th style={styles.tablaPorcionesTh}>RAC</th>
-                  <th style={styles.tablaPorcionesTh}>KCAL</th><th style={styles.tablaPorcionesTh}>PROT</th>
-                  <th style={styles.tablaPorcionesTh}>LIP</th><th style={styles.tablaPorcionesTh}>HCO</th>
-                </tr>
-              </thead>
-              <tbody style={{fontSize: '7.5px'}}>
-                {['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA', 'Lácteo', 'Aceites s/p', 'Aceites c/p', 'Azúcares'].map(grupo => {
-                  const grupoKey = grupo.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_');
-                  const cols = ['des', 'cm', 'com', 'cv', 'cena', 'rac', 'kcal', 'prot', 'lip', 'hco'];
-                  return (
-                  <tr key={grupo}>
-                    <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>{grupo}</td>
-                    {cols.map(col => <td key={col} style={styles.tablaPorcionesTd}><input type="text" name={`calc_${grupoKey}_${col}`} value={accumulatedData.pagina_4?.[`calc_${grupoKey}_${col}`] || ''} onChange={handleLocalChange} style={styles.inputInvisible} /></td>)}
-                  </tr>
-                  );
-                })}
-                <tr style={{backgroundColor: '#f2f5f9'}}>
-                  <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>Total</td>
-                  <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_kcal" value={accumulatedData.pagina_4?.calc_total_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>kcal</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_prot" value={accumulatedData.pagina_4?.calc_total_prot || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_lip" value={accumulatedData.pagina_4?.calc_total_lip || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_total_hco" value={accumulatedData.pagina_4?.calc_total_hco || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>g</span></div></td>
-                </tr>
-                <tr style={{backgroundColor: '#f2f5f9'}}>
-                  <td style={{color:'#1a428a', fontWeight:'bold', border: '0.5px solid #1a428a', padding: '1px 4px'}}>% Adecuación</td>
-                  <td colSpan={6} style={{border: '0.5px solid #1a428a'}}></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_kcal" value={accumulatedData.pagina_4?.calc_adec_kcal || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_prot" value={accumulatedData.pagina_4?.calc_adec_prot || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_lip" value={accumulatedData.pagina_4?.calc_adec_lip || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                  <td style={styles.tablaPorcionesTd}><div style={{display:'flex', alignItems:'center'}}><input type="text" name="calc_adec_hco" value={accumulatedData.pagina_4?.calc_adec_hco || ''} onChange={handleLocalChange} style={styles.inputInvisible}/><span style={{fontSize:'6px'}}>%</span></div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <table style={{...styles.table, marginBottom: '8px'}}>
-            <thead>
-              <tr><th colSpan={5} style={{...styles.headerCell, padding: '3px', fontSize: '11px'}}>Menú del día</th></tr>
-              <tr style={{backgroundColor: '#f0f4fa', fontWeight: 'bold', textAlign: 'center', fontSize: '10px'}}>
-                <td style={{border: '1px solid #1a428a', padding: '4px'}}>Desayuno</td>
-                <td style={{border: '1px solid #1a428a', padding: '4px'}}>C.M.</td>
-                <td style={{border: '1px solid #1a428a', padding: '4px'}}>Comida</td>
-                <td style={{border: '1px solid #1a428a', padding: '4px'}}>C.V.</td>
-                <td style={{border: '1px solid #1a428a', padding: '4px'}}>Cena</td>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {['desayuno', 'cm', 'comida', 'cv', 'cena'].map(meal => (
-                  <td key={meal} style={{height: '140px', border: '1px solid #1a428a', padding: 0, verticalAlign: 'top'}}>
-                    <textarea name={`menu_${meal}`} value={accumulatedData.pagina_4?.[`menu_${meal}`] || ''} onChange={handleLocalChange} style={{...styles.inputInvisible, fontSize: '9px', paddingTop: '8px'}}></textarea>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{marginTop: 'auto', display: 'flex', justifyContent: 'space-around', textAlign: 'center', paddingBottom: '15px', fontSize: '10px'}}>
-            <div style={{width: '40%'}}>
-              <input type="text" name="firma_alumno" value={accumulatedData.pagina_4?.firma_alumno || ''} onChange={handleLocalChange} autoCapitalize="sentences" style={{width: '100%', border: 'none', borderBottom: '1px solid #1a428a', outline: 'none', fontSize: '10px', textAlign: 'center', background: 'transparent', marginBottom: '4px', color: '#1a428a'}} />
-              <div style={{borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, matrícula y firma del alumno</div>
-            </div>
-            <div style={{width: '40%'}}>
-              <input type="text" name="firma_docente" value={accumulatedData.pagina_4?.firma_docente || ''} onChange={handleLocalChange} autoCapitalize="sentences" style={{width: '100%', border: 'none', borderBottom: '1px solid #1a428a', outline: 'none', fontSize: '10px', textAlign: 'center', background: 'transparent', marginBottom: '4px', color: '#1a428a'}} />
-              <div style={{borderTop: '1px solid #000', paddingTop: '5px'}}>Nombre, cédula y firma del docente responsable</div>
-            </div>
-          </div>
-
-          <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '8px'}}>
-            <div>ESA: Explorado y sin alteraciones; N/A: No Aplica; PN: Preguntado y negado, ✔: Adecuado</div>
-            <div style={{fontWeight: 'bold', fontSize: '14px'}}>4</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
   /*
    * Las tres páginas siguientes son la versión documental de la maqueta UTC.
    * Los campos conservan los identificadores ya persistidos por el formulario
@@ -2568,14 +953,16 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
         subir este valor evita que la píldora se superponga a la fila de la
         tabla justo debajo — es una corrección de espacio, no de diseño. */
     titlePaddingTop?: string;
-  }> = ({ title, children, className = '', contentClassName = 'p-2', pill = true, centerTitle = false, titlePaddingTop = '11px' }) => (
+    /** Override puntual del tamaño de fuente del título (píldora pill=true) para que quepa en una sola línea sin crecer la caja — ver "Hallazgos físicos Orientados a Nut...DEN". */
+    titleClassName?: string;
+  }> = ({ title, children, className = '', contentClassName = 'p-2', pill = true, centerTitle = false, titlePaddingTop = '11px', titleClassName = 'text-[11px]' }) => (
     <section
       className={`relative rounded-[10px] border-[2px] border-[#2c5697] bg-white ${className}`}
       style={title && pill ? { paddingTop: titlePaddingTop } : undefined}
     >
       {title && (
         pill ? (
-          <span className="absolute -top-[11px] left-3 inline-block rounded-full bg-[#2c5697] px-3 py-1 text-[11px] font-bold tracking-wide text-white">
+          <span className={`absolute -top-[11px] left-3 inline-block whitespace-nowrap rounded-full bg-[#2c5697] px-3 py-1 font-bold tracking-wide text-white ${titleClassName}`}>
             {title}
           </span>
         ) : (
@@ -2625,7 +1012,13 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
       ['IMLG (kg/m²)', 'imlg', true], ['cAMB (cm²)', 'camb', true], ['MMT InBody', 'mmt_inb', true],
       ['IMEA InBody', 'imea_inb', true], ['ACT (L)', 'act', false], ['Grasa Visc (L)', 'grasa_visc', true],
     ] as const;
-    const signos = ['T. Arterial', 'F. Resp (rpm)', 'F. Card (lpm)', 'Temp (°C)', 'SO₂'];
+    // La clave real de guardado (segundo elemento) debe coincidir con la de
+    // NutricionPrimeraConsultaCaptura.tsx (SIGNOS_VITALES) para que captura y
+    // documento lean/escriban el mismo dato; la etiqueta (primer elemento) es
+    // solo texto abreviado por espacio en la hoja impresa.
+    const signos: Array<[string, string]> = [
+      ['T. Arterial', 'ta'], ['F. Resp (rpm)', 'fr'], ['F. Card (lpm)', 'fc'], ['Temp (°C)', 'temp'], ['SO₂', 'so2'],
+    ];
     const inputClass = 'h-full w-full min-w-0 border-0 bg-transparent px-1 text-[8.5px] text-[#333] outline-none';
     const pillHead = 'border-b border-r border-[#2c5697] bg-[#2c5697] px-1 py-1 text-center text-[8.5px] font-bold text-white last:border-r-0';
     const cell = 'h-[15px] border-b border-r border-[#2c5697] p-0 last:border-r-0';
@@ -2696,15 +1089,15 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
                 </table>
               </DocumentSection>
               <DocumentSection title="Interpretación antropométrica" className="mt-auto" contentClassName="p-1">
-                <textarea value={p2.int_antrop || ''} onChange={e => set('int_antrop', e.target.value)} className="h-9 w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" />
+                <textarea value={p2.int_antrop || ''} onChange={e => set('int_antrop', e.target.value)} className="h-9 w-full resize-none overflow-hidden border-0 bg-transparent text-[9px] text-[#333] outline-none" />
               </DocumentSection>
               <DocumentSection contentClassName="p-0">
                 <table className="w-full border-collapse table-fixed">
                   <thead><tr><th className={`${pillHead} text-left`}>Signos Vitales</th><th className={`${pillHead} w-[20%]`}>VO</th><th className={`${pillHead} w-[45%]`}>Interpretación</th></tr></thead>
-                  <tbody>{signos.map(label => <tr key={label}>
+                  <tbody>{signos.map(([label, key]) => <tr key={key}>
                     <td className={`${cell} px-1.5 text-[8.5px] font-bold text-[#2c5697]`}>{label}</td>
-                    <td className={`${cell} w-[20%]`}><input value={p2[`sv_${label}_vo`] || ''} onChange={e => set(`sv_${label}_vo`, e.target.value)} className={inputClass} /></td>
-                    <td className={`${cell} w-[45%]`}><input value={p2[`sv_${label}_int`] || ''} onChange={e => set(`sv_${label}_int`, e.target.value)} className={inputClass} /></td>
+                    <td className={`${cell} w-[20%]`}><input value={p2[`sv_${key}_vo`] || ''} onChange={e => set(`sv_${key}_vo`, e.target.value)} className={inputClass} /></td>
+                    <td className={`${cell} w-[45%]`}><input value={p2[`sv_${key}_int`] || ''} onChange={e => set(`sv_${key}_int`, e.target.value)} className={inputClass} /></td>
                   </tr>)}</tbody>
                 </table>
               </DocumentSection>
@@ -2720,7 +1113,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
                 </table>
               </DocumentSection>
               <DocumentSection title="Interpretación bioquímica" contentClassName="p-1">
-                <textarea value={p2.int_bioq || ''} onChange={e => set('int_bioq', e.target.value)} className="h-9 w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" />
+                <textarea value={p2.int_bioq || ''} onChange={e => set('int_bioq', e.target.value)} className="h-9 w-full resize-none overflow-hidden border-0 bg-transparent text-[9px] text-[#333] outline-none" />
               </DocumentSection>
               <DocumentSection title="Solicitud de análisis" className="mt-auto">
                 <div className="grid grid-cols-2 gap-2">{['Química Sanguínea', 'EGO', 'Biometría hemática'].map(label => <DocumentCheckbox key={label} label={label} checked={!!p2[`sol_${label}`]} onChange={e => set(`sol_${label}`, e.target.checked)} />)}
@@ -2745,7 +1138,10 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
   function NutritionPage3Document({ accumulatedData, onUpdate }: PageProps) {
     const p3 = accumulatedData.pagina_3 || {};
     const set = (name: string, value: string | boolean) => onUpdate('pagina_3', { [name]: value });
-    const hallazgos = ['Hallazgos grales', 'Adiposidad', 'Músculo', 'Cardiovascular', 'Respiratorio', 'Digestivo', 'Edema', 'Extremidades', 'Ojos', 'Pelo', 'Cabeza', 'Manos y uñas', 'Boca / Lengua', 'Cuello / Piel', 'Dientes', 'Garganta'];
+    // Debe coincidir exactamente (mismo texto, misma clave `key()`) con HALLAZGOS_FISICOS de
+    // NutricionPrimeraConsultaCaptura.tsx — de lo contrario los datos guardados desde captura
+    // no se reflejan aquí (mismo bug ya corregido en Signos Vitales).
+    const hallazgos = ['Hallazgos generales', 'Adiposidad', 'Huesos', 'Sistema cardiovascular-respiratorio', 'Sistema digestivo', 'Edema', 'Extremidades', 'Ojos', 'Pelo', 'Cabeza', 'Manos y uñas', 'Boca', 'Músculos', 'Cuello', 'Piel', 'Dientes', 'Garganta y deglución', 'Lengua'];
     const grupos = ['Verduras', 'Frutas', 'Cereales s/g', 'Leguminosas', 'POA ___', 'Lácteo ___', 'Aceites s/p', 'Aceites c/p', 'Azúcares'];
     const evaluacion = [
       ['¿Incluye todos los nutrimentos esenciales (HC, proteínas, lípidos, vitaminas, minerales y agua)?', 'Completa'], ['¿Los nutrimentos están en proporciones apropiadas entre sí?', 'Equilibrada'],
@@ -2759,7 +1155,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
 
     return (
       <div className="w-full"><div className="page p1-paper flex min-h-[297mm] w-full flex-col rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl">
-        <div className="grid grid-cols-[2.1fr_1fr] gap-3">
+        <div className="grid grid-cols-[1.7fr_1.4fr] gap-3">
           <div>
             <DocumentSection title="Matriz IMG/IMLG" contentClassName="p-0">
               <table className="w-full border-collapse text-center text-[7.5px]"><thead><tr className="bg-[#f2f5f9] font-bold text-[#2c5697]">
@@ -2770,15 +1166,15 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
                   ['IMLG Normal (17-23 H / 15-21 M)', 'Bajo en grasa', 'Normalidad', 'Normalidad', 'Obesidad preclínica / clínica'],
                   ['IMLG Alto (23-25 H / 21-23 M)', 'Atletas', 'Físicamente activa', 'Físicamente activa', 'Sano metabólicamente / obesidad'],
                 ].map(row => <tr key={row[0]}>{row.map((value, i) => <td key={i} className={`border-b border-r border-[#2c5697] p-1 last:border-r-0 ${i === 0 ? 'bg-[#f2f5f9] font-bold text-[#2c5697]' : ''}`}>{value}</td>)}</tr>)}
-                <tr><td className="border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (25-28 H / 23-25 M)</td><td colSpan={4} className="border-[#2c5697] p-1 font-bold">Sospecha de uso de esteroides / Obesidad mórbida</td></tr>
-                <tr><td className="border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (&gt;28 H / &gt;25 M)</td><td colSpan={4} className="border-[#2c5697] p-1 font-bold">Diagnóstico de uso de esteroides / Obesidad mórbida</td></tr>
+                <tr><td className="border-b border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (25-28 H / 23-25 M)</td><td colSpan={4} className="border-b border-[#2c5697] p-1 font-bold text-[#2c5697]">Sospecha de uso de esteroides / Obesidad mórbida</td></tr>
+                <tr><td className="border-r border-[#2c5697] bg-[#f2f5f9] p-1 font-bold text-[#2c5697]">IMLG Muy Alto (&gt;28 H / &gt;25 M)</td><td colSpan={4} className="border-[#2c5697] p-1 font-bold text-[#2c5697]">Diagnóstico de uso de esteroides / Obesidad mórbida</td></tr>
               </tbody></table>
             </DocumentSection>
             <div className="mt-2 flex items-center text-[9px] font-bold"><span>Diagnóstico Matriz IMG/IMLG:</span><input value={p3.diag_matriz_imlo_img || ''} onChange={e => set('diag_matriz_imlo_img', e.target.value)} className="ml-2 h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent px-1 text-[#333] outline-none" /></div>
           </div>
-          <DocumentSection title="Hallazgos físicos Orientados a Nut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DEN" contentClassName="p-0" titlePaddingTop="32px">
-            <table className="w-full border-collapse text-[7.5px]"><thead><tr className="bg-[#f2f5f9] text-[#2c5697]"><th colSpan={2} className="border-b border-r border-[#2c5697] py-1 text-left">Hallazgos físicos </th><th className="border-b border-[#2c5697] py-1">DEN</th></tr></thead><tbody>
-              {hallazgos.map(label => { const k = key(label); return <tr key={label}><td className="h-[13px] w-[43%] border-b border-[#2c5697] pl-1 font-bold">{label}</td><td className="border-b border-r border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_desc`] || ''} onChange={e => set(`hallazgo_${k}_desc`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-[7px] text-[#333] outline-none" /></td><td className="border-b border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_den`] || ''} onChange={e => set(`hallazgo_${k}_den`, e.target.value)} className="h-full w-full border-0 bg-transparent px-1 text-center text-[7px] text-[#333] outline-none" /></td></tr>; })}
+          <DocumentSection title="Hallazgos físicos Orientados a Nut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DEN" contentClassName="p-0" titleClassName="text-[8px]">
+            <table className="w-full border-collapse text-[7.5px]"><tbody>
+              {hallazgos.map(label => { const k = key(label); return <tr key={label}><td className="h-[11.56px] w-[38%] whitespace-nowrap border-b border-r border-[#2c5697] pl-1 text-[6.5px] font-bold">{label}</td><td className="border-b border-r border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_desc`] || ''} onChange={e => set(`hallazgo_${k}_desc`, e.target.value)} maxLength={36} className="h-full w-full border-0 bg-transparent px-1 text-[7px] text-[#333] outline-none" /></td><td className="w-[20%] border-b border-[#2c5697] p-0"><input value={p3[`hallazgo_${k}_den`] || ''} onChange={e => set(`hallazgo_${k}_den`, e.target.value)} maxLength={10} className="h-full w-full border-0 bg-transparent px-1 text-center text-[7px] text-[#333] outline-none" /></td></tr>; })}
             </tbody></table>
           </DocumentSection>
         </div>
@@ -2790,7 +1186,7 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
               <div className="flex border-b-2 border-[#2c5697] bg-[#f2f5f9] text-center text-[8px] font-bold shrink-0"><div className="w-[20%] py-1">Hora</div><div className="w-[80%] py-1">Contenido (platillo: cantidad y alimento)</div></div>
               <div className="relative flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-[20%] border-l-2 border-[#2c5697]" />
-                {[1, 2, 3, 4, 5].map(i => <div key={i} className="flex h-[22px]"><input value={p3[`rec_hora_${i}`] || ''} onChange={e => set(`rec_hora_${i}`, e.target.value)} className="w-[20%] border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" /><textarea value={p3[`rec_contenido_${i}`] || ''} onChange={e => set(`rec_contenido_${i}`, e.target.value)} className="h-full w-[80%] resize-none border-0 bg-transparent px-2 text-[8px] text-[#333] outline-none" /></div>)}
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <div key={i} className={`flex h-[24px] mb-1 last:mb-0 ${i % 2 === 0 ? 'bg-[#f2f5f9]' : ''}`}><input value={p3[`rec_hora_${i}`] || ''} onChange={e => set(`rec_hora_${i}`, e.target.value)} className="w-[20%] border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" /><textarea value={p3[`rec_contenido_${i}`] || ''} onChange={e => set(`rec_contenido_${i}`, e.target.value)} maxLength={207} className="h-full w-[80%] resize-none overflow-hidden border-0 bg-transparent px-2 text-[8px] text-[#333] outline-none" /></div>)}
               </div>
             </div>
             <div className="relative p-2">
@@ -2843,15 +1239,15 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
       <div className="w-full"><div className="page p1-paper flex min-h-[297mm] w-full flex-col rounded-[15px] bg-white px-[10mm] pb-[8mm] pt-[8mm] text-[#2c5697] shadow-2xl">
         <div className="grid overflow-hidden rounded-[10px] border-[2px] border-[#2c5697] grid-cols-4">
           {['Diagnósticos Nutricios', 'Objetivo general', 'Educación Nutricia', 'Consejería Nutricia'].map((title, i) => <div key={title} className={`bg-[#2c5697] py-1.5 text-center text-[10px] font-bold uppercase text-white ${i < 3 ? 'border-r border-white' : ''}`}>{title}</div>)}
-          <div className="min-h-[200px] border-r border-[#2c5697] p-2"><textarea value={p4.diag || ''} onChange={e => set('diag', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div>
-          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697] p-2"><textarea value={p4.objetivo || ''} onChange={e => set('objetivo', e.target.value)} className="h-[84px] w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /><ul className="mt-auto list-none p-0 text-[7.5px] leading-tight"><li className="mb-1 font-bold">En formato SMART:</li><li>• <b>Specific:</b> Definición del fenómeno</li><li>• <b>Measurable:</b> Selección del indicador</li><li>• <b>Achievable:</b> Evaluación de factibilidad</li><li>• <b>Relevant:</b> Relación con el problema clínico</li><li>• <b>Time-bound:</b> Dinámica temporal</li></ul></div>
-          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697]"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Contenido (E-1.<input value={p4.edu_cont_num || ''} onChange={e => set('edu_cont_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_contenido || ''} onChange={e => set('edu_contenido', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Aplicación (E-2.<input value={p4.edu_app_num || ''} onChange={e => set('edu_app_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_aplicacion || ''} onChange={e => set('edu_aplicacion', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div></div>
-          <div className="flex min-h-[200px] flex-col"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Bases/Teórico (C-1.<input value={p4.cons_bases_num || ''} onChange={e => set('cons_bases_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_bases || ''} onChange={e => set('cons_bases', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Estrategias (C-2.<input value={p4.cons_est_num || ''} onChange={e => set('cons_est_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_estrategias || ''} onChange={e => set('cons_estrategias', e.target.value)} className="h-full w-full resize-none border-0 bg-transparent text-[9px] text-[#333] outline-none" /></div></div>
+          <div className="min-h-[200px] border-r border-[#2c5697] p-2"><textarea value={p4.diag || ''} onChange={e => set('diag', e.target.value)} maxLength={679} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /></div>
+          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697] p-2"><textarea value={p4.objetivo || ''} onChange={e => set('objetivo', e.target.value)} maxLength={428} className="mb-1 min-h-[84px] w-full flex-1 resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /><ul className="shrink-0 list-none p-0 text-[7.5px] leading-tight"><li className="mb-1 font-bold">En formato SMART:</li><li>• <b>Specific:</b> Definición del fenómeno</li><li>• <b>Measurable:</b> Selección del indicador</li><li>• <b>Achievable:</b> Evaluación de factibilidad</li><li>• <b>Relevant:</b> Relación con el problema clínico</li><li>• <b>Time-bound:</b> Dinámica temporal</li></ul></div>
+          <div className="flex min-h-[200px] flex-col border-r border-[#2c5697]"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Contenido (E-1.<input value={p4.edu_cont_num || ''} onChange={e => set('edu_cont_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_contenido || ''} onChange={e => set('edu_contenido', e.target.value)} maxLength={217} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Aplicación (E-2.<input value={p4.edu_app_num || ''} onChange={e => set('edu_app_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.edu_aplicacion || ''} onChange={e => set('edu_aplicacion', e.target.value)} maxLength={214} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /></div></div>
+          <div className="flex min-h-[200px] flex-col"><div className="flex flex-1 flex-col border-b border-[#2c5697] p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Bases/Teórico (C-1.<input value={p4.cons_bases_num || ''} onChange={e => set('cons_bases_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_bases || ''} onChange={e => set('cons_bases', e.target.value)} maxLength={213} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /></div><div className="flex flex-1 flex-col p-2"><span className="mb-1 text-center text-[8.5px] font-bold">Estrategias (C-2.<input value={p4.cons_est_num || ''} onChange={e => set('cons_est_num', e.target.value)} className="w-5 border-b border-[#2c5697] bg-transparent text-center outline-none" />)</span><textarea value={p4.cons_estrategias || ''} onChange={e => set('cons_estrategias', e.target.value)} maxLength={216} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent text-justify text-[9px] text-[#333] outline-none" /></div></div>
         </div>
 
         <DocumentSection title="Intervención" className="mt-3" pill={false} centerTitle>
           <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-3">
-            <div className="flex min-h-[135px] flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Indicación de Alimentos/Nutrimentos</div><div className="flex flex-1 flex-col gap-1 p-2">{['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'].map(name => <textarea key={name} value={p4[name] || ''} onChange={e => set(name, e.target.value)} className="min-h-5 flex-1 resize-none border-0 border-b border-[#2c5697] bg-transparent text-[8px] text-[#333] outline-none last:border-b-0" />)}</div></div>
+            <div className="flex min-h-[135px] flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Indicación de Alimentos/Nutrimentos</div><div className="flex flex-1 flex-col gap-1 p-2">{['indicacion_1', 'indicacion_2', 'indicacion_3', 'indicacion_4'].map(name => <textarea key={name} value={p4[name] || ''} onChange={e => set(name, e.target.value)} maxLength={110} className="min-h-5 flex-1 resize-none overflow-hidden border-0 border-b border-[#2c5697] bg-transparent text-[8px] text-[#333] outline-none last:border-b-0" />)}</div></div>
             <div className="overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Requerimiento calórico</div><div className="space-y-2 p-2 text-[8.5px] font-bold"><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_pred} onChange={e => set('req_ec_pred', e.target.checked)} /><div className="flex-1">Ecuación predictiva<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Nombre:<input value={p4.req_ec_pred_nombre || ''} onChange={e => set('req_ec_pred_nombre', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-[#333] outline-none" /></div></div></div><div className="flex gap-2"><DocumentCheckbox checked={!!p4.req_ec_rapida} onChange={e => set('req_ec_rapida', e.target.checked)} /><div className="flex-1">Ecuación rápida<div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Peso:<input value={p4.req_ec_rapida_peso || ''} onChange={e => set('req_ec_rapida_peso', e.target.value)} className="h-3 w-8 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kg</div><div className="mt-1 flex items-end gap-1 text-[7px] font-normal">Const. kcal:<input value={p4.req_ec_rapida_kcal_kg || ''} onChange={e => set('req_ec_rapida_kcal_kg', e.target.value)} className="h-3 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" /> kcal/kg/d</div></div></div><div className="flex items-end gap-1 pt-1 text-[10px]">Total<input value={p4.req_total_kcal || ''} onChange={e => set('req_total_kcal', e.target.value)} className="h-4 min-w-0 flex-1 border-b border-[#2c5697] bg-transparent text-center text-[#333] outline-none" />kcal</div></div></div>
             <div className="flex h-full flex-col overflow-hidden rounded-lg border border-[#2c5697]"><div className="bg-[#2c5697] py-1 text-center text-[9px] font-bold text-white">Cuadro dietosintético</div><table className="h-full w-full border-collapse text-center text-[8px]"><thead><tr className="bg-[#f2f5f9]"><th className="border-b border-r border-[#2c5697] py-1">Macronutrimento</th>{['%', 'Kcal', 'Gramos', 'g/kg'].map(label => <th key={label} className="border-b border-r border-[#2c5697] py-1 last:border-r-0">{label}</th>)}</tr></thead><tbody>{['Proteína', 'HCO', 'Lípidos'].map(macro => { const k = macro.toLowerCase().replace('í', 'i'); return <tr key={macro}><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>{macro}</td>{['porc', 'kcal', 'g', 'g_kg'].map(col => <td key={col} className={cell}><input value={p4[`${k}_${col}`] || ''} onChange={e => set(`${k}_${col}`, e.target.value)} className={input} /></td>)}</tr>; })}<tr className="bg-[#f2f5f9]"><td className={`${cell} pl-1 text-left font-bold text-[#2c5697]`}>Totales</td><td className={`${cell} font-bold`}>100%</td><td className={cell}><input value={p4.total_kcal || ''} onChange={e => set('total_kcal', e.target.value)} className={input} /></td><td className={cell}><input value={p4.total_g || ''} onChange={e => set('total_g', e.target.value)} className={input} /></td><td className={`${cell} text-[6px] font-bold`}>kcal/kgPt/d</td></tr></tbody></table></div>
           </div>
@@ -2865,19 +1261,12 @@ function NutritionPage4Component({ accumulatedData, onUpdate, onBack: _onBack, o
           </tbody></table>
         </DocumentSection>
 
-        <DocumentSection title="Menú del día" className="mt-3" contentClassName="p-0"><table className="w-full border-collapse"><thead><tr className="bg-[#f2f5f9] text-center text-[9px] font-bold">{[['desayuno', 'Desayuno'], ['cm', 'CM'], ['comida', 'Comida'], ['cv', 'CV'], ['cena', 'Cena']].map(([key, label], i) => <th key={key} className={`border-b border-[#2c5697] py-1 ${i < 4 ? 'border-r' : ''}`}>{label}</th>)}</tr></thead><tbody><tr>{['desayuno', 'cm', 'comida', 'cv', 'cena'].map((meal, i) => <td key={meal} className={`h-[100px] p-0 align-top ${i < 4 ? 'border-r border-[#2c5697]' : ''}`}><textarea value={p4[`menu_${meal}`] || ''} onChange={e => set(`menu_${meal}`, e.target.value)} className="h-full w-full resize-none border-0 bg-transparent p-1 text-[8px] text-[#333] outline-none" /></td>)}</tr></tbody></table></DocumentSection>
+        <DocumentSection title="Menú del día" className="mt-3" contentClassName="p-0"><table className="w-full border-collapse"><thead><tr className="bg-[#f2f5f9] text-center text-[9px] font-bold">{[['desayuno', 'Desayuno'], ['cm', 'CM'], ['comida', 'Comida'], ['cv', 'CV'], ['cena', 'Cena']].map(([key, label], i) => <th key={key} className={`border-b border-[#2c5697] py-1 ${i < 4 ? 'border-r' : ''}`}>{label}</th>)}</tr></thead><tbody><tr>{['desayuno', 'cm', 'comida', 'cv', 'cena'].map((meal, i) => <td key={meal} className={`h-[100px] p-0 align-top ${i < 4 ? 'border-r border-[#2c5697]' : ''}`}><textarea value={p4[`menu_${meal}`] || ''} onChange={e => set(`menu_${meal}`, e.target.value)} maxLength={219} className="h-full w-full resize-none overflow-hidden border-0 bg-transparent p-1 pb-3 text-justify text-[8px] text-[#333] outline-none" /></td>)}</tr></tbody></table></DocumentSection>
 
         <div className="mt-auto flex justify-around pt-6 text-center text-[9px] font-bold"><div className="w-[35%] border-t border-[#2c5697] pt-1"><input value={p4.firma_alumno || ''} onChange={e => set('firma_alumno', e.target.value)} className="mb-1 w-full border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" />Nombre, matrícula y firma del alumno</div><div className="w-[35%] border-t border-[#2c5697] pt-1"><input value={p4.firma_docente || ''} onChange={e => set('firma_docente', e.target.value)} className="mb-1 w-full border-0 bg-transparent text-center text-[8px] text-[#333] outline-none" />Nombre, cédula y firma del docente responsable</div></div>
         <DocumentFooter page="4" />
       </div></div>
     );
   }
-
-  // Conservan la implementación histórica dentro del archivo para no alterar
-  // su lógica ni sus referencias de datos; la vista documental usa la maqueta
-  // nueva declarada arriba.
-  void NutritionPage2Component;
-  void NutritionPage3Component;
-  void NutritionPage4Component;
 
   export default NutritionMasterForm;

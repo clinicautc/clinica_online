@@ -32,7 +32,7 @@ import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import PatientList from '../components/PatientList';
 import NotesViewer from '../components/NotesViewer';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { getEstadoBadgeClasses, getEstadoLabel, esFechaPasada } from '../lib/citasHelpers';
 import { formatExpediente } from '../lib/formatExpediente';
 
@@ -59,8 +59,8 @@ export default function NutritionPractitionerDashboard() {
   const [recurrenceMap, setRecurrenceMap] = useState<Record<number, boolean>>({});
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
-  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('month');
+  const [estadoFilter, setEstadoFilter] = useState<string>('programada');
   const [citaSubTab, setCitaSubTab] = useState<'programadas' | 'en_atencion'>('programadas');
 
   // ==========================================

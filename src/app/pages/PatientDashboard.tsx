@@ -22,7 +22,7 @@ import { useNavigate } from 'react-router';
 import AppointmentForm from '../components/AppointmentForm';
 import PatientPlans from '../components/PatientPlans';
 import { Card, CardContent } from '../components/ui/card';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DateFilterPicker from '../components/DateFilterPicker';
@@ -42,7 +42,7 @@ export default function PatientDashboard() {
   const [areaFiltro, setAreaFiltro] = useState<'nutricion' | 'fisioterapia'>('nutricion');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'month'>('month');
   
   /**
    * ESTADO PARA RE-AGENDAR

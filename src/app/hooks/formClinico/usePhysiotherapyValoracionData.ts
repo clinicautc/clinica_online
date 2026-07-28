@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { toast } from 'sonner';
+import { toast } from '../../lib/toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch, historialesAPI } from '../../lib/api';
 import type { FormClinicoCallbacks } from '../../lib/types/formClinico';
@@ -114,7 +114,7 @@ export function usePhysiotherapyValoracionData(props: Partial<FormClinicoCallbac
       if (props.onSaveSuccess) {
         props.onSaveSuccess(props.formKey ?? '');
       } else {
-        setTimeout(() => navigate(`/historial/${pId}/fisioterapia`, { replace: true }), 1500);
+        setTimeout(() => navigate(`/forms/fisioterapia/${aId}/documento`, { replace: true }), 1500);
       }
     } catch (error: any) {
       console.error('Error en el guardado final:', error);

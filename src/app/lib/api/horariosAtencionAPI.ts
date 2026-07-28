@@ -1,4 +1,4 @@
-import { apiFetchJson } from './client';
+import { apiFetch, apiFetchJson } from './client';
 
 export type Area = 'nutricion' | 'fisioterapia';
 
@@ -15,6 +15,21 @@ export interface CierreClinico {
   fecha: string;
   motivo: string | null;
   created_at: string;
+}
+
+export interface ConsultoriosConfig {
+  area: Area;
+  cantidad: number;
+  cantidadPendiente: number | null;
+  vigenteDesde: string | null;
+}
+
+// Respuesta cuando reducir consultorios dejaría citas ya agendadas por
+// encima de la nueva capacidad: no se aplica nada todavía, se propone la
+// primera fecha en la que sí se puede.
+export interface ConsultoriosRequiereFecha {
+  requiereFecha: true;
+  fechaSugerida: string;
 }
 
 export const horariosAtencionAPI = {
@@ -40,5 +55,24 @@ export const horariosAtencionAPI = {
   },
   eliminarCierre(id: number): Promise<{ message: string }> {
     return apiFetchJson(`/cierres-clinicos/${id}`, { method: 'DELETE' });
+  },
+  getConsultorios(area: Area): Promise<ConsultoriosConfig> {
+    return apiFetchJson(`/consultorios/${area}`);
+  },
+  // Puede devolver la config aplicada, o (si reducir choca con citas ya
+  // agendadas y no se pasó vigenteDesde, o la fecha dada no alcanza)
+  // ConsultoriosRequiereFecha en vez de lanzar — el llamador decide qué
+  // mostrar en cada caso.
+  async upsertConsultorios(area: Area, cantidad: number, vigenteDesde?: string): Promise<ConsultoriosConfig | ConsultoriosRequiereFecha> {
+    const response = await apiFetch(`/consultorios/${area}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cantidad, vigenteDesde }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok && !data?.requiereFecha) {
+      throw new Error(data?.error || 'Error en la solicitud');
+    }
+    return data;
   },
 };

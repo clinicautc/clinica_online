@@ -115,6 +115,7 @@ export default function CheckboxGridSection({ rows, columns, fieldName, formData
                 type="text"
                 value={otrasRow.value}
                 onChange={e => otrasRow.onTextChange(e.target.value)}
+                maxLength={otrasRow.maxLength}
                 className="w-full min-w-0 border-b border-slate-300 bg-transparent text-sm outline-none"
               />
             </div>
