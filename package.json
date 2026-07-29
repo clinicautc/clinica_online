@@ -9,6 +9,7 @@
     "dev:frontend": "vite",
     "dev:backend": "cd utc-api && npm run dev",
     "build": "vite build",
+    "build:single": "cross-env VITE_API_BASE_URL=/api vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.7.0",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "tailwindcss": "4.1.12",
     "typescript": "^5.7.2",
     "vite": "6.3.5"

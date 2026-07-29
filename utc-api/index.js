@@ -9,6 +9,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const pool = require('./db');
 require('dotenv').config();
 
@@ -70,6 +71,20 @@ app.get('/api/health', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// --- MODO (b): UN SOLO SERVICIO — Express sirve el front compilado ---
+// Condicionado a SERVE_STATIC=true (ver utc-api/.env.example). Va DESPUÉS de
+// todas las rutas /api/* montadas arriba (incluida /api/health) para que el
+// catch-all de abajo nunca las intercepte — Express resuelve rutas en el
+// orden en que se registran, así que si esto se moviera antes de los app.use
+// de /api, cualquier llamada a la API devolvería el index.html en vez de JSON.
+// En modo (a)/(c) esta env var no se define y este bloque no se registra —
+// el servidor se comporta exactamente igual que antes.
+if (process.env.SERVE_STATIC === 'true') {
+  const distPath = path.join(__dirname, '../dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+}
 
 app.get('/', (req, res) => {
   res.send(' Servidor UTC Activo - API funcionando correctamente.');

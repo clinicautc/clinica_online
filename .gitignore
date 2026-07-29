@@ -11,6 +11,10 @@ utc-api/node_modules/
 .env.*
 utc-api/.env
 *.local
+# Excepción: los .env.example son plantillas sin secretos, deben commitearse
+# para que quien clone el repo sepa qué variables definir.
+!.env.example
+!utc-api/.env.example
 
 # =========================================
 # ARCHIVOS DE PRODUCCIÓN / BUILD
@@ -34,4 +38,5 @@ pnpm-debug.log*
 .idea/
 .vscode/
 .DS_Store
-Thumbs.db
+Thumbs.db".qa-tmp/" 
+".qa-tmp/" 
