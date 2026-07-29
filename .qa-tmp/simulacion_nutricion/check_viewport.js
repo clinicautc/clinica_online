@@ -1,0 +1,23 @@
+const { chromium, devices } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const iphone = devices['iPhone 13'];
+  console.log('device profile viewport:', JSON.stringify(iphone.viewport));
+  const context = await browser.newContext({ ...iphone });
+  const page = await context.newPage();
+  console.log('page.viewportSize() before nav:', JSON.stringify(page.viewportSize()));
+  await page.goto('http://localhost:5173/login');
+  const w1 = await page.evaluate(() => window.innerWidth);
+  console.log('innerWidth on /login:', w1);
+  await page.fill('#email', 'master@edu.utc.mx');
+  await page.fill('#password', 'master123');
+  await page.click('button[type="submit"]');
+  await page.waitForURL('**/dashboard', { timeout: 15000 });
+  const w2 = await page.evaluate(() => window.innerWidth);
+  console.log('innerWidth on /dashboard:', w2);
+  await page.goto('http://localhost:5173/forms/nutricion/72/documento', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1000);
+  const w3 = await page.evaluate(() => ({ innerWidth: window.innerWidth, bodyScrollWidth: document.body.scrollWidth, docElClientWidth: document.documentElement.clientWidth }));
+  console.log('on documento page:', JSON.stringify(w3));
+  await browser.close();
+})();
