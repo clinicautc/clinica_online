@@ -1285,3 +1285,8 @@
 [0] Restarting 'index.js'
 [0]  API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO 3001
 [0] [startup] Status de practicantes sincronizado desde asistencia del 2026-07-29
+[0] Failed running 'index.js'. Waiting for file changes before restarting...
+[0] Restarting 'index.js'
+[0]  API DE LA CLÍNICA UTC EJECUTÁNDOSE - PUERTO 3001
+[0] [startup] Status de practicantes sincronizado desde asistencia del 2026-07-29
+[0] Failed running 'index.js'. Waiting for file changes before restarting...
