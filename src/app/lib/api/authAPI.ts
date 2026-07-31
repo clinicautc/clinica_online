@@ -28,7 +28,7 @@ export const authAPI = {
     return result;
   },
 
-  async sendRegisterCode(data: { name: string; email: string; password: string }) {
+  async sendRegisterCode(data: { name: string; email: string; password: string; telefono?: string }) {
 
     const response = await fetch(`${API_BASE_URL}/auth/pre-register`, {
       method: 'POST',

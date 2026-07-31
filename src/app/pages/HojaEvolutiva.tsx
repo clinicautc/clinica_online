@@ -21,7 +21,7 @@ const HojaEvolutiva = () => {
   const { user } = useAuth();
   const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
-  const handleVolver = () => navigate(`/historial/${formData.paciente_id}/fisioterapia`);
+  const handleVolver = () => navigate(`/historial/${formData.paciente_id}`);
   const handleImprimir = () => window.print();
   const handleEditar = () => navigate(`/forms/seguimiento/${appointmentId}`);
 

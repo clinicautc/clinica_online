@@ -18,7 +18,7 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   ArrowLeft, Plus, Trash2, UserCheck, UserMinus, Shield,
-  Filter, CalendarClock, ClipboardCheck, CheckCircle2, XCircle, Lock, Search,
+  Filter, CalendarClock, ClipboardCheck, CheckCircle2, XCircle, Lock, Search, Phone,
 } from 'lucide-react';
 import { toast } from '../lib/toast';
 import { format, addDays, subDays } from 'date-fns';
@@ -43,6 +43,7 @@ export default function ManagePersonnelPage() {
     nombre: '',
     apellido: '',
     email: '',
+    telefono: '',
     matricula: '',
     numero_empleado: '',
     area: '' as 'nutricion' | 'fisioterapia' | '',
@@ -131,6 +132,7 @@ export default function ManagePersonnelPage() {
         id: d.id.toString(),
         name: d.nombre,
         email: d.email,
+        telefono: d.telefono || '',
         area: d.area,
         status: d.status || 'activo',
         dateAdded: d.fecha_autorizacion,
@@ -202,13 +204,14 @@ export default function ManagePersonnelPage() {
         tipo: tipoAcceso,
         nombre: capitalizeWords(`${nuevoD.nombre.trim()} ${nuevoD.apellido.trim()}`),
         email: nuevoD.email.trim().toLowerCase(),
+        telefono: nuevoD.telefono.trim() || undefined,
         matricula: esDocente ? undefined : nuevoD.matricula.trim(),
         numero_empleado: esDocente ? nuevoD.numero_empleado.trim() : undefined,
         area: nuevoD.area,
       });
       toast.success(`${esDocente ? 'Docente' : 'Practicante'} autorizado.\nContraseña temporal: UTC${identificador}`);
       if (!esDocente && creado?.id) setPendienteHorarioId(creado.id);
-      setNuevoD({ nombre: '', apellido: '', email: '', matricula: '', numero_empleado: '', area: (user?.area || '') as any });
+      setNuevoD({ nombre: '', apellido: '', email: '', telefono: '', matricula: '', numero_empleado: '', area: (user?.area || '') as any });
       setMostrandoFormulario(false);
       cargarDocentes();
     } catch (error: any) {
@@ -415,6 +418,21 @@ export default function ManagePersonnelPage() {
                     />
                   </div>
 
+                  {/* Teléfono (opcional) */}
+                  <div className="space-y-2">
+                    <Label className="text-blue-900 font-bold">
+                      Teléfono <span className="text-slate-400 font-medium">(opcional)</span>
+                    </Label>
+                    <Input
+                      type="tel"
+                      inputMode="numeric"
+                      value={nuevoD.telefono}
+                      onChange={e => setNuevoD({ ...nuevoD, telefono: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      placeholder="10 dígitos" maxLength={10} className="bg-white border-blue-900/20"
+                    />
+                    <p className="text-[10px] text-slate-400">Solo números (máximo 10 dígitos).</p>
+                  </div>
+
                   {/* Matrícula / No. Empleado */}
                   {tipoAcceso === 'docente' ? (
                     <div className="space-y-2">
@@ -531,7 +549,7 @@ export default function ManagePersonnelPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="p-0 overflow-y-auto max-h-[600px]">
+          <CardContent className="p-0">
             {docentesFiltrados.length === 0 ? (
               <p className="text-center py-10 text-slate-400 italic">No hay registros encontrados.</p>
             ) : (
@@ -547,6 +565,9 @@ export default function ManagePersonnelPage() {
                           {docente.name}
                         </span>
                         <span className="text-sm text-gray-400 font-medium italic">{docente.email}</span>
+                        <span className="text-sm text-gray-400 font-medium flex items-center gap-1">
+                          <Phone className="w-3 h-3" /> {docente.telefono || 'S/N'}
+                        </span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -611,10 +632,11 @@ export default function ManagePersonnelPage() {
 
                 {/* VISTA ESCRITORIO */}
                 <div className="hidden lg:block">
-                <Table>
+                <Table containerClassName="overflow-x-visible">
                   <TableHeader className="bg-white sticky top-0 z-20 border-b">
                     <TableRow>
-                      <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información del Docente</TableHead>
+                      <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest whitespace-normal">Información del Docente</TableHead>
+                      <TableHead className="text-blue-900 font-black uppercase tracking-widest whitespace-normal">Teléfono</TableHead>
                       <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
                       <TableHead className="text-blue-900 font-black uppercase tracking-widest text-center">Área</TableHead>
                       <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Estado</TableHead>
@@ -630,7 +652,7 @@ export default function ManagePersonnelPage() {
                         key={docente.id}
                         className={`group transition-all ${docente.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
                       >
-                        <TableCell className="pl-4">
+                        <TableCell className="pl-4 whitespace-normal break-words">
                           <div className="flex flex-col">
                             <span className={`text-base font-bold ${docente.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
                               {docente.name}
@@ -638,6 +660,7 @@ export default function ManagePersonnelPage() {
                             <span className="text-sm text-gray-400 font-medium italic">{docente.email}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="whitespace-normal break-words text-slate-600 font-medium">{docente.telefono || 'S/N'}</TableCell>
 
                         <TableCell className="text-center">
                           <div className="flex justify-center">

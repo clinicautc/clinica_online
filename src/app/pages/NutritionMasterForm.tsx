@@ -280,7 +280,7 @@
           "Volver" / "Imprimir" / "Editar", fuera del fieldset deshabilitado. */}
       <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex gap-1.5 sm:gap-2 print:hidden">
         <button
-          onClick={() => navigate(`/historial/${formData.pagina_1.paciente_id}/nutricion`)}
+          onClick={() => navigate(`/historial/${formData.pagina_1.paciente_id}`)}
           className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-bold shadow-2xl transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 sm:w-4 sm:h-4">

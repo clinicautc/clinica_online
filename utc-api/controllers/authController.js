@@ -170,7 +170,13 @@ async function logout(req, res) {
 
 async function preRegister(req, res) {
   console.log('🚨 PRE-REGISTER EJECUTADO');
-  const { name, email, password } = req.body;
+  const { name, email, password, telefono } = req.body;
+
+  // TELÉFONO: opcional — no debe impedir el registro. Si viene, solo dígitos
+  // (máx. 10), igual que la validación de "editar perfil" (usuariosController).
+  if (telefono && !/^\d{1,10}$/.test(telefono)) {
+    return res.status(400).json({ error: 'El teléfono solo puede contener números (máximo 10 dígitos).' });
+  }
 
   // VALIDACIÓN DE NOMBRE: solo letras y espacios (respaldo del lado del
   // servidor a la validación que ya existe en el formulario de registro).
@@ -193,11 +199,11 @@ async function preRegister(req, res) {
 
     // Inserción en la tabla de retención (Ya verificada)
     await pool.query(
-      `INSERT INTO registro_temporal (nombre, email, password_hash, codigo_verificacion, expira_en)
-       VALUES ($1, $2, $3, $4, NOW() + interval '15 minutes')
+      `INSERT INTO registro_temporal (nombre, email, password_hash, codigo_verificacion, expira_en, telefono)
+       VALUES ($1, $2, $3, $4, NOW() + interval '15 minutes', $5)
        ON CONFLICT (email) DO UPDATE SET
-       nombre = $1, password_hash = $3, codigo_verificacion = $4, expira_en = NOW() + interval '15 minutes'`,
-      [name, email.trim().toLowerCase(), hashedPassword, codigo]
+       nombre = $1, password_hash = $3, codigo_verificacion = $4, expira_en = NOW() + interval '15 minutes', telefono = $5`,
+      [name, email.trim().toLowerCase(), hashedPassword, codigo, telefono || null]
     );
 
     await notificationService.notificarCodigoVerificacion(name, email.trim().toLowerCase(), codigo);
@@ -222,11 +228,11 @@ async function verifyAndRegister(req, res) {
       return res.status(400).json({ error: "Código incorrecto o expirado." });
     }
 
-    const { nombre, password_hash } = tempUser.rows[0];
+    const { nombre, password_hash, telefono } = tempUser.rows[0];
 
     const newUser = await pool.query(
-      "INSERT INTO usuarios (nombre, email, password, rol, status) VALUES ($1, $2, $3, 'paciente', 'activo') RETURNING *",
-      [nombre, email.trim().toLowerCase(), password_hash]
+      "INSERT INTO usuarios (nombre, email, password, rol, status, telefono) VALUES ($1, $2, $3, 'paciente', 'activo', $4) RETURNING *",
+      [nombre, email.trim().toLowerCase(), password_hash, telefono || null]
     );
 
     // Limpiamos la tabla temporal para no dejar basura

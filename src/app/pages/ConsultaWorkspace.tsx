@@ -426,6 +426,14 @@ const ConsultaWorkspace: React.FC = () => {
   const hasBorrador = !!(cita?.borrador && formKey && cita.borrador[formKey]);
   const formName  = resolveFormName(tipo, tipo_consulta);
 
+  // numero_consulta cuenta las citas YA completadas; mientras esta sigue en
+  // curso (no "completada" todavía) no se cuenta a sí misma, así que su folio
+  // real es ese conteo + 1 — mismo ajuste que useNutritionHistoriaData.ts /
+  // usePhysiotherapyValoracionData.ts aplican para el campo F/N del formulario.
+  const folioConsulta = cita?.numero_consulta != null
+    ? (cita.estado === 'completada' ? cita.numero_consulta : cita.numero_consulta + 1)
+    : cita?.id;
+
   const accent = isNutri ? {
     badge       : 'bg-orange-100 text-orange-700',
     bar         : 'bg-orange-500',
@@ -463,7 +471,7 @@ const ConsultaWorkspace: React.FC = () => {
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm sticky top-0 z-50">
         {activeView === 'hub' ? (
           <p className="text-sm text-gray-500 font-medium">
-            Consultas &rsaquo; <span className="text-gray-800 font-semibold">Consulta #{cita?.numero_consulta ?? cita?.id}</span> &rsaquo; Workspace
+            Consultas &rsaquo; <span className="text-gray-800 font-semibold">Consulta #{folioConsulta}</span> &rsaquo; Workspace
           </p>
         ) : (
           <div className="flex items-center gap-4">
@@ -525,7 +533,7 @@ const ConsultaWorkspace: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex justify-between items-start gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Consulta #{cita?.numero_consulta ?? cita?.id}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Consulta #{folioConsulta}</h1>
                   <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${accent.badge}`}>
                     En Atención
                   </span>
@@ -785,7 +793,7 @@ const ConsultaWorkspace: React.FC = () => {
             <p className="text-xs text-blue-600 font-bold uppercase tracking-widest">Paciente</p>
             <p className="text-blue-900 font-black text-base">{cita?.paciente_nombre}</p>
             <p className="text-[11px] text-slate-500 mt-1">
-              Consulta #{cita?.numero_consulta ?? cita?.id} &bull; {cita?.tipo === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
+              Consulta #{folioConsulta} &bull; {cita?.tipo === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
             </p>
           </>
         }

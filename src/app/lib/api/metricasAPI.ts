@@ -2,8 +2,10 @@ import { apiFetchJson } from './client';
 
 export const metricasAPI = {
 
-  getDashboardStats() {
-    return apiFetchJson('/stats/dashboard');
+  // Eventos crudos de cancelación/reagendado (tabla metricas) — el llamador
+  // agrega por área/rango de fecha, igual que hace con citas/historiales.
+  getEventos() {
+    return apiFetchJson('/stats/eventos');
   },
 
   getLogs() {

@@ -30,6 +30,7 @@ import Humano1Img from '../Humano_1.png';
 import Humano2Img from '../Humano_2.png';
 import { usePhysiotherapyValoracionData } from '../../hooks/formClinico/usePhysiotherapyValoracionData';
 import { useFormClinicoController } from '../../hooks/formClinico/useFormClinicoController';
+import { formatExpediente } from '../../lib/formatExpediente';
 import type { FormClinicoHandle, FormClinicoCallbacks } from '../../lib/types/formClinico';
 
 const ENFERMEDADES_HEREDO = [
@@ -121,6 +122,7 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
           <FormSectionCard title="Datos personales">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2 space-y-1"><label className="text-xs font-medium text-slate-600">Nombre completo</label><Input {...field1('nombre_completo')} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Expediente</label><Input value={formatExpediente(p1.paciente_id)} readOnly tabIndex={-1} /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Edad</label><Input {...field1('edad')} /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Fecha</label><Input {...field1('fecha')} /></div>
               <div className="space-y-1">

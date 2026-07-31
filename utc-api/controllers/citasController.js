@@ -143,6 +143,12 @@ async function getDocumentosExistentes(appointmentId, area, tipoConsulta) {
         [appointmentId]
       );
       if (hist.rows.length > 0) docs.push('valoracion_inicial_fisioterapia');
+
+      const consent = await pool.query(
+        'SELECT id FROM consentimientos_informados WHERE appointment_id = $1 LIMIT 1',
+        [appointmentId]
+      );
+      if (consent.rows.length > 0) docs.push('consentimiento');
     } else {
       const nota = await pool.query(
         'SELECT id FROM notas_evolucion WHERE appointment_id = $1 LIMIT 1',
@@ -475,8 +481,8 @@ async function remove(req, res) {
     const citaPrevia = await pool.query("SELECT * FROM citas WHERE id = $1", [id]);
     if (citaPrevia.rowCount > 0) {
       await pool.query(
-        "INSERT INTO metricas (tipo_evento, area, paciente_id) VALUES ($1, $2, $3)",
-        ['cita_cancelada', citaPrevia.rows[0].tipo, citaPrevia.rows[0].paciente_id]
+        "INSERT INTO metricas (tipo_evento, area, paciente_id, practicante_id) VALUES ($1, $2, $3, $4)",
+        ['cita_cancelada', citaPrevia.rows[0].tipo, citaPrevia.rows[0].paciente_id, citaPrevia.rows[0].practicante_id]
       );
     }
     const result = await pool.query('DELETE FROM citas WHERE id = $1 RETURNING *', [id]);

@@ -27,7 +27,7 @@ export function getEstadoBadgeClasses(estado: string): string {
     case 'no_asistio':               return 'bg-gray-50 text-gray-500 border-gray-200';
     case 'cancelada':                return 'bg-red-50 text-red-500 border-red-100';
     case 'pendiente_reprogramacion': return 'bg-red-50 text-red-600 border-red-100';
-    case 'incompleta':               return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'incompleta':               return 'bg-[#FEB2E6]/25 text-pink-700 border-[#FEB2E6]';
     case 'recuperada':               return 'bg-sky-50 text-sky-700 border-sky-200';
     default:                         return 'bg-amber-50 text-amber-700 border-amber-100';
   }

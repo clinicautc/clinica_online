@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Check,X} from 'lucide-react';
+import {AlertCircle,ArrowLeft,Mail,ShieldCheck,Loader2,Eye,EyeOff,User,Lock,Check,X,Phone} from 'lucide-react';
 import { toast } from '../lib/toast';
 import { authAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
@@ -15,7 +15,7 @@ const DRAFT_KEY = 'utc_registro_draft';
 
 function loadDraft(): Partial<{
   nombre: string; apellido: string; email: string; password: string;
-  confirmPassword: string; verificationCode: string; codeSent: boolean;
+  confirmPassword: string; telefono: string; verificationCode: string; codeSent: boolean;
 }> {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
@@ -32,6 +32,7 @@ export default function Register() {
   const [email, setEmail] = useState(draft.email || '');
   const [password, setPassword] = useState(draft.password || '');
   const [confirmPassword, setConfirmPassword] = useState(draft.confirmPassword || '');
+  const [telefono, setTelefono] = useState(draft.telefono || '');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword,setShowConfirmPassword] = useState(false);
   const passwordValidation = {
@@ -59,13 +60,13 @@ export default function Register() {
   useEffect(() => {
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-        nombre, apellido, email, password, confirmPassword, verificationCode, codeSent
+        nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent
       }));
     } catch {
       // sessionStorage no disponible (modo privado, etc.) — el flujo sigue funcionando,
       // solo se pierde la recuperación tras una recarga.
     }
-  }, [nombre, apellido, email, password, confirmPassword, verificationCode, codeSent]);
+  }, [nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent]);
 
   const clearDraft = () => {
     try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
@@ -88,7 +89,8 @@ const handleSendCode = async () => {
 await authAPI.sendRegisterCode({
   name: `${capitalizeWords(nombre)} ${capitalizeWords(apellido)}`,
   email,
-  password
+  password,
+  telefono: telefono || undefined
 });
 
 
@@ -296,6 +298,32 @@ const handleSubmit = async (e: React.FormEvent) => {
                   placeholder="usuario@utc.mx"
                 />
               </div>
+            </div>
+
+            {/* Campo Teléfono (opcional) */}
+            <div className="space-y-1">
+              <label htmlFor="telefono" className="block text-sm font-bold text-[#002f6c]">
+                Número de teléfono <span className="text-slate-400 font-medium">(opcional)</span>
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="h-4 w-4 text-slate-400 group-focus-within:text-[#002f6c] transition-colors" />
+                </div>
+                <input
+                  type="tel"
+                  id="telefono"
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  maxLength={10}
+                  className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#002f6c]/20 focus:border-[#002f6c] transition-all text-slate-800 placeholder-slate-400 font-medium"
+                  placeholder="10 dígitos"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 ml-1">
+                Solo números (máximo 10 dígitos). Nos permite contactarte si la clínica necesita darte información sobre tu cita o tu seguimiento.
+              </p>
             </div>
 
             {/* Campo Contraseña */}

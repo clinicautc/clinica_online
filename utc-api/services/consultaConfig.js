@@ -4,7 +4,7 @@ const DOCUMENTOS_REQUERIDOS = {
     subsecuente: ['seguimiento_nutricion']
   },
   fisioterapia: {
-    primera:     ['valoracion_inicial_fisioterapia'],
+    primera:     ['consentimiento', 'valoracion_inicial_fisioterapia'],
     subsecuente: ['nota_evolutiva']
   }
 };

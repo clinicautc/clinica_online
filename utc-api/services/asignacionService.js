@@ -115,17 +115,22 @@ async function _buscarDocente({ area, fecha, hora }) {
 
 /**
  * Persiste la asignación en la tabla citas.
+ *
+ * asignacionFallback: true cuando el candidato es el docente de último
+ * recurso (_buscarDocente), no un practicante por horario — alimenta el KPI
+ * "Asignación Automática" del panel de estadísticas.
  */
-async function _guardarAsignacion(citaId, candidato) {
+async function _guardarAsignacion(citaId, candidato, asignacionFallback = false) {
   const { rows } = await pool.query(
     `UPDATE citas
-     SET practicante_id     = $1,
-         practicante_nombre = $2,
-         estado             = 'programada',
-         fecha_asignacion   = NOW()
-     WHERE id = $3
+     SET practicante_id      = $1,
+         practicante_nombre  = $2,
+         estado              = 'programada',
+         fecha_asignacion    = NOW(),
+         asignacion_fallback = $3
+     WHERE id = $4
      RETURNING *`,
-    [candidato.id, candidato.nombre, citaId]
+    [candidato.id, candidato.nombre, asignacionFallback, citaId]
   );
   return rows[0];
 }
@@ -179,7 +184,7 @@ async function asignarPracticante(citaId, area, fecha, hora) {
     return { cita, asignado: null, esFallbackDocente: false };
   }
 
-  const cita = await _guardarAsignacion(citaId, candidato);
+  const cita = await _guardarAsignacion(citaId, candidato, esFallbackDocente);
   return { cita, asignado: candidato, esFallbackDocente };
 }
 
@@ -238,11 +243,12 @@ async function reasignarCitasPorAusencia(practicanteAusenteId, fecha, area) {
     if (candidato) {
       await pool.query(
         `UPDATE citas
-         SET practicante_id     = $1,
-             practicante_nombre = $2,
-             fecha_asignacion   = NOW()
-         WHERE id = $3`,
-        [candidato.id, candidato.nombre, cita.id]
+         SET practicante_id      = $1,
+             practicante_nombre  = $2,
+             fecha_asignacion    = NOW(),
+             asignacion_fallback = $3
+         WHERE id = $4`,
+        [candidato.id, candidato.nombre, esFallbackDocente, cita.id]
       );
       resultados.push({
         citaId:          cita.id,

@@ -262,7 +262,7 @@ export default function NutritionPractitionerDashboard() {
   const handleAccessForms = (appointment: Appointment) => {
     const esRecurrente = recurrenceMap[appointment.paciente_id];
     if (esRecurrente) {
-      navigate(`/historial/${appointment.paciente_id}/nutricion`);
+      navigate(`/historial/${appointment.paciente_id}`);
     } else {
       navigate(`/forms/nutricion/${appointment.id}`);
     }
@@ -439,7 +439,7 @@ export default function NutritionPractitionerDashboard() {
                     { value: 'en_atencion', label: 'En Atención', active: 'bg-purple-600 text-white',  inactive: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
                     { value: 'completada',  label: 'Completadas', active: 'bg-green-600 text-white',   inactive: 'bg-green-100 text-green-800 hover:bg-green-200' },
                     { value: 'no_asistio',  label: 'No Asistió',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
-                    { value: 'incompleta',  label: 'Incompletas', active: 'bg-red-600 text-white',     inactive: 'bg-red-100 text-red-800 hover:bg-red-200' },
+                    { value: 'incompleta',  label: 'Incompletas', active: 'bg-[#FEB2E6] text-slate-900', inactive: 'bg-[#FEB2E6]/30 text-pink-800 hover:bg-[#FEB2E6]/50' },
                     { value: 'recuperada',  label: 'Recuperadas', active: 'bg-sky-500 text-white',     inactive: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
                     { value: 'cancelada',   label: 'Canceladas',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
                   ].map(btn => (

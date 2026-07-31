@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Button } from './ui/button';
-import { Users, Mail, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
+import { Users, Mail, Phone, Search, Loader2, UserCircle, BookOpen, Trash2 } from 'lucide-react';
 import { toast } from '../lib/toast';
 import { usuariosAPI } from '../lib/api';
 import { formatExpediente } from '../lib/formatExpediente';
@@ -23,6 +23,7 @@ interface Patient {
   id: number | string;
   nombre: string;
   email: string;
+  telefono?: string;
   rol: string;
 }
 
@@ -69,18 +70,11 @@ export default function PatientList() {
     }
   };
 
-  /**
-   * MODIFICACIÓN: handleViewHistory
-   * Ahora detecta el área del practicante/admin actual para redirigir 
-   * correctamente a /historial/:id/:area y evitar errores de carga.
-   */
   const handleViewHistory = (patientId: string | number) => {
-    // Obtenemos el área actual del usuario (nutricion o fisioterapia)
-    const areaActual = user?.area || 'nutricion';
-    
-    // Navegamos a la ruta protegida sincronizada en el router.tsx
+    // MedicalHistoryViewer resuelve el área sola (la del usuario si es
+    // admin/practicante); ya no hace falta pasarla en la URL.
     toast.info("Accediendo al expediente clínico...");
-    navigate(`/historial/${patientId}/${areaActual}`);
+    navigate(`/historial/${patientId}`);
   };
 
   const filteredPatients = patients.filter(patient =>
@@ -128,7 +122,7 @@ export default function PatientList() {
                 <p className="text-slate-500 font-medium italic">No se encontraron coincidencias en la base de datos.</p>
               </div>
           ) : (
-              <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-blue-900/20">
+              <div>
                 {/* VISTA MÓVIL */}
                 <div className="block md:hidden divide-y divide-blue-900/10">
                   {filteredPatients.map((patient) => (
@@ -147,6 +141,7 @@ export default function PatientList() {
                         </div>
                         <p className="font-black text-blue-950 uppercase">{patient.nombre}</p>
                         <p className="text-xs text-slate-500 flex items-center gap-2"><Mail className="w-3 h-3" /> {patient.email}</p>
+                        <p className="text-xs text-slate-500 flex items-center gap-2"><Phone className="w-3 h-3" /> {patient.telefono || 'S/N'}</p>
                         <Button size="sm" className="w-full bg-blue-900 hover:bg-blue-800 font-bold gap-2 text-xs" onClick={() => handleViewHistory(patient.id)}>
                           <BookOpen className="w-3 h-3" /> Expediente
                         </Button>
@@ -156,12 +151,13 @@ export default function PatientList() {
 
                 {/* VISTA ESCRITORIO */}
                 <div className="hidden md:block">
-                  <Table>
+                  <Table containerClassName="overflow-x-visible">
                     <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                       <TableRow>
-                        <TableHead className="text-blue-900 font-bold w-[130px]">Expediente</TableHead>
-                        <TableHead className="text-blue-900 font-bold">Nombre Completo</TableHead>
-                        <TableHead className="text-blue-900 font-bold">Email Institucional</TableHead>
+                        <TableHead className="text-blue-900 font-bold whitespace-normal">Expediente</TableHead>
+                        <TableHead className="text-blue-900 font-bold whitespace-normal">Nombre Completo</TableHead>
+                        <TableHead className="text-blue-900 font-bold whitespace-normal">Email Institucional</TableHead>
+                        <TableHead className="text-blue-900 font-bold whitespace-normal">Teléfono</TableHead>
                         <TableHead className="text-blue-900 font-bold text-center">Estado</TableHead>
                         <TableHead className="text-blue-900 font-bold text-right">Historial</TableHead>
                         {/* CABECERA ACCIONES: Mostrar solo si es Master */}
@@ -173,9 +169,10 @@ export default function PatientList() {
                     <TableBody>
                       {filteredPatients.map((patient) => (
                           <TableRow key={patient.id} className="hover:bg-blue-50/50 transition-colors">
-                            <TableCell className="font-mono text-xs font-bold text-blue-900/60">{formatExpediente(patient.id)}</TableCell>
-                            <TableCell className="font-bold text-blue-900 uppercase">{patient.nombre}</TableCell>
-                            <TableCell className="text-slate-600 font-medium italic">{patient.email}</TableCell>
+                            <TableCell className="font-mono text-xs font-bold text-blue-900/60 whitespace-normal">{formatExpediente(patient.id)}</TableCell>
+                            <TableCell className="font-bold text-blue-900 uppercase whitespace-normal break-words">{patient.nombre}</TableCell>
+                            <TableCell className="text-slate-600 font-medium italic whitespace-normal break-words">{patient.email}</TableCell>
+                            <TableCell className="text-slate-600 font-medium whitespace-normal break-words">{patient.telefono || 'S/N'}</TableCell>
                             <TableCell className="text-center">
                               <Badge className="bg-green-600 text-white border-none font-black text-[9px] px-2 shadow-sm">ACTIVO</Badge>
                             </TableCell>

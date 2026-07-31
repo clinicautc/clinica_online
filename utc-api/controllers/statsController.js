@@ -1,23 +1,14 @@
 const pool = require('../db');
+const statsService = require('../services/statsService');
 
-async function getDashboard(req, res) {
+// Eventos crudos de cancelación/reagendado — citas.estado no puede responder
+// esto (cancelar borra la fila; reagendar no cambia el estado), así que
+// metricas sigue siendo la única fuente para estos dos. El frontend agrega
+// por área/rango de fecha, igual que hace con citas/historiales.
+async function getEventos(req, res) {
   try {
-    const total = await pool.query("SELECT COUNT(*) FROM citas");
-    const completadas = await pool.query("SELECT COUNT(*) FROM citas WHERE estado = 'completada'");
-    const programadas = await pool.query("SELECT COUNT(*) FROM citas WHERE estado = 'programada'");
-    const canceladasMetrica = await pool.query("SELECT COUNT(*) FROM metricas WHERE tipo_evento = 'cita_cancelada'");
-    const reagendadasMetrica = await pool.query("SELECT COUNT(*) FROM metricas WHERE tipo_evento = 'cita_reagendada'");
-    const promedioConsultaMetrica = await pool.query("SELECT AVG(valor_numerico) FROM metricas WHERE tipo_evento = 'tiempo_consulta'");
-
-    res.json({
-      totalCitas: parseInt(total.rows[0].count),
-      citasCompletadas: parseInt(completadas.rows[0].count),
-      citasCanceladas: parseInt(canceladasMetrica.rows[0].count),
-      citasProgramadas: parseInt(programadas.rows[0].count),
-      reagendadas: parseInt(reagendadasMetrica.rows[0].count),
-      promedioConsulta: Math.round(promedioConsultaMetrica.rows[0].avg || 0),
-      timestamp: new Date()
-    });
+    const eventos = await statsService.obtenerEventos(['cita_cancelada', 'cita_reagendada']);
+    res.json(eventos);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -32,4 +23,4 @@ async function getLogs(req, res) {
   }
 }
 
-module.exports = { getDashboard, getLogs };
+module.exports = { getEventos, getLogs };

@@ -15,7 +15,7 @@ async function getAll(req, res) {
 }
 
 async function create(req, res) {
-  const { tipo, nombre, email, matricula, numero_empleado, area } = req.body;
+  const { tipo, nombre, email, matricula, numero_empleado, area, telefono } = req.body;
 
   // tipo === 'docente' -> rol admin, identificado por numero_empleado.
   // Cualquier otro valor (incluido ausente, para no romper llamadas viejas)
@@ -37,6 +37,12 @@ async function create(req, res) {
         ? 'El número de empleado debe contener solo números (máximo 9 dígitos).'
         : 'La matrícula debe contener solo números (máximo 9 dígitos).'
     });
+  }
+
+  // TELÉFONO: opcional — no debe impedir el alta. Si viene, solo dígitos
+  // (máx. 10), igual que en el registro de pacientes y "editar perfil".
+  if (telefono && !/^\d{1,10}$/.test(telefono)) {
+    return res.status(400).json({ error: 'El teléfono solo puede contener números (máximo 10 dígitos).' });
   }
 
   const passwordTemporal = `UTC${identificador}`;
@@ -83,8 +89,8 @@ async function create(req, res) {
 
     const result = await pool.query(
       `INSERT INTO usuarios
-      (nombre, email, password, rol, area, matricula, numero_empleado, status, primer_inicio)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      (nombre, email, password, rol, area, matricula, numero_empleado, status, primer_inicio, telefono)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         nombre.trim(),
@@ -95,7 +101,8 @@ async function create(req, res) {
         esDocente ? null : matricula,
         esDocente ? numero_empleado : null,
         'activo',
-        true
+        true,
+        telefono || null
       ]
     );
 

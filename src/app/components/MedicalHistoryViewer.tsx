@@ -56,7 +56,7 @@ interface MedicalHistoryViewerProps {
 }
 
 export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewerProps) {
-  const { id, area } = useParams<{ id: string; area: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const arialStyle = { fontFamily: 'Arial, sans-serif' };
@@ -66,10 +66,11 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
 
   const getAreaAutorizada = (): 'nutricion' | 'fisioterapia' => {
     if (isMaster) {
-      // El master puede ver el área de la URL, el prop o por defecto nutrición
-      return (area as any) || filterType || 'nutricion';
+      // El master puede ver cualquier área — por prop, o nutrición por defecto.
+      // El selector de la barra superior cambia esto en vivo (setSelectedArea).
+      return filterType || 'nutricion';
     }
-    // Si es docente o practicante, ignoramos la URL y forzamos SU área real
+    // Si es docente o practicante, siempre forzamos SU área real
     return (user?.area?.toLowerCase() as 'nutricion' | 'fisioterapia') || 'nutricion';
   };
 
@@ -90,15 +91,6 @@ export default function MedicalHistoryViewer({ filterType }: MedicalHistoryViewe
   const [selectedArea, setSelectedArea] = useState<'nutricion' | 'fisioterapia'>(getAreaAutorizada());
   const [detectedArea, setDetectedArea] = useState<'fisioterapia' | 'nutricion'>(selectedArea);
   
-  // 2. PROTECCIÓN CONTRA TRAMPAS EN LA URL
-  useEffect(() => {
-    // Si un practicante o docente intenta escribir otra área en la barra de direcciones, lo regresamos a la suya
-    if (!isMaster && area && area.toLowerCase() !== user?.area?.toLowerCase()) {
-       toast.error(`Acceso denegado. Solo puedes ver historiales de tu área asignada.`);
-       navigate(`/historial/${id}/${user?.area?.toLowerCase()}`, { replace: true });
-    }
-  }, [area, isMaster, user, navigate, id]);
-
   useEffect(() => {
     if (filterType && isMaster) {
       setSelectedArea(filterType);

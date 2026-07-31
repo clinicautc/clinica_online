@@ -191,6 +191,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
           id: p.id.toString(),
           name: p.nombre || 'Sin Nombre',
           email: p.email || 'sin@correo.com',
+          telefono: p.telefono || '',
           area: p.area ? p.area.toLowerCase() : 'fisioterapia',
           status: p.estado || p.status || 'activo',
           dateAdded: p.fecha_creacion || new Date().toISOString(),
@@ -474,7 +475,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         </header>
 
         <div className="w-full space-y-7">
-          <Tabs defaultValue="practitioners" className="space-y-6">
+          <Tabs defaultValue="stats" className="space-y-6">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm p-1.5 border border-gray-100 overflow-x-auto">
               <TabsList className="bg-transparent flex justify-start gap-2.5 h-auto">
                 <TabsTrigger value="today_appointments" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
@@ -486,7 +487,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 <TabsTrigger value="patients" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <Users className="w-5 h-5" /> Pacientes
                 </TabsTrigger>
-
+                <TabsTrigger value="horarios" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
+                  <CalendarClock className="w-5 h-5" /> Horarios de Atención
+                </TabsTrigger>
 
                 <TabsTrigger value="stats" className="data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-lg px-6 py-1.5 text-base flex items-center gap-2 transition-all font-bold">
                   <BarChart3 className="w-5 h-5" /> Estadísticas
@@ -566,7 +569,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                       { value: 'en_atencion', label: 'En Atención', active: 'bg-purple-600 text-white',  inactive: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
                       { value: 'completada',  label: 'Completadas', active: 'bg-green-600 text-white',   inactive: 'bg-green-100 text-green-800 hover:bg-green-200' },
                       { value: 'no_asistio',  label: 'No Asistió',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
-                      { value: 'incompleta',  label: 'Incompletas', active: 'bg-red-600 text-white',     inactive: 'bg-red-100 text-red-800 hover:bg-red-200' },
+                      { value: 'incompleta',  label: 'Incompletas', active: 'bg-[#FEB2E6] text-slate-900', inactive: 'bg-[#FEB2E6]/30 text-pink-800 hover:bg-[#FEB2E6]/50' },
                       { value: 'recuperada',  label: 'Recuperadas', active: 'bg-sky-500 text-white',     inactive: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
                       { value: 'cancelada',   label: 'Canceladas',  active: 'bg-gray-500 text-white',    inactive: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
                     ].map(btn => (
@@ -766,7 +769,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-0 overflow-y-auto max-h-[600px]">
+                <CardContent className="p-0">
                   {/* VISTA MÓVIL — misma información que la tabla, en tarjetas apiladas */}
                   <div className="block md:hidden divide-y divide-slate-100">
                     {practicantesFiltrados.map((p) => {
@@ -782,6 +785,9 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               {p.name}
                             </span>
                             <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
+                            <span className="text-sm text-gray-400 font-medium flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> {p.telefono || 'S/N'}
+                            </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge
@@ -827,10 +833,11 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
 
                   {/* VISTA ESCRITORIO */}
                   <div className="hidden md:block">
-                  <Table>
+                  <Table containerClassName="overflow-x-visible">
                     <TableHeader className="bg-white sticky top-0 z-20 border-b">
                       <TableRow>
-                        <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest">Información del Docente</TableHead>
+                        <TableHead className="pl-4 text-blue-900 font-black uppercase tracking-widest whitespace-normal">Información del Docente</TableHead>
+                        <TableHead className="text-blue-900 font-black uppercase tracking-widest whitespace-normal">Teléfono</TableHead>
                         {/* NUEVA CABECERA ROL */}
                         <TableHead className="text-center text-blue-900 font-black uppercase tracking-widest">Rol</TableHead>
                         <TableHead className="text-blue-900 font-black uppercase tracking-widest text-center">Area</TableHead>
@@ -850,7 +857,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                           key={p.id}
                           className={`group transition-all ${p.status === 'inactivo' ? 'bg-gray-100/50 opacity-70' : 'hover:bg-blue-50/50'}`}
                         >
-                          <TableCell className="pl-4">
+                          <TableCell className="pl-4 whitespace-normal break-words">
                             <div className="flex flex-col">
                               <span className={`text-base font-bold ${p.status === 'inactivo' ? 'text-gray-500' : 'text-blue-950'}`}>
                                 {p.name}
@@ -858,6 +865,7 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                               <span className="text-sm text-gray-400 font-medium italic">{p.email}</span>
                             </div>
                           </TableCell>
+                          <TableCell className="whitespace-normal break-words text-slate-600 font-medium">{p.telefono || 'S/N'}</TableCell>
 
                           {/* COLUMNA ROL: DISEÑO DE BORDES COLOREADOS SIN FONDO (OUTLINE) */}
                           <TableCell className="text-center">
@@ -921,8 +929,12 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
             </TabsContent>
 
             <TabsContent value="patients" className="space-y-6">
-              <HorarioAtencionPanel />
               <PatientList />
+            </TabsContent>
+
+            {/* CONTENIDO: HORARIOS DE ATENCIÓN (AMBAS ÁREAS) */}
+            <TabsContent value="horarios" className="animate-in fade-in duration-500">
+              <HorarioAtencionPanel />
             </TabsContent>
 
             <TabsContent value="histories">

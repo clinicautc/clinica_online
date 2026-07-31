@@ -195,14 +195,11 @@ const routeDefinitions = [
 
   /**
    * RUTA: VISOR DE HISTORIAL CLÍNICO (Sincronizada con Dashboards)
-   * Esta ruta permite cargar el historial por paciente e identificar el área.
+   * Sin segmento de área en la URL — MedicalHistoryViewer la resuelve sola
+   * (el área del usuario si es admin/practicante, o un selector si es master).
    */
-  /**
- * RUTA: VISOR DE HISTORIAL CLÍNICO (Sincronizada con Dashboards)
- * Esta es la pieza que falta para que el Login no te expulse.
- */
 {
-  path: '/historial/:id/:area', // <--- Asegúrate de que coincida con el navigate del dashboard
+  path: '/historial/:id',
   element: (
     <ProtectedRoute allowedRoles={['practicante', 'admin', 'master']}>
       <MedicalHistoryViewer />

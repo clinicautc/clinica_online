@@ -24,7 +24,7 @@ const SeguimientoNutricional = () => {
   const { user } = useAuth();
   const puedeEditar = user?.rol === 'admin' || user?.rol === 'master';
 
-  const handleVolver = () => navigate(`/historial/${formData.paciente_id}/nutricion`);
+  const handleVolver = () => navigate(`/historial/${formData.paciente_id}`);
   const handleImprimir = () => window.print();
   const handleEditar = () => navigate(`/forms/seguimiento-nutricional/${appointmentId}`);
 
