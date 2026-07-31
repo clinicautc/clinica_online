@@ -53,6 +53,21 @@ function getNodemailerFromAddress() {
   return process.env.EMAIL_USER;
 }
 
+// Dominios de correo público/conocido. Nunca deben quedar mapeados a un
+// proveedor distinto de Resend en enviarCorreo() — ver el guard más abajo.
+// reenviarCorreo() también usa esta lista para no insertarlos jamás en
+// correos_especiales (ese INSERT es solo para dominios institucionales).
+const DOMINIOS_PUBLICOS = [
+  'gmail.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'yahoo.com',
+  'icloud.com',
+  'proton.me',
+  'protonmail.com'
+];
+
 async function enviarCorreo(destino, asunto, html) {
 
     // ==========================================================
@@ -91,6 +106,24 @@ if (resultado.rows.length > 0) {
 }
 
 // ==========================================================
+// GUARD: dominios públicos nunca deben salir por otra vía que no
+// sea Resend, sin importar lo que diga la tabla. Protege contra
+// filas insertadas a mano por fuera del código (ya pasó una vez
+// con hotmail.com) — correos_especiales solo debe tener dominios
+// institucionales.
+// ==========================================================
+
+if (DOMINIOS_PUBLICOS.includes(dominio) && proveedor !== 'resend') {
+
+  console.warn(
+    `[emailService] ${dominio} es un dominio público pero está mapeado a "${proveedor}" en correos_especiales. Forzando Resend.`
+  );
+
+  proveedor = 'resend';
+
+}
+
+// ==========================================================
 // MOSTRAR PROVEEDOR ELEGIDO
 // ==========================================================
 
@@ -111,12 +144,20 @@ if (proveedor === 'nodemailer') {
     throw new Error('NodeMailer no configurado (faltan EMAIL_USER/EMAIL_PASS).');
   }
 
-  const info = await transporter.sendMail({
-    from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
-    to: destino,
-    subject: asunto,
-    html: html
-  });
+  let info;
+  try {
+    info = await transporter.sendMail({
+      from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
+      to: destino,
+      subject: asunto,
+      html: html
+    });
+  } catch (error) {
+    console.error(
+      `[emailService] NodeMailer falló para ${destino} — code=${error.code || 'N/A'}: ${error.message}`
+    );
+    throw error;
+  }
 
   console.log(
     'Correo enviado por NodeMailer'
@@ -151,6 +192,10 @@ if (proveedor === 'resend') {
 
   if (error) {
 
+    console.error(
+      `[emailService] Resend falló para ${destino}: ${error.message || error}`
+    );
+
     throw error;
 
   }
@@ -179,26 +224,10 @@ const dominio = destino
 
 
 // ==========================================================
-// DOMINIOS PÚBLICOS
-// ==========================================================
-
-const dominiosPublicos = [
-  'gmail.com',
-  'hotmail.com',
-  'outlook.com',
-  'live.com',
-  'yahoo.com',
-  'icloud.com',
-  'proton.me',
-  'protonmail.com'
-];
-
-
-// ==========================================================
 // AGREGAR A correos_especiales
 // ==========================================================
 
-if (!dominiosPublicos.includes(dominio)) {
+if (!DOMINIOS_PUBLICOS.includes(dominio)) {
 
   const existe = await pool.query(
     `
@@ -237,17 +266,20 @@ if (!transporter) {
   throw new Error('NodeMailer no configurado (faltan EMAIL_USER/EMAIL_PASS).');
 }
 
-const info = await transporter.sendMail({
-
-  from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
-
-  to: destino,
-
-  subject: asunto,
-
-  html: html
-
-});
+let info;
+try {
+  info = await transporter.sendMail({
+    from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
+    to: destino,
+    subject: asunto,
+    html: html
+  });
+} catch (error) {
+  console.error(
+    `[emailService] NodeMailer (reenvío) falló para ${destino} — code=${error.code || 'N/A'}: ${error.message}`
+  );
+  throw error;
+}
 
 console.log(
   `Correo reenviado por NodeMailer a ${destino}`
