@@ -9,6 +9,21 @@ interface BodyMarkerDiagramProps {
   onChangeMarkers: (markers: BodyMarkerPct[]) => void;
   withMarkerId?: boolean;
   heightClass?: string;
+  /**
+   * Relación de aspecto real de la imagen ("ancho/alto", ej. "585/521").
+   * Sin esto, el contenedor usa una altura fija (heightClass) + flexbox para
+   * centrar la imagen (object-contain) — si la imagen no llena el
+   * contenedor en algún eje queda una franja vacía ("letterbox"), y el %
+   * del clic se calcula sobre el CONTENEDOR completo (letterbox incluido),
+   * no sobre la imagen. Eso es inofensivo mientras el tamaño del
+   * contenedor nunca cambie, pero si se agranda/achica después de guardar
+   * marcas, el letterbox se redistribuye y las marcas guardadas (mismo %,
+   * ahora relativo a un letterbox distinto) aparecen desplazadas respecto
+   * a la imagen. Fijando aspect-ratio al de la imagen real, esta nunca
+   * necesita letterbox (siempre llena el contenedor en ambos ejes), así
+   * que contenedor% === imagen% sin importar el tamaño elegido.
+   */
+  aspectRatio?: string;
 }
 
 /**
@@ -17,14 +32,17 @@ interface BodyMarkerDiagramProps {
  * que el contenedor se monta (mismo tamaño real disponible vía
  * getBoundingClientRect), y de ahí en adelante trabaja siempre en %.
  */
-export default function BodyMarkerDiagram({ image, alt, markers, onChangeMarkers, withMarkerId, heightClass = 'h-56' }: BodyMarkerDiagramProps) {
+export default function BodyMarkerDiagram({ image, alt, markers, onChangeMarkers, withMarkerId, heightClass = 'h-56', aspectRatio }: BodyMarkerDiagramProps) {
   const { containerRef, addMarker, normalizeMarkers } = useBodyMarkers();
   const [normalized, setNormalized] = useState<BodyMarkerPct[] | null>(null);
 
   useEffect(() => {
-    if (normalized === null && markers) {
-      setNormalized(normalizeMarkers(markers as any));
-    }
+    // Recalcula cada vez que cambian los marcadores de origen (no solo la
+    // primera vez): el estado inicial del formulario ya trae `markers = []`
+    // (arreglo vacío, "truthy") antes de que llegue el expediente real desde
+    // la API — un guard de "solo una vez" se quedaría fijo en ese `[]`
+    // transitorio y nunca reflejaría los marcadores reales una vez cargados.
+    setNormalized(markers && markers.length > 0 ? normalizeMarkers(markers as any) : []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markers]);
 
@@ -49,7 +67,8 @@ export default function BodyMarkerDiagram({ image, alt, markers, onChangeMarkers
       <div
         ref={containerRef}
         onClick={handleClick}
-        className={`relative w-full ${heightClass} bg-white rounded-lg border border-slate-200 cursor-crosshair flex items-center justify-center overflow-hidden`}
+        className={`relative w-full ${aspectRatio ? '' : heightClass} bg-white rounded-lg border border-slate-200 cursor-crosshair flex items-center justify-center overflow-hidden`}
+        style={aspectRatio ? { aspectRatio } : undefined}
       >
         <img src={image} alt={alt} className="max-w-full max-h-full object-contain pointer-events-none select-none" />
         {displayMarkers.map((m, i) => (

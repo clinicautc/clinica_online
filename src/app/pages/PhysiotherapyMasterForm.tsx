@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePhysiotherapyValoracionData } from '../hooks/formClinico/usePhysiotherapyValoracionData';
+import { useBodyMarkers, type BodyMarkerPct } from '../hooks/formClinico/useBodyMarkers';
 import { usePrintFitScale } from '../hooks/usePrintFitScale';
 import { useScreenFitScale } from '../hooks/useScreenFitScale';
 import { useAuth } from '../contexts/AuthContext';
@@ -148,6 +149,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         fieldset:disabled .controls-bar-p2,
         fieldset:disabled .btn-anterior-p3,
         fieldset:disabled .btn-finalizar-p3,
+        fieldset:disabled .eraser-container,
         fieldset:disabled .eraser-container-p3 { display: none !important; }
 
         /* Configuraciones Generales */
@@ -192,27 +194,45 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           .hc-body { zoom: 1.5; }
         }
 
-        /* CONTENEDOR PRINCIPAL: Espaciado expandido para llenar la hoja */
+        /* CONTENEDOR PRINCIPAL — geometría replicada literalmente de la
+           referencia de diseño aportada (basada en el PDF oficial). */
         .page {
             zoom: var(--screen-scale, 1);
             background-color: #fff;
             width: var(--screen-width, 215.9mm);
             flex-shrink: 0;
             min-height: 279.4mm;
-            padding: 10mm 14mm 8mm 14mm;
+            padding: 10mm 5mm 8mm 5mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             color: #5575B3;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
+        .page::before {
+            content: "utc";
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 280px;
+            font-weight: 900;
+            color: rgba(230, 235, 240, 0.3);
+            z-index: 0;
+            pointer-events: none;
+            letter-spacing: -15px;
+        }
+        .page > * { position: relative; z-index: 1; }
 
-        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0px; }
-        .logo { display: flex; flex-direction: column; color: #2A4B8C; width: 130px;}
+        /* ENCABEZADO */
+        .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 5px; }
+        /* Mismo tamaño que el logo del documento de Nutrición
+           (NutritionMasterForm.tsx: h-[80px] w-[100px]). */
+        .logo { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #2A4B8C; width: 100px; height: 80px; }
         .logo h1 { font-size: 48px; letter-spacing: -2px; margin-bottom: -5px; font-weight: 900; text-transform: lowercase; }
         .logo p { font-size: 10px; line-height: 1.1; font-weight: bold; }
         .title-section { flex-grow: 1; margin-left: 15px; display: flex; flex-direction: column;}
@@ -221,21 +241,21 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             background-color: #2A4B8C;
             color: #fff;
             text-align: center;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
-            padding: 10px 20px;
+            padding: 8px;
             border-radius: 20px;
             print-color-adjust: exact;
         }
         .title-sub-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; padding: 0 10px; }
-        .address { font-size: 11px; color: #5575B3; font-weight: bold;}
-        .fecha-container { display: flex; align-items: flex-end; width: 160px; }
+        .address { font-size: 10px; color: #2A4B8C; font-weight: bold;}
+        .fecha-container { display: flex; align-items: flex-end; width: 140px; }
 
         .box {
             border: 2px solid #2A4B8C;
             border-radius: 8px;
             position: relative;
-            padding: 20px 14px 14px 14px;
+            padding: 16px 8px 8px 8px;
             background: transparent;
             width: 100%;
             display: flex;
@@ -243,14 +263,14 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         }
         .box-title {
             position: absolute;
-            top: -13px;
+            top: -10px;
             left: 50%;
             transform: translateX(-50%);
             background-color: #2A4B8C;
             color: white;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            padding: 4px 20px;
+            padding: 2px 20px;
             border-radius: 10px;
             print-color-adjust: exact;
             white-space: nowrap;
@@ -258,74 +278,97 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         }
         .box-title.left-aligned { left: 15px; transform: none; }
 
-        .form-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-bottom: 10px; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 6px; }
         .field { display: flex; align-items: flex-end; flex-grow: 1; }
-        .field-label { font-weight: bold; font-size: 12px; color: #2A4B8C; margin-right: 5px; white-space: nowrap; }
+        .field-label { font-weight: bold; font-size: 10px; color: #2A4B8C; margin-right: 4px; white-space: nowrap; }
         input.line-input {
             border: none;
-            border-bottom: 1.5px solid #5575B3;
+            border-bottom: 1.2px solid #5575B3;
             background: transparent;
-            font-size: 12px;
-            color: #000;
+            font-size: 11px;
+            color: #333;
             flex-grow: 1;
-            height: 22px;
-            min-height: 22px;
+            height: 16px;
+            min-height: 16px;
             outline: none;
             width: 100%;
             font-family: Arial, sans-serif;
-            text-transform: capitalize;
+            padding-left: 4px;
         }
 
-        .chk-group { display: flex; align-items: center; gap: 8px; color: #5575B3; flex-wrap: wrap;}
-        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 12px;}
+        .chk-group { display: flex; align-items: center; gap: 8px; color: #2A4B8C; font-size: 10px; flex-wrap: wrap;}
+        .chk-label { display: flex; align-items: center; cursor: pointer; white-space: nowrap; font-weight: bold; font-size: 10px;}
         input[type="checkbox"], input[type="radio"] {
             appearance: none;
-            width: 13px; height: 13px;
+            width: 12px; height: 12px;
             border: 1.5px solid #2A4B8C;
             margin-right: 4px; position: relative; cursor: pointer;
             display: grid; place-content: center;
             background-color: #fff;
         }
+        input[type="radio"] { border-radius: 50%; }
         input[type="checkbox"]:checked::after, input[type="radio"]:checked::after {
-            content: '✓'; position: absolute; top: -3px; left: 1px;
-            font-size: 13px; color: #2A4B8C; font-weight: bold;
+            content: '✓'; position: absolute; top: -4px; left: 0px;
+            font-size: 12px; color: #2A4B8C; font-weight: bold;
         }
 
-        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 10px; flex-wrap: wrap; gap: 6px; }
-        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 12px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 5px; }
+        /* "Datos personales" compactada: reduce aún más tipografía/espaciado
+           respecto a la base general de arriba, para que la fila
+           Sexo/Edo.civil/Ocupación/F-N no haga wrap y duplique el alto. */
+        .box-datos-personales {
+            padding: 8px 10px 4px 10px;
+            gap: 0;
+        }
+        .box-datos-personales .form-row { gap: 4px 10px; margin-bottom: 2px; }
+        .box-datos-personales .field-label { font-size: 9.5px; }
+        .box-datos-personales input.line-input { font-size: 9.5px; height: 15px; min-height: 15px; }
+        .box-datos-personales .chk-label { font-size: 9.5px; }
+        .box-datos-personales input[type="checkbox"],
+        .box-datos-personales input[type="radio"] { width: 10px; height: 10px; }
+        .box-datos-personales input[type="checkbox"]:checked::after,
+        .box-datos-personales input[type="radio"]:checked::after { font-size: 10px; top: -2.5px; left: 0.5px; }
+
+        .escala-dolor-container { height: 70px; margin-top: 15px; width: 100%; display: flex; justify-content: center; align-items: center; }
+        .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 8px; flex-wrap: wrap; gap: 6px; }
+        .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 9px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 4px; }
 
         .table-responsive { width: 100%; overflow: visible; }
-        table { width: 100%; border-collapse: collapse; text-align: center; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 9px; }
+        th { color: #2A4B8C; font-weight: bold; padding: 3px; border: 1px solid #2A4B8C; background-color: rgba(240, 244, 250, 0.5); }
+        td { border: 1px solid #2A4B8C; padding: 3px; vertical-align: middle; color: #333; }
         .text-left { text-align: left; padding-left: 6px; }
 
-        /* TABLA DE ANTECEDENTES EXPANDIDA */
+        /* TABLA DE ANTECEDENTES */
         .tabla-antecedentes th, .tabla-antecedentes td {
             border: 1px solid #2A4B8C !important;
             color: #2A4B8C !important;
-            padding: 5px 6px;
-            height: 27px;
+            padding: 3px;
         }
-        .tabla-antecedentes th { background-color: transparent !important; font-size: 12px; }
-        .tabla-antecedentes td.text-left { font-size: 11px; }
+        .tabla-antecedentes th { background-color: rgba(240, 244, 250, 0.5) !important; font-size: 9px; }
+        .tabla-antecedentes td.text-left { font-size: 9px; color: #333 !important; }
+
+        .free-text { border: none; background: transparent; width: 100%; height: 100%; resize: none; outline: none; font-size: 9px; font-family: inherit; color: #333; min-height: 16px; text-align: center; }
 
         .grid-60-40 { display: grid; grid-template-columns: 63% 35%; gap: 2%; }
-        .grid-3-col { display: grid; grid-template-columns: 28% 34% 34%; gap: 2%; flex-grow: 1;}
+        .grid-55-43 { display: grid; grid-template-columns: 55% 43%; gap: 2%; }
+        .grid-3-col { display: grid; grid-template-columns: 32% 32% 32%; gap: 2%; flex-grow: 1;}
 
-        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 13px; padding: 6px 0; text-align: center; width: 100%; print-color-adjust: exact; margin-bottom: 2px; }
+        .full-width-title { background-color: #2A4B8C; color: white; font-weight: bold; font-size: 13px; padding: 4px 0; text-align: center; width: 100%; print-color-adjust: exact; border-radius: 6px 6px 0 0; }
 
         /* LÍNEAS DE ESCRITURA SEPARADAS */
-        .blank-lines { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; flex-grow: 1; justify-content: flex-start; }
+        .blank-lines { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; flex-grow: 1; justify-content: flex-start; }
         .motivo-container { display: flex; gap: 15px; flex-grow: 1; padding: 6px 0;}
-        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 18px; justify-content: flex-start; margin-top: 6px; }
+        .motivo-lines { flex: 1; display: flex; flex-direction: column; gap: 14px; justify-content: flex-start; margin-top: 6px; }
 
-        /* ALICIA AJUSTADA */
-        .alicia-box { width: 195px; font-size: 11px; border-left: 1.5px solid #2A4B8C; padding-left: 15px; display: flex; flex-direction: column; justify-content: center; line-height: 1.9;}
-        .alicia-box b { color: #2A4B8C; font-size: 13px; margin-bottom: 5px;}
+        /* ALICIA */
+        .alicia-box { width: 200px; font-size: 9px; border-left: 1px solid #2A4B8C; padding-left: 15px; margin-left: 15px; display: flex; flex-direction: column; justify-content: center; line-height: 1.4; color: #2A4B8C; }
+        .alicia-box p.alicia-title { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
+        .alicia-box ul { padding-left: 12px; }
 
         /* FOOTER */
-        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 10px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 8px;}
-        .page-num { font-size: 15px; font-weight: bold; color: #2A4B8C; }
-        
+        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 4px;}
+        .page-num { font-size: 14px; font-weight: bold; color: #2A4B8C; }
+
         .btn-salir-fixed { position: fixed; top: 64px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
         .btn-siguiente-fixed { position: fixed; bottom: 32px; right: 32px; padding: 12px 32px; border-radius: 9999px; font-weight: bold; z-index: 50; border: none; transition: all 0.2s; background-color: #16a34a; color: white; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
         .btn-siguiente-fixed:hover { transform: scale(1.05); background-color: #15803d; }
@@ -345,7 +388,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                 page-break-after: always;
                 width: var(--print-width, 215.9mm) !important;
                 min-height: 279.4mm !important;
-                padding: 10mm 14mm 8mm 14mm !important;
+                padding: 10mm 5mm 8mm 5mm !important;
                 position: relative !important;
                 margin: 0 auto !important;
                 /* Escala calculada en tiempo real por usePrintFitScale — NUNCA
@@ -359,7 +402,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
       ` }} />
 
       <div className="hc-container hc-body">
-        
+
         {/* BOTONES FLOTANTES RESTAURADOS AQUÍ */}
         <button className="btn-salir-fixed" onClick={onBack}>Salir</button>
         <button className="btn-siguiente-fixed" onClick={onNext}>Siguiente (P2) →</button>
@@ -369,12 +412,12 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           {/* HEADER */}
           <div className="header">
             <div className="logo">
-              <img src={logoUtc} alt="Universidad Tres Culturas" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+              <img src={logoUtc} alt="Universidad Tres Culturas" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div className="title-section">
               <div className="main-title">Historia Clínica Fisioterapéutica</div>
               <div className="title-sub-row">
-                <div className="address">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</div>
+                <span className="address">Av. Insurgentes Sur 92, Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX</span>
                 <div className="fecha-container">
                   <span className="field-label">Fecha:</span>
                   <input type="text" className="line-input" value={accumulatedData.pagina_1.fecha || ''} onChange={(e) => handleInputChange(e, 'fecha')} />
@@ -384,7 +427,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           </div>
 
           {/* DATOS PERSONALES */}
-          <div className="box" style={{ marginTop: '0' }}>
+          <div className="box box-datos-personales" style={{ marginTop: '0' }}>
             <div className="box-title left-aligned">Datos personales</div>
             <div className="form-row">
               <div className="field" style={{ flex: 3 }}>
@@ -401,22 +444,22 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
               </div>
             </div>
             <div className="form-row">
-              <div className="field chk-group" style={{ flex: 1 }}>
+              <div className="field chk-group" style={{ flex: 0.9 }}>
                 <span className="field-label">Sexo</span>
                 <label className="chk-label"><input type="radio" name="sexo" checked={accumulatedData.pagina_1.sexo === 'Fem'} onChange={() => onUpdate('pagina_1', { sexo: 'Fem' })} /> Fem</label>
                 <label className="chk-label"><input type="radio" name="sexo" checked={accumulatedData.pagina_1.sexo === 'Mas'} onChange={() => onUpdate('pagina_1', { sexo: 'Mas' })} /> Mas</label>
               </div>
-              <div className="field chk-group" style={{ flex: 1.5 }}>
+              <div className="field chk-group" style={{ flex: 1.9 }}>
                 <span className="field-label">Edo. civil</span>
                 {['Soltero', 'Casado', 'Viuda(o)'].map(civil => (
                   <label key={civil} className="chk-label"><input type="radio" name="civil" checked={accumulatedData.pagina_1.civil === civil} onChange={() => onUpdate('pagina_1', { civil })} /> {civil}</label>
                 ))}
               </div>
-              <div className="field" style={{ flex: 1.5 }}>
+              <div className="field" style={{ flex: 1.3 }}>
                 <span className="field-label">Ocupación</span>
                 <input type="text" className="line-input" value={accumulatedData.pagina_1.ocupacion || ''} onChange={(e) => handleInputChange(e, 'ocupacion')} />
               </div>
-              <div className="field" style={{ flex: 0.8 }}>
+              <div className="field" style={{ flex: 0.7 }}>
                 <span className="field-label">F/N</span>
                 <input type="text" className="line-input" value={accumulatedData.pagina_1.fn || ''} onChange={(e) => handleInputChange(e, 'fn')} />
               </div>
@@ -459,11 +502,32 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
               </div>
             </div>
             <div className="box">
-              <div className="box-title left-aligned">Antecedentes personales</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', marginTop: '10px' }}>
-                {['Diabetes', 'Obesidad', 'Hipertensión', 'Renales', 'Endocrinas', 'Tiroidea', 'Fracturas', 'Esguinces'].map(item => (
-                  <label key={item} className="chk-label"><input type="checkbox" checked={accumulatedData.pagina_1[`pers-${item}`] || false} onChange={(e) => handleCheckboxChange(`pers-${item}`, e.target.checked)} /> {item}</label>
+              <div className="box-title left-aligned">Antecedentes patológicos personales</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '5px' }}>
+                {[
+                  { key: 'Diabetes', label: 'Diabetes Mellitus' },
+                  { key: 'Obesidad', label: 'Obesidad o Sobrepeso' },
+                  { key: 'Hipertensión', label: 'Hipertensión' },
+                  { key: 'Renales', label: 'Enfermedades Renales' },
+                  { key: 'Endocrinas', label: 'Enfermedades Endocrinas' },
+                  { key: 'Tiroidea', label: 'Enfermedad Tiroidea' },
+                  { key: 'Psiquiatricas', label: 'Enfermedades Psiquiátricas' },
+                  { key: 'Neurologicas', label: 'Enfermedades Neurológicas' },
+                  { key: 'Autoinmunes', label: 'Enfermedades Autoinmunes' },
+                  { key: 'Gastrointestinales', label: 'Enfermedades Gastrointestinales' },
+                  { key: 'Fracturas', label: 'Fracturas' },
+                  { key: 'Esguinces', label: 'Esguinces' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="chk-label"><input type="checkbox" checked={accumulatedData.pagina_1[`pers-${key}`] || false} onChange={(e) => handleCheckboxChange(`pers-${key}`, e.target.checked)} /> {label}</label>
                 ))}
+                <label className="chk-label" style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" checked={accumulatedData.pagina_1['pers-Cancer'] || false} onChange={(e) => handleCheckboxChange('pers-Cancer', e.target.checked)} /> Cáncer, tipo:
+                  <input type="text" className="line-input" style={{ marginLeft: '5px' }} value={accumulatedData.pagina_1.pers_cancer_tipo || ''} onChange={(e) => handleInputChange(e, 'pers_cancer_tipo')} />
+                </label>
+                <label className="chk-label" style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" checked={accumulatedData.pagina_1['pers-Otras'] || false} onChange={(e) => handleCheckboxChange('pers-Otras', e.target.checked)} /> Otras:
+                  <input type="text" className="line-input" style={{ marginLeft: '5px' }} value={accumulatedData.pagina_1.pers_otras_tipo || ''} onChange={(e) => handleInputChange(e, 'pers_otras_tipo')} />
+                </label>
               </div>
             </div>
           </div>
@@ -471,7 +535,9 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           <div className="grid-3-col">
             <div className="box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
               <div className="box-title">Dolor</div>
-              <img src={caritasImg} alt="EVA" style={{ maxWidth: '95%', height: 'auto', marginBottom: '8px', marginTop: '16px' }} />
+              <div className="escala-dolor-container">
+                <img src={caritasImg} alt="EVA" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
               <div className="escala-dolor-chk">
                 {[...Array(10)].map((_, i) => (
                   <label key={i+1}>{i+1}<input type="checkbox" checked={accumulatedData.pagina_1.dolor_escala === (i+1)} onChange={() => onUpdate('pagina_1', { dolor_escala: (i+1) })} /></label>
@@ -492,21 +558,155 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             </div>
           </div>
 
-          <div className="box">
+          {/* BLOQUE INFERIOR: Estudios de gabinete / Qx o Tx previos / Antecedentes personales no patológicos */}
+          <div className="grid-3-col" style={{ marginTop: '8px' }}>
+            <div className="box">
+              <div className="box-title">Estudios de gabinete</div>
+              <div className="blank-lines">
+                {[...Array(4)].map((_, i) => <input key={i} type="text" className="line-input" value={accumulatedData.pagina_1[`estudio_gabinete_${i}`] || ''} onChange={(e) => handleInputChange(e, `estudio_gabinete_${i}`)} />)}
+              </div>
+            </div>
+            <div className="box">
+              <div className="box-title">Qx o Tx previos</div>
+              <div className="blank-lines">
+                {[...Array(4)].map((_, i) => <input key={i} type="text" className="line-input" value={accumulatedData.pagina_1[`qx_tx_${i}`] || ''} onChange={(e) => handleInputChange(e, `qx_tx_${i}`)} />)}
+              </div>
+            </div>
+            <div className="box" style={{ padding: 0, borderWidth: '2px' }}>
+              <div className="full-width-title" style={{ fontSize: '10px' }}>Antecedentes personales no patológicos</div>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr><th></th><th>Frecuencia</th><th>Cantidad</th></tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { key: 'Habito tabaquico', label: 'Hábito tabáquico' },
+                      { key: 'Consumo de alcohol', label: 'Consumo de alcohol' },
+                      { key: 'Consumo de drogas', label: 'Consumo de drogas' },
+                    ].map(({ key, label }, i) => (
+                      <tr key={key}>
+                        <td className="text-left">
+                          <label className="chk-label"><input type="checkbox" checked={accumulatedData.pagina_1[`no_pat-${key}`] || false} onChange={(e) => handleCheckboxChange(`no_pat-${key}`, e.target.checked)} /> {label}</label>
+                        </td>
+                        <td><input type="text" className="free-text" value={accumulatedData.pagina_1[`no_pat_frecuencia_${i}`] || ''} onChange={(e) => handleInputChange(e, `no_pat_frecuencia_${i}`)} /></td>
+                        <td><input type="text" className="free-text" value={accumulatedData.pagina_1[`no_pat_cantidad_${i}`] || ''} onChange={(e) => handleInputChange(e, `no_pat_cantidad_${i}`)} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Ejercicio / Antecedentes gineco-obstétricos */}
+          <div className="grid-55-43">
+            <div className="box" style={{ padding: '18px 10px 5px 10px' }}>
+              <div className="box-title">Ejercicio</div>
+              <div className="form-row" style={{ marginBottom: '8px' }}>
+                <div className="field chk-group">
+                  <span className="field-label">Realiza ejercicio</span>
+                  <label className="chk-label"><input type="radio" name="ejercicio_realiza" checked={accumulatedData.pagina_1.ejercicio_realiza === 'No'} onChange={() => onUpdate('pagina_1', { ejercicio_realiza: 'No' })} /> No</label>
+                  <label className="chk-label"><input type="radio" name="ejercicio_realiza" checked={accumulatedData.pagina_1.ejercicio_realiza === 'Si'} onChange={() => onUpdate('pagina_1', { ejercicio_realiza: 'Si' })} /> Sí</label>
+                </div>
+                <div className="field" style={{ marginLeft: '10px' }}>
+                  <span className="field-label">¿Cuál?</span>
+                  <input type="text" className="line-input" value={accumulatedData.pagina_1.ejercicio_cual || ''} onChange={(e) => handleInputChange(e, 'ejercicio_cual')} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="field">
+                  <span className="field-label">Frecuencia</span>
+                  <input type="text" className="line-input" value={accumulatedData.pagina_1.ejercicio_frecuencia || ''} onChange={(e) => handleInputChange(e, 'ejercicio_frecuencia')} />
+                </div>
+                <div className="field">
+                  <span className="field-label">Intensidad</span>
+                  <input type="text" className="line-input" value={accumulatedData.pagina_1.ejercicio_intensidad || ''} onChange={(e) => handleInputChange(e, 'ejercicio_intensidad')} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="field">
+                  <span className="field-label">Tiempo</span>
+                  <input type="text" className="line-input" value={accumulatedData.pagina_1.ejercicio_tiempo || ''} onChange={(e) => handleInputChange(e, 'ejercicio_tiempo')} />
+                </div>
+              </div>
+            </div>
+
+            <div className="box" style={{ padding: '18px 10px 5px 10px' }}>
+              <div className="box-title">Antecedentes gineco-obstétricos</div>
+              <div className="form-row" style={{ marginBottom: '6px' }}>
+                <div className="field" style={{ flex: '0 0 auto' }}>
+                  <span className="field-label">Gestas</span>
+                  <input type="text" className="line-input" style={{ width: '30px' }} value={accumulatedData.pagina_1.gineco_gestas || ''} onChange={(e) => handleInputChange(e, 'gineco_gestas')} />
+                </div>
+                <div className="field" style={{ flex: '0 0 auto' }}>
+                  <span className="field-label" style={{ fontWeight: 'normal' }}>de las cuales fueron: P</span>
+                  <input type="text" className="line-input" style={{ width: '25px' }} value={accumulatedData.pagina_1.gineco_partos || ''} onChange={(e) => handleInputChange(e, 'gineco_partos')} />
+                </div>
+                <div className="field" style={{ flex: '0 0 auto' }}>
+                  <span className="field-label">C</span>
+                  <input type="text" className="line-input" style={{ width: '25px' }} value={accumulatedData.pagina_1.gineco_cesarea || ''} onChange={(e) => handleInputChange(e, 'gineco_cesarea')} />
+                </div>
+                <div className="field" style={{ flex: '0 0 auto' }}>
+                  <span className="field-label">A</span>
+                  <input type="text" className="line-input" style={{ width: '25px' }} value={accumulatedData.pagina_1.gineco_abortos || ''} onChange={(e) => handleInputChange(e, 'gineco_abortos')} />
+                </div>
+              </div>
+              <div className="form-row" style={{ marginBottom: '6px' }}>
+                <div className="field" style={{ flex: '0 0 auto' }}>
+                  <span className="field-label">FUM</span>
+                  <input type="text" className="line-input" style={{ width: '40px' }} value={accumulatedData.pagina_1.gineco_fum || ''} onChange={(e) => handleInputChange(e, 'gineco_fum')} />
+                </div>
+                <div className="field chk-group" style={{ marginLeft: '5px' }}>
+                  <span className="field-label">Embarazo</span>
+                  <label className="chk-label"><input type="radio" name="gineco_embarazo" checked={accumulatedData.pagina_1.gineco_embarazo === 'No'} onChange={() => onUpdate('pagina_1', { gineco_embarazo: 'No' })} /> No</label>
+                  <label className="chk-label"><input type="radio" name="gineco_embarazo" checked={accumulatedData.pagina_1.gineco_embarazo === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_embarazo: 'Si' })} /> Sí</label>
+                </div>
+                <div className="field" style={{ flex: '0 0 auto', marginLeft: '5px' }}>
+                  <span className="field-label">SDG</span>
+                  <input type="text" className="line-input" style={{ width: '30px' }} value={accumulatedData.pagina_1.gineco_sdg || ''} onChange={(e) => handleInputChange(e, 'gineco_sdg')} />
+                </div>
+              </div>
+              <div className="form-row" style={{ marginBottom: '6px' }}>
+                <div className="field chk-group">
+                  <span className="field-label">Remplazo hormonal</span>
+                  <label className="chk-label"><input type="radio" name="gineco_reemplazo_hormonal" checked={accumulatedData.pagina_1.gineco_reemplazo_hormonal === 'No'} onChange={() => onUpdate('pagina_1', { gineco_reemplazo_hormonal: 'No' })} /> No</label>
+                  <label className="chk-label"><input type="radio" name="gineco_reemplazo_hormonal" checked={accumulatedData.pagina_1.gineco_reemplazo_hormonal === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_reemplazo_hormonal: 'Si' })} /> Sí</label>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="field chk-group">
+                  <span className="field-label">Anticonceptivos</span>
+                  <label className="chk-label"><input type="radio" name="gineco_anticonceptivos" checked={accumulatedData.pagina_1.gineco_anticonceptivos === 'No'} onChange={() => onUpdate('pagina_1', { gineco_anticonceptivos: 'No' })} /> No</label>
+                  <label className="chk-label"><input type="radio" name="gineco_anticonceptivos" checked={accumulatedData.pagina_1.gineco_anticonceptivos === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_anticonceptivos: 'Si' })} /> Sí</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="box" style={{ flexGrow: 1 }}>
             <div className="box-title">Motivo de consulta</div>
             <div className="motivo-container">
               <div className="motivo-lines">
-                {[...Array(5)].map((_, i) => <input key={i} type="text" className="line-input" value={accumulatedData.pagina_1[`motivo_${i}`] || ''} onChange={(e) => handleInputChange(e, `motivo_${i}`)} />)}
+                {[...Array(7)].map((_, i) => <input key={i} type="text" className="line-input" value={accumulatedData.pagina_1[`motivo_${i}`] || ''} onChange={(e) => handleInputChange(e, `motivo_${i}`)} />)}
               </div>
               <div className="alicia-box">
-                <p><b>ALICIA:</b></p>
-                <p>A: Antigüedad<br/>L: Lugar<br/>I: Incidencia<br/>C: Característica<br/>I: Intensidad<br/>A: Agravantes</p>
+                <p className="alicia-title">Recordando, dolor (ALICIA),<br />donde:</p>
+                <ul>
+                  <li><b>A</b>ntigüedad</li>
+                  <li><b>L</b>ugar: Zona</li>
+                  <li><b>I</b>ncidencia: # episodios / frecuencia</li>
+                  <li><b>C</b>aracterísticas</li>
+                  <li><b>I</b>ntensidad</li>
+                  <li><b>A</b>gravantes</li>
+                </ul>
               </div>
             </div>
           </div>
 
           <div className="footer">
-            <p>ESA: Exploración sin alteraciones | ✓: Adecuado</p>
+            <p>ESA: Explorado y sin alteraciones; N/A: No Aplica; PN: Preguntado y negado; ✓: Adecuado.<br />
+            Aa: abuela; Ao: abuelo; Mat: materno (a); Pat: paterno (a); Qx: Cirugías; Tx: Tratamientos; Gestas: P: Partos; C: Cesárea; A: Abortos; FUM: Fecha de última menstruación; SDG: Semanas de Gestación</p>
             <div className="page-num">1</div>
           </div>
         </div>
@@ -527,7 +727,26 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
   onNext,
   isReadOnly,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { containerRef, addMarker, normalizeMarkers } = useBodyMarkers();
+  // Los marcadores se guardan en % (xPct/yPct) desde la captura en vivo
+  // (BodyMarkerDiagram/useBodyMarkers) — normalizeMarkers también convierte
+  // el formato legado en px absolutos ({x,y}) usando el tamaño real ya
+  // montado del contenedor. Sin esto, un marcador en % se renderizaba con
+  // `left`/`top` en `undefined` (CSS los ignora) y caía en la esquina del
+  // contenedor en vez de en el punto marcado.
+  const [normalizedMarkersP2, setNormalizedMarkersP2] = useState<BodyMarkerPct[] | null>(null);
+  useEffect(() => {
+    // Recalcula cada vez que cambian los marcadores de origen (no solo la
+    // primera vez): el estado inicial del formulario ya trae
+    // `pagina_2.markers = []` (arreglo vacío, "truthy") antes de que llegue
+    // el expediente real desde la API — un guard de "solo una vez" se
+    // quedaría fijo en ese `[]` transitorio y nunca reflejaría los
+    // marcadores reales una vez cargados.
+    const raw = accumulatedData.pagina_2.markers;
+    setNormalizedMarkersP2(raw && raw.length > 0 ? normalizeMarkers(raw) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accumulatedData.pagina_2.markers]);
+  const displayMarkersP2 = normalizedMarkersP2 ?? [];
 
   // Lógica de marcadores (X) adaptada para persistencia global en accumulatedData
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -535,17 +754,17 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
     // Evita marcar si se hace clic en el botón de borrar
     if ((e.target as HTMLElement).closest('.btn-clear-as-icon')) return;
 
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      const currentMarkers = accumulatedData.pagina_2.markers || [];
-      onUpdate('pagina_2', { markers: [...currentMarkers, { x, y }] });
+    const marker = addMarker(e);
+    if (marker) {
+      const currentMarkers = displayMarkersP2;
+      const next = [...currentMarkers, marker];
+      setNormalizedMarkersP2(next);
+      onUpdate('pagina_2', { markers: next });
     }
   };
 
   const clearAllMarkers = () => {
+    setNormalizedMarkersP2([]);
     onUpdate('pagina_2', { markers: [] });
   };
 
@@ -672,16 +891,33 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
             margin-left: auto;
             margin-right: auto;
             min-height: 279.4mm;
-            padding: 10mm 14mm 8mm 14mm;
+            /* Padding y proporciones replicadas de la referencia de diseño
+               (misma geometría que la página 1). */
+            padding: 10mm 5mm 8mm 5mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             color: var(--utc-blue);
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 8px;
             position: relative;
             overflow: hidden;
+            z-index: 1;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+        }
+
+        .page-p2::before {
+            content: "utc";
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 280px;
+            font-weight: 900;
+            color: rgba(230, 235, 240, 0.3);
+            z-index: -1;
+            pointer-events: none;
+            letter-spacing: -15px;
         }
 
         .box-p2 {
@@ -697,50 +933,50 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .box-header-p2 {
             background-color: var(--utc-blue);
             color: white;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: bold;
             text-align: center;
-            padding: 7px 0;
+            padding: 4px 0;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
 
         input.line-input-p2 {
             border: none;
-            border-bottom: 1.5px solid var(--utc-blue);
+            border-bottom: 1.2px solid var(--utc-blue);
             background: transparent;
-            font-size: 12px;
-            color: #000;
-            height: 20px;
+            font-size: 11px;
+            color: #333;
+            height: 16px;
             outline: none;
             width: 100%;
             font-family: Arial, sans-serif;
-            text-transform: capitalize;
+            padding-left: 4px;
         }
 
         .free-text-p2 {
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
-            font-size: 12px;
-            color: #000;
+            font-size: 10px;
+            color: #333;
             outline: none !important;
             resize: none;
             width: 100%;
             height: 100%;
-            min-height: 24px;
+            min-height: 18px;
             font-family: Arial, sans-serif;
             padding: 3px 6px;
             box-sizing: border-box;
             display: block;
         }
 
-        .chk-group-p2 { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;}
-        .chk-label-p2 { display: flex; align-items: center; cursor: pointer; font-size: 12px; color: var(--utc-blue);}
+        .chk-group-p2 { display: flex; align-items: center; gap: 30px; flex-wrap: wrap;}
+        .chk-label-p2 { display: flex; align-items: center; cursor: pointer; font-size: 11px; color: var(--utc-blue);}
 
         input[type="checkbox"] {
             appearance: none; -webkit-appearance: none;
-            width: 13px; height: 13px;
+            width: 12px; height: 12px;
             border: 1.5px solid var(--utc-blue);
             margin-right: 5px; position: relative; cursor: pointer;
             display: grid; place-content: center;
@@ -778,23 +1014,29 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
 
         .table-responsive-p2 { width: 100%; overflow: hidden; }
         .tabla-exploracion-p2 { width: 100%; border-collapse: collapse; text-align: center; }
-        .tabla-exploracion-p2 th { color: var(--utc-blue); font-size: 14px; padding: 6px; border-bottom: 1px solid var(--utc-blue); border-right: 1px solid var(--utc-blue); }
+        .tabla-exploracion-p2 th { color: var(--utc-blue); font-size: 12px; padding: 4px; border-bottom: 1px solid var(--utc-blue); border-right: 1px solid var(--utc-blue); }
 
-        .tabla-exploracion-p2 td { border: 1px solid var(--utc-blue); height: 28px; padding: 0; vertical-align: middle; }
-        .lbl-col-p2 { color: var(--utc-blue); font-size: 12px; width: 12%; text-align: center; padding: 5px;}
+        .tabla-exploracion-p2 td { border: 1px solid var(--utc-blue); height: 24px; padding: 0; vertical-align: middle; }
+        .lbl-col-p2 { color: var(--utc-blue); font-size: 11px; width: 12%; text-align: center; padding: 4px;}
 
         .zona-content { display: flex; padding: 14px 16px; }
         .zona-left { width: 35%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-right: 1px dashed #ccc; padding-right: 12px; }
         .zona-right { width: 65%; padding-left: 22px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
 
+        /* aspect-ratio fijo al de Humano_1.png (585/521) — ver el comentario
+           equivalente en .image-marker-container-p3 más abajo. Este caso en
+           particular ya medía bien (inline-block se ajusta al tamaño real de
+           la imagen), pero depende de que ningún ancestro fuerce un ancho
+           distinto; fijar el aspect-ratio lo hace robusto sin depender de eso. */
         .image-marker-container-p2 {
             position: relative;
-            display: inline-block;
+            width: 100%;
+            aspect-ratio: 585 / 521;
             cursor: crosshair;
         }
         .image-marker-container-p2 img {
-            max-width: 100%;
-            height: 210px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
         }
         .marker-p2 {
@@ -808,12 +1050,12 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         }
 
         .form-row-zona { display: flex; align-items: center; flex-wrap: wrap; }
-        .form-row-zona .lbl { width: 95px; font-weight: bold; font-size: 12px; color: var(--utc-blue); }
+        .form-row-zona .lbl { width: 90px; font-weight: bold; font-size: 11px; color: var(--utc-blue); }
         .otros-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
-        .otros-row .lbl { font-weight: bold; font-size: 12px; color: var(--utc-blue); }
+        .otros-row .lbl { font-weight: bold; font-size: 11px; color: var(--utc-blue); }
 
-        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 10px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 6px; }
-        .page-num-p2 { font-size: 15px; font-weight: bold; }
+        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 4px; }
+        .page-num-p2 { font-size: 14px; font-weight: bold; }
 
         @media print {
             @page { size: 215.9mm 279.4mm; margin: 0; }
@@ -826,7 +1068,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
                 page-break-after: always;
                 width: var(--print-width, 215.9mm) !important;
                 min-height: 279.4mm !important;
-                padding: 10mm 14mm 8mm 14mm !important;
+                padding: 10mm 5mm 8mm 5mm !important;
                 print-color-adjust: exact !important;
                 -webkit-print-color-adjust: exact !important;
                 /* Escala calculada en tiempo real por usePrintFitScale — NUNCA
@@ -1006,11 +1248,11 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
                   onClick={handleImageClick}
                 >
                   <img src={Humano1Img} alt="Ubicación Cuerpo" />
-                  {(accumulatedData.pagina_2.markers || []).map((marker: any, index: number) => (
+                  {displayMarkersP2.map((marker, index) => (
                     <div
-                      key={index}
+                      key={marker.id ?? index}
                       className="marker-p2"
-                      style={{ left: marker.x, top: marker.y }}
+                      style={{ left: `${marker.xPct}%`, top: `${marker.yPct}%` }}
                     >
                       ✖
                     </div>
@@ -1091,27 +1333,36 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
   onFinalizarDirecto,
   isReadOnly,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { containerRef, addMarker: addMarkerPct, normalizeMarkers } = useBodyMarkers();
   const [showConfirm, setShowConfirm] = React.useState(false);
+
+  // Ver el comentario equivalente en PhysiotherapyPage2Component: los
+  // marcadores se guardan en % (xPct/yPct), normalizeMarkers también
+  // convierte el formato legado en px absolutos.
+  const [normalizedMarkersP3, setNormalizedMarkersP3] = useState<BodyMarkerPct[] | null>(null);
+  useEffect(() => {
+    // Ver el comentario equivalente en PhysiotherapyPage2Component.
+    const raw = accumulatedData.pagina_3.markers;
+    setNormalizedMarkersP3(raw && raw.length > 0 ? normalizeMarkers(raw) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accumulatedData.pagina_3.markers]);
+  const displayMarkersP3 = normalizedMarkersP3 ?? [];
 
   // --- LÓGICA DE MARCADORES (P3 - Dermatomas) ---
   const addMarker = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isReadOnly) return;
     if ((e.target as HTMLElement).closest('.btn-clear-as-icon')) return;
 
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const currentMarkers = accumulatedData.pagina_3.markers || [];
-      onUpdate('pagina_3', {
-        markers: [...currentMarkers, { x, y, id: Date.now() }]
-      });
+    const marker = addMarkerPct(e, true);
+    if (marker) {
+      const next = [...displayMarkersP3, marker];
+      setNormalizedMarkersP3(next);
+      onUpdate('pagina_3', { markers: next });
     }
   };
 
   const clearMarkers = () => {
+    setNormalizedMarkersP3([]);
     onUpdate('pagina_3', { markers: [] });
   };
 
@@ -1212,12 +1463,14 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             margin-left: auto;
             margin-right: auto;
             min-height: 279.4mm;
-            padding: 10mm 14mm 8mm 14mm;
+            /* Padding y proporciones replicadas de la referencia de diseño
+               (misma geometría que las páginas 1 y 2). */
+            padding: 10mm 5mm 8mm 5mm;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             color: #1F4287;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 8px;
             position: relative;
             overflow: hidden;
             z-index: 1;
@@ -1252,10 +1505,10 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .box-title-p3 {
             background-color: #1F4287;
             color: white;
-            font-size: 15px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
-            padding: 7px 0;
+            padding: 4px 0;
             border-bottom: 1.5px solid #1F4287;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -1264,19 +1517,19 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .free-text-p3 {
             border: none !important;
             background: transparent !important;
-            font-size: 12px;
+            font-size: 10px;
             color: #333;
             outline: none !important;
             resize: none;
             width: 100%;
             height: 100%;
             font-family: Arial, sans-serif;
-            padding: 5px 7px;
+            padding: 3px 6px;
             display: block;
         }
 
         .tabla-p3 { width: 100%; border-collapse: collapse; text-align: center; height: 100%; }
-        .tabla-p3 th { color: #1F4287; font-size: 13px; font-weight: bold; padding: 8px 5px; border: 1px solid #1F4287; }
+        .tabla-p3 th { color: #1F4287; font-size: 9px; font-weight: bold; padding: 3px; border: 1px solid #1F4287; }
         .tabla-p3 td { border: 1px solid #1F4287; padding: 0; vertical-align: middle; }
 
         .movilidad-box-p3 th, .movilidad-box-p3 td, .movilidad-box-p3 textarea, .movilidad-box-p3 span {
@@ -1284,18 +1537,23 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         }
         .movilidad-box-p3 td { height: 15px !important; }
 
+        /*
+          aspect-ratio fijo al de Humano_2.png (636/601, medido del archivo)
+          en vez de height/min-height + flex-centrado: con eso, si la
+          imagen no llenaba el contenedor en algún eje quedaba una franja
+          vacía ("letterbox"), y los marcadores (guardados como % del
+          CONTENEDOR) se veían desplazados respecto a la imagen — mismo
+          bug que en BodyMarkerDiagram.tsx (captura), corregido igual aquí
+          para que contenedor% === imagen% siempre.
+        */
         .image-marker-container-p3 {
             position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            min-height: 250px;
+            width: 100%;
+            aspect-ratio: 636 / 601;
             cursor: crosshair;
-            padding: 10px;
             background-color: #fff;
         }
-        .image-marker-container-p3 img { max-width: 100%; max-height: 240px; object-fit: contain; }
+        .image-marker-container-p3 img { width: 100%; height: 100%; object-fit: contain; }
         .marker-p3 {
             position: absolute;
             color: #e74c3c;
@@ -1307,9 +1565,9 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         }
 
         .signatures-area-p3 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; padding: 0 30px; margin-bottom: 10px; }
-        .signature-line-p3 { border-top: 1.5px solid #1F4287; width: 42%; text-align: center; font-size: 12px; color: #1F4287; font-weight: bold; padding-top: 7px; }
+        .signature-line-p3 { border-top: 1.5px solid #1F4287; width: 42%; text-align: center; font-size: 11px; color: #1F4287; font-weight: bold; padding-top: 6px; }
 
-        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; color: #1F4287; margin-top: auto; }
+        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; color: #1F4287; margin-top: auto; border-top: 1px solid #1F4287; padding-top: 4px; }
 
         @media print {
             @page { size: 215.9mm 279.4mm; margin: 0; }
@@ -1317,7 +1575,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             .btn-anterior-p3, .btn-finalizar-p3, .eraser-container-p3 { display: none !important; }
             /* Escala calculada en tiempo real por usePrintFitScale — NUNCA un
                valor fijo. */
-            .page-p3 { box-shadow: none !important; width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; padding: 10mm 14mm 8mm 14mm !important; margin: 0 auto !important; zoom: var(--print-scale, 1) !important; }
+            .page-p3 { box-shadow: none !important; width: var(--print-width, 215.9mm) !important; min-height: 279.4mm !important; padding: 10mm 5mm 8mm 5mm !important; margin: 0 auto !important; zoom: var(--print-scale, 1) !important; }
         }
       `}</style>
 
@@ -1377,8 +1635,8 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
                 </div>
                 <div className="image-marker-container-p3" ref={containerRef} onClick={addMarker}>
                   <img src={Humano2Img} alt="Dermatomas" />
-                  {(accumulatedData.pagina_3.markers || []).map((marker: any) => (
-                    <div key={marker.id} className="marker-p3" style={{ left: marker.x, top: marker.y }}>✖</div>
+                  {displayMarkersP3.map((marker, index) => (
+                    <div key={marker.id ?? index} className="marker-p3" style={{ left: `${marker.xPct}%`, top: `${marker.yPct}%` }}>✖</div>
                   ))}
                 </div>
               </div>

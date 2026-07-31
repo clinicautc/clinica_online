@@ -247,6 +247,7 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
                   alt="Ubicación cuerpo"
                   markers={p2.markers}
                   onChangeMarkers={(markers) => set2({ markers })}
+                  aspectRatio="585/521"
                 />
               </div>
               <div className="space-y-3">
@@ -282,6 +283,7 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
                 markers={p3.markers}
                 onChangeMarkers={(markers) => set3({ markers })}
                 withMarkerId
+                aspectRatio="636/601"
               />
             </FormSectionCard>
 
