@@ -18,6 +18,20 @@ require('dotenv').config();
 // que usa dns.lookup internamente para conectar por SMTP).
 dns.setDefaultResultOrder('ipv4first');
 
+// Diagnóstico de arranque: confirma en los logs del host (ej. Render) que
+// este ajuste realmente quedó activo en el proceso que está corriendo, y
+// qué IPs está devolviendo la resolución real de smtp.gmail.com ahí. Si
+// aquí aparece "ipv4first" pero igual falla con una IP 2607:f8b0..., el
+// problema ya no es DNS — es la red saliente del host bloqueando SMTP.
+console.log('[emailService] DNS default order:', dns.getDefaultResultOrder ? dns.getDefaultResultOrder() : 'API no disponible en esta versión de Node');
+dns.lookup('smtp.gmail.com', { all: true }, (err, addresses) => {
+  if (err) {
+    console.error('[emailService] dns.lookup(smtp.gmail.com) falló:', err.message);
+    return;
+  }
+  console.log('[emailService] dns.lookup(smtp.gmail.com) ->', JSON.stringify(addresses));
+});
+
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const transporter = process.env.EMAIL_USER && process.env.EMAIL_PASS
   ? nodemailer.createTransport({
