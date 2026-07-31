@@ -18,23 +18,41 @@ require('dotenv').config();
 // que usa dns.lookup internamente para conectar por SMTP).
 dns.setDefaultResultOrder('ipv4first');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  // Sin esto, en hosts que bloquean el tráfico saliente por SMTP (ej. el
-  // plan gratuito de Render) `sendMail` se queda colgado indefinidamente
-  // intentando conectar — la promesa nunca resuelve ni rechaza, así que el
-  // controlador nunca responde y el botón del frontend queda cargando para
-  // siempre. Con estos timeouts, falla en unos segundos con un error real
-  // que sí se propaga (log + 500 al frontend) en vez de colgarse.
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const transporter = process.env.EMAIL_USER && process.env.EMAIL_PASS
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      // Sin esto, en hosts que bloquean el tráfico saliente por SMTP (ej. el
+      // plan gratuito de Render) `sendMail` se queda colgado indefinidamente
+      // intentando conectar — la promesa nunca resuelve ni rechaza, así que
+      // el controlador nunca responde y el botón del frontend queda
+      // cargando para siempre. Con estos timeouts, falla en unos segundos
+      // con un error real que sí se propaga (log + 500 al frontend) en vez
+      // de colgarse.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+    })
+  : null;
+
+// OJO: el remitente de Resend y el de Nodemailer NO son intercambiables.
+// Resend solo puede enviar desde un dominio verificado en su panel
+// (notificaciones@clinicautc.com); Nodemailer solo puede enviar desde la
+// cuenta de Gmail autenticada (EMAIL_USER). Compartir un mismo fallback
+// entre ambos rompía Resend si EMAIL_FROM no estaba definida (caía en
+// EMAIL_USER, una dirección de Gmail no verificada en Resend).
+function getResendFromAddress() {
+  return process.env.EMAIL_FROM || 'notificaciones@clinicautc.com';
+}
+
+function getNodemailerFromAddress() {
+  return process.env.EMAIL_USER;
+}
+
 async function enviarCorreo(destino, asunto, html) {
 
     // ==========================================================
@@ -83,18 +101,21 @@ console.log(
 // ENVÍO POR NODEMAILER
 // ==========================================================
 
+// Nota de diseño (ver notificationService.js): estas notificaciones son
+// BLOQUEANTES — si el envío falla, la excepción debe propagarse para que
+// el controlador responda con error y el usuario sepa que no le llegó el
+// código, en vez de ver "enviado con éxito" y quedarse sin poder continuar.
 if (proveedor === 'nodemailer') {
 
+  if (!transporter) {
+    throw new Error('NodeMailer no configurado (faltan EMAIL_USER/EMAIL_PASS).');
+  }
+
   const info = await transporter.sendMail({
-
-    from: `"Clínica UTC" <${process.env.EMAIL_USER}>`,
-
+    from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
     to: destino,
-
     subject: asunto,
-
     html: html
-
   });
 
   console.log(
@@ -111,10 +132,14 @@ if (proveedor === 'nodemailer') {
 
 if (proveedor === 'resend') {
 
+  if (!resend) {
+    throw new Error('Resend no configurado (falta RESEND_API_KEY).');
+  }
+
   const { data, error } =
     await resend.emails.send({
 
-      from: 'Clinica UTC <notificaciones@clinicautc.com>',
+      from: `Clinica UTC <${getResendFromAddress()}>`,
 
       to: [destino],
 
@@ -208,9 +233,13 @@ if (!dominiosPublicos.includes(dominio)) {
 // ENVÍO FORZADO POR NODEMAILER
 // ==========================================================
 
+if (!transporter) {
+  throw new Error('NodeMailer no configurado (faltan EMAIL_USER/EMAIL_PASS).');
+}
+
 const info = await transporter.sendMail({
 
-  from: `"Clínica UTC" <${process.env.EMAIL_USER}>`,
+  from: `"Clínica UTC" <${getNodemailerFromAddress()}>`,
 
   to: destino,
 
