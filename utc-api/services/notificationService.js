@@ -83,33 +83,63 @@ async function reenviar({ canal = 'email', destino, asunto, html }) {
 // ==========================================================
 
 async function notificarCodigoVerificacion(nombre, email, codigo) {
-  const html = crearHtmlCodigoVerificacion(nombre, codigo);
-  return enviarCorreo(email, 'Código de Verificación - Clínica UTC', html);
+  try {
+    const html = crearHtmlCodigoVerificacion(nombre, codigo);
+    return await enviarCorreo(email, 'Código de Verificación - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar código de verificación:', error.message);
+    return null;
+  }
 }
 
 async function notificarReenvioCodigoVerificacion(nombre, email, codigo) {
-  const html = crearHtmlCodigoVerificacion(nombre, codigo);
-  return reenviarCorreo(email, 'Código de Verificación - Clínica UTC', html);
+  try {
+    const html = crearHtmlCodigoVerificacion(nombre, codigo);
+    return await reenviarCorreo(email, 'Código de Verificación - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al reenviar código de verificación:', error.message);
+    return null;
+  }
 }
 
 async function notificarRecuperacionPassword(nombre, email, codigo) {
-  const html = crearHtmlRecuperacionPassword(nombre, codigo);
-  return enviarCorreo(email, 'Recuperación de contraseña - Clínica UTC', html);
+  try {
+    const html = crearHtmlRecuperacionPassword(nombre, codigo);
+    return await enviarCorreo(email, 'Recuperación de contraseña - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar recuperación de contraseña:', error.message);
+    return null;
+  }
 }
 
 async function notificarReenvioRecuperacionPassword(nombre, email, codigo) {
-  const html = crearHtmlRecuperacionPassword(nombre, codigo);
-  return reenviarCorreo(email, 'Recuperación de contraseña - Clínica UTC', html);
+  try {
+    const html = crearHtmlRecuperacionPassword(nombre, codigo);
+    return await reenviarCorreo(email, 'Recuperación de contraseña - Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al reenviar recuperación de contraseña:', error.message);
+    return null;
+  }
 }
 
 async function notificarCodigoPrimerInicio(nombre, email, codigo) {
-  const html = crearHtmlCodigoPrimerInicio(nombre, codigo);
-  return enviarCorreo(email, 'Código de configuración inicial · Clínica UTC', html);
+  try {
+    const html = crearHtmlCodigoPrimerInicio(nombre, codigo);
+    return await enviarCorreo(email, 'Código de configuración inicial · Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al notificar código de primer inicio:', error.message);
+    return null;
+  }
 }
 
 async function notificarReenvioCodigoPrimerInicio(nombre, email, codigo) {
-  const html = crearHtmlCodigoPrimerInicio(nombre, codigo);
-  return reenviarCorreo(email, 'Código de configuración inicial · Clínica UTC', html);
+  try {
+    const html = crearHtmlCodigoPrimerInicio(nombre, codigo);
+    return await reenviarCorreo(email, 'Código de configuración inicial · Clínica UTC', html);
+  } catch (error) {
+    console.error('[notificaciones] Error al reenviar código de primer inicio:', error.message);
+    return null;
+  }
 }
 
 // ==========================================================

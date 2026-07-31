@@ -238,7 +238,7 @@ async function verifyAndRegister(req, res) {
     // Limpiamos la tabla temporal para no dejar basura
     await pool.query('DELETE FROM registro_temporal WHERE email = $1', [email.trim().toLowerCase()]);
 
-    notificationService.notificarBienvenidaPaciente(nombre, email.trim().toLowerCase());
+    await notificationService.notificarBienvenidaPaciente(nombre, email.trim().toLowerCase());
 
     const { password: _omitPassword, ...usuarioCreado } = newUser.rows[0];
     const tokens = await issueTokens(newUser.rows[0]);

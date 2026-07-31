@@ -8,14 +8,22 @@ const pool = require('../db');
 const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
-const resend = new Resend(process.env.RESEND_API_KEY);
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const transporter = process.env.EMAIL_USER && process.env.EMAIL_PASS
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    })
+  : null;
+
+function getFromAddress() {
+  return process.env.EMAIL_FROM || process.env.EMAIL_USER || 'notificaciones@clinicautc.com';
+}
+
 async function enviarCorreo(destino, asunto, html) {
 
     // ==========================================================
@@ -64,61 +72,54 @@ console.log(
 // ENVÍO POR NODEMAILER
 // ==========================================================
 
-if (proveedor === 'nodemailer') {
+try {
+  if (proveedor === 'nodemailer') {
 
-  const info = await transporter.sendMail({
+    if (!transporter) {
+      throw new Error('NodeMailer no configurado');
+    }
 
-    from: `"Clínica UTC" <${process.env.EMAIL_USER}>`,
-
-    to: destino,
-
-    subject: asunto,
-
-    html: html
-
-  });
-
-  console.log(
-    'Correo enviado por NodeMailer'
-  );
-
-  return info;
-
-}
-
-// ==========================================================
-// ENVÍO POR RESEND
-// ==========================================================
-
-if (proveedor === 'resend') {
-
-  const { data, error } =
-    await resend.emails.send({
-
-      from: 'Clinica UTC <notificaciones@clinicautc.com>',
-
-      to: [destino],
-
+    const info = await transporter.sendMail({
+      from: `"Clínica UTC" <${getFromAddress()}>`,
+      to: destino,
       subject: asunto,
-
       html: html
-
     });
 
-  if (error) {
-
-    throw error;
-
+    console.log('Correo enviado por NodeMailer');
+    return info;
   }
 
-  console.log(
-    'Correo enviado por Resend'
-  );
+  // ==========================================================
+  // ENVÍO POR RESEND
+  // ==========================================================
 
-  return data;
+  if (proveedor === 'resend') {
 
+    if (!resend) {
+      throw new Error('Resend no configurado');
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: `Clinica UTC <${getFromAddress()}>`,
+      to: [destino],
+      subject: asunto,
+      html: html
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    console.log('Correo enviado por Resend');
+    return data;
+  }
+} catch (error) {
+  console.error(`[emailService] Error enviando correo a ${destino}:`, error.message || error);
+  return null;
 }
 
+return null;
 
 }
 
@@ -189,23 +190,24 @@ if (!dominiosPublicos.includes(dominio)) {
 // ENVÍO FORZADO POR NODEMAILER
 // ==========================================================
 
-const info = await transporter.sendMail({
+try {
+  if (!transporter) {
+    throw new Error('NodeMailer no configurado');
+  }
 
-  from: `"Clínica UTC" <${process.env.EMAIL_USER}>`,
+  const info = await transporter.sendMail({
+    from: `"Clínica UTC" <${getFromAddress()}>`,
+    to: destino,
+    subject: asunto,
+    html: html
+  });
 
-  to: destino,
-
-  subject: asunto,
-
-  html: html
-
-});
-
-console.log(
-  `Correo reenviado por NodeMailer a ${destino}`
-);
-
-return info;
+  console.log(`Correo reenviado por NodeMailer a ${destino}`);
+  return info;
+} catch (error) {
+  console.error(`[emailService] Error reenviando correo a ${destino}:`, error.message || error);
+  return null;
+}
 
 }
 
