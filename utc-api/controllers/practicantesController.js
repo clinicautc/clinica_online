@@ -82,7 +82,7 @@ async function create(req, res) {
       if (dominioExistente.rows.length === 0) {
         await pool.query(
           'INSERT INTO correos_especiales (dominio, proveedor, origen) VALUES ($1, $2, $3)',
-          [dominio, 'nodemailer', 'alta_practicante']
+          [dominio, 'gmail', 'alta_practicante']
         );
       }
     }
