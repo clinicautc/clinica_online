@@ -27,7 +27,7 @@ import {
   LogOut, Users, Calendar, Clock, Utensils, BarChart3,
   Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
   X, User, Phone, Building, Trash2, AlertTriangle, Edit2,
-  CalendarClock, ChevronUp, Search, Shield, UserX, RotateCcw, FileText
+  CalendarClock, ChevronUp, Search, Shield, UserX, RotateCcw, FileText, Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, subDays } from 'date-fns';
@@ -114,7 +114,8 @@ export default function NutritionAdminDashboard() {
   const [profileData, setProfileData] = useState({
     nombre: user?.nombre || '',
     telefono: user?.telefono || '',
-    numero_empleado: user?.numero_empleado || ''
+    numero_empleado: user?.numero_empleado || '',
+    email: user?.email || ''
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
 
@@ -205,7 +206,8 @@ export default function NutritionAdminDashboard() {
       setProfileData({
         nombre: user.nombre || profileData.nombre,
         telefono: user.telefono || profileData.telefono,
-        numero_empleado: user.numero_empleado || profileData.numero_empleado
+        numero_empleado: user.numero_empleado || profileData.numero_empleado,
+        email: user.email || profileData.email
       });
     }
   }, [user]);
@@ -1045,7 +1047,19 @@ export default function NutritionAdminDashboard() {
                     <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El nombre no puede ser modificado.</p>
                   </div>
 
-
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Correo Electrónico</Label>
+                    <div className="relative flex items-center">
+                      <Mail className="w-4 h-4 text-blue-400 absolute left-4" />
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        disabled={true}
+                        className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El correo solo puede modificarlo un paciente desde su propio perfil.</p>
+                  </div>
 
               {/* Input Único: Nombre */}
              <div className="space-y-1">

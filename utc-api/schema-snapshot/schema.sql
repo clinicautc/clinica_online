@@ -1,5 +1,5 @@
 -- Snapshot de esquema generado desde la BD real (columnas + constraints + indices)
--- Generado: 2026-08-02T05:37:43.382Z
+-- Generado: 2026-08-02T07:15:00.655Z
 
 -- ============================================================
 -- TABLA: asistencia_practicantes
@@ -210,6 +210,33 @@ ALTER TABLE correos_especiales ADD CONSTRAINT correos_especiales_pkey PRIMARY KE
 -- Indices:
 CREATE UNIQUE INDEX correos_especiales_dominio_key ON public.correos_especiales USING btree (dominio);
 CREATE UNIQUE INDEX correos_especiales_pkey ON public.correos_especiales USING btree (id);
+
+
+-- ============================================================
+-- TABLA: email_change_requests
+-- ============================================================
+CREATE TABLE email_change_requests (
+  usuario_id integer NOT NULL,
+  nuevo_email character varying(255) NOT NULL,
+  codigo_verificacion character varying(6) NOT NULL,
+  expira_en timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  confirmado boolean NOT NULL DEFAULT false,
+  aplicar_en timestamp with time zone
+);
+
+-- Constraints:
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_codigo_verificacion_not_null NOT NULL codigo_verificacion;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_confirmado_not_null NOT NULL confirmado;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_created_at_not_null NOT NULL created_at;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_expira_en_not_null NOT NULL expira_en;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_nuevo_email_not_null NOT NULL nuevo_email;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_pkey PRIMARY KEY (usuario_id);
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE;
+ALTER TABLE email_change_requests ADD CONSTRAINT email_change_requests_usuario_id_not_null NOT NULL usuario_id;
+
+-- Indices:
+CREATE UNIQUE INDEX email_change_requests_pkey ON public.email_change_requests USING btree (usuario_id);
 
 
 -- ============================================================

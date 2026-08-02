@@ -225,6 +225,59 @@ async function aplicarConsultoriosPendientes() {
 }
 
 // ---------------------------------------------------------------------------
+// APLICAR CAMBIOS DE CORREO PENDIENTES (PERÍODO DE GRACIA)
+// Se ejecuta cada minuto. usuariosController.confirmarCambioEmail ya validó
+// código+contraseña y marcó confirmado=true con aplicar_en = +24h — aquí solo
+// se aplica el UPDATE real de usuarios.email cuando esa fecha se cumple. Si
+// el dueño legítimo canceló el cambio (resetPassword borra la fila) o si el
+// correo nuevo fue tomado por otra cuenta mientras tanto, la fila
+// simplemente ya no aparece o se descarta sin aplicar nada.
+// ---------------------------------------------------------------------------
+
+async function aplicarCambiosEmailPendientes() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT ecr.usuario_id, ecr.nuevo_email, u.nombre, u.email AS correo_anterior
+         FROM email_change_requests ecr
+         JOIN usuarios u ON u.id = ecr.usuario_id
+        WHERE ecr.confirmado = true AND ecr.aplicar_en <= NOW()`
+    );
+
+    for (const fila of rows) {
+      // Revalida unicidad por última vez — pudo haberse registrado otra
+      // cuenta con ese correo durante el período de gracia.
+      const duplicado = await pool.query('SELECT id FROM usuarios WHERE email = $1 AND id != $2', [fila.nuevo_email, fila.usuario_id]);
+      if (duplicado.rows.length > 0) {
+        await pool.query('DELETE FROM email_change_requests WHERE usuario_id = $1', [fila.usuario_id]);
+        console.log(`[cambio-email] Cambio de usuario ${fila.usuario_id} descartado: correo ya en uso.`);
+        continue;
+      }
+
+      await pool.query('UPDATE usuarios SET email = $1 WHERE id = $2', [fila.nuevo_email, fila.usuario_id]);
+      await pool.query('DELETE FROM email_change_requests WHERE usuario_id = $1', [fila.usuario_id]);
+
+      const fechaHoraTexto = new Date().toLocaleString('es-MX', {
+        timeZone: 'America/Mexico_City',
+        dateStyle: 'long',
+        timeStyle: 'short'
+      });
+
+      try {
+        await notificationService.notificarCambioEmailConfirmado(fila.nombre, fila.correo_anterior, fila.nuevo_email, fechaHoraTexto);
+      } catch (err) {
+        console.error('[cambio-email] No se pudo enviar la confirmación final:', err.message);
+      }
+    }
+
+    if (rows.length > 0) {
+      console.log(`[cambio-email] ${rows.length} cambio(s) de correo aplicado(s).`);
+    }
+  } catch (error) {
+    console.error('[scheduledTasks] Error en aplicarCambiosEmailPendientes:', error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // ARRANQUE
 // ---------------------------------------------------------------------------
 
@@ -233,6 +286,7 @@ async function tick() {
   await cerrarCitasNoAtendidas();
   await enviarRecordatoriosCitas();
   await aplicarConsultoriosPendientes();
+  await aplicarCambiosEmailPendientes();
 }
 
 function iniciarTareasProgramadas() {

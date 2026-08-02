@@ -3,6 +3,16 @@ const pool = require('../db');
 const notificationService = require('../services/notificationService');
 const { signAccessToken, generateRefreshToken, hashToken } = require('../middleware/authMiddleware');
 
+// Revoca todas las sesiones activas (refresh tokens) de un usuario. Se llama
+// cada vez que su contraseña cambia (recuperación, primer inicio) sin
+// importar el rol de la cuenta — cualquier dispositivo con una sesión abierta
+// deja de poder renovar su access token la próxima vez que lo intente
+// (máx. 15 min, JWT_ACCESS_TTL) y el frontend fuerza un recheck al recuperar
+// el foco de la pestaña/ventana (ver AuthContext.tsx).
+async function revocarSesionesActivas(usuarioId) {
+  await pool.query('UPDATE refresh_tokens SET revocado = true WHERE usuario_id = $1 AND revocado = false', [usuarioId]);
+}
+
 // Emite y persiste un par de tokens para un usuario ya autenticado.
 async function issueTokens(usuario) {
   const accessToken = signAccessToken(usuario);
@@ -395,6 +405,11 @@ async function resetPassword(req, res) {
     }
 
     await pool.query('DELETE FROM password_resets WHERE email = $1', [emailNormalizado]);
+    await revocarSesionesActivas(result.rows[0].id);
+    // Cancela cualquier cambio de correo pendiente (en verificación o ya
+    // confirmado y en período de gracia) — resetear la contraseña es la
+    // señal de que el dueño legítimo retomó el control de la cuenta.
+    await pool.query('DELETE FROM email_change_requests WHERE usuario_id = $1', [result.rows[0].id]);
 
     res.status(200).json({ message: 'Contraseña actualizada correctamente.' });
 
@@ -480,6 +495,10 @@ async function cambiarPasswordInicial(req, res) {
 
     const usuarioActualizado = updateResult.rows[0];
     const { password: _omitPassword, ...usuarioSafe } = usuarioActualizado;
+    // Antes de emitir la sesión nueva — por si existieran sesiones previas
+    // (no debería en primer inicio, pero se aplica igual por consistencia).
+    await revocarSesionesActivas(usuario.id);
+    await pool.query('DELETE FROM email_change_requests WHERE usuario_id = $1', [usuario.id]);
     const tokens = await issueTokens(usuarioActualizado);
 
     res.json({ ...usuarioSafe, ...tokens });

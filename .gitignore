@@ -38,6 +38,9 @@ pnpm-debug.log*
 .idea/
 .vscode/
 .DS_Store
-Thumbs.db".qa-tmp/" 
-".qa-tmp/" 
-".qa-tmp/" 
+Thumbs.db
+
+# =========================================
+# SCRATCH / SCRIPTS DE VERIFICACIÓN DESECHABLES
+# =========================================
+.qa-tmp/

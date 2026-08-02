@@ -58,6 +58,8 @@ interface AuthContextType {
   ) => Promise<User>;
 
   logout: () => void;
+
+  updateUser: (partial: Partial<User>) => void;
 }
 
 const AuthContext =
@@ -116,6 +118,64 @@ export function AuthProvider({
     loadStoredSession();
 
   }, []);
+
+  /**
+   * ============================================================================
+   * RECHEQUEO DE SESIÓN AL RECUPERAR EL FOCO (pestaña o ventana)
+   * Un cambio de contraseña (recuperación, primer inicio) revoca en el backend
+   * TODOS los refresh tokens del usuario, sin importar el dispositivo/pestaña
+   * donde se emitieron. Al recuperar el foco se reintenta /auth/refresh en
+   * silencio (bootstrapSession) — si la sesión sigue viva, nadie nota nada
+   * (ni reload, ni parpadeo). Solo si el token ya fue revocado se fuerza un
+   * reload para expulsar a ESA cuenta a login; el resto de usuarios nunca ve
+   * un reload por este mecanismo.
+   * ============================================================================
+   */
+  useEffect(() => {
+    if (!user) return;
+
+    // 'focus' (ventana) y 'visibilitychange' (pestaña) suelen dispararse casi
+    // al mismo tiempo al cambiar de ventana — sin este guard, dos llamadas
+    // simultáneas a /auth/refresh rotan el mismo token dos veces: la segunda
+    // usa el token que la primera ya acababa de revocar y recibe 401,
+    // cerrando la sesión aunque nunca hubo un cambio de contraseña real.
+    let revalidando = false;
+
+    const revalidarSesion = async () => {
+      if (revalidando) return;
+      revalidando = true;
+
+      try {
+        const sessionUser = await bootstrapSession();
+
+        if (sessionUser) {
+          setUser(sessionUser as User);
+          setAccessToken(getClientAccessToken());
+        } else {
+          // Refresh token revocado o expirado — sesión realmente muerta.
+          setUser(null);
+          setAccessToken(null);
+          window.location.reload();
+        }
+      } finally {
+        revalidando = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        revalidarSesion();
+      }
+    };
+
+    window.addEventListener('focus', revalidarSesion);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', revalidarSesion);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
 
   /**
    * ============================================================================
@@ -238,6 +298,13 @@ export function AuthProvider({
     setAccessToken(null);
   };
 
+  // Refleja de inmediato en la sesión un cambio de datos del propio usuario
+  // (p. ej. el correo tras confirmarlo) sin esperar al refresh silencioso de
+  // /auth/refresh, que solo ocurre cuando expira el access token (15 min).
+  const updateUser = (partial: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -248,7 +315,8 @@ export function AuthProvider({
         login,
         completarPrimerInicio,
         completarRegistro,
-        logout
+        logout,
+        updateUser
       }}
     >
 

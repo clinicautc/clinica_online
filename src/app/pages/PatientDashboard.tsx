@@ -13,15 +13,18 @@ import { citasAPI, usuariosAPI } from '../lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
-import { 
+import {
   LogOut, Calendar, FileText, User, Clock, Utensils,
   Activity, AlertCircle, Trash2, CalendarClock, ChevronUp, CalendarDays,
-  X, Edit2, Phone, AlertTriangle
+  X, Edit2, Phone, AlertTriangle, Mail, ShieldCheck, Loader2, Lock, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import AppointmentForm from '../components/AppointmentForm';
 import PatientPlans from '../components/PatientPlans';
 import { Card, CardContent } from '../components/ui/card';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
+} from '../components/ui/dialog';
 import { toast } from '../lib/toast';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,6 +33,7 @@ import MonthFilterPicker from '../components/MonthFilterPicker';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
 import { formatExpediente } from '../lib/formatExpediente';
+import { useResendCooldown } from '../hooks/useResendCooldown';
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth();
@@ -66,6 +70,24 @@ export default function PatientDashboard() {
     area: ''
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
+
+  // Cambio de correo — flujo propio con verificación por código, separado
+  // del guardado instantáneo de teléfono/matrícula porque el correo es el
+  // identificador de acceso (login) y necesita confirmar que el paciente
+  // controla la bandeja nueva antes de aplicarse.
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [nuevoEmailInput, setNuevoEmailInput] = useState('');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailVerificationCode, setEmailVerificationCode] = useState('');
+  const [isSendingEmailCode, setIsSendingEmailCode] = useState(false);
+  const [isValidatingEmailCode, setIsValidatingEmailCode] = useState(false);
+  const [isConfirmingEmailCode, setIsConfirmingEmailCode] = useState(false);
+  const [isResendingEmailCode, setIsResendingEmailCode] = useState(false);
+  const emailResendCooldown = useResendCooldown();
+  const [showConfirmEmailDialog, setShowConfirmEmailDialog] = useState(false);
+  const [showEmailPasswordDialog, setShowEmailPasswordDialog] = useState(false);
+  const [showEmailSuccessDialog, setShowEmailSuccessDialog] = useState(false);
+  const [emailChangePassword, setEmailChangePassword] = useState('');
 
   const patientId = (user as any)?.id;
   const patientRole = (user as any)?.rol || "paciente";
@@ -181,6 +203,98 @@ export default function PatientDashboard() {
     } catch (error: any) {
       console.error("Error actualizando perfil:", error);
       toast.error(error.message || "Error de conexión con la base de datos.");
+    }
+  };
+
+  const handleStartChangeEmail = () => {
+    setNuevoEmailInput('');
+    setEmailVerificationCode('');
+    setEmailCodeSent(false);
+    setIsChangingEmail(true);
+  };
+
+  const handleCancelChangeEmail = () => {
+    setIsChangingEmail(false);
+    setNuevoEmailInput('');
+    setEmailVerificationCode('');
+    setEmailCodeSent(false);
+    setShowConfirmEmailDialog(false);
+    setShowEmailPasswordDialog(false);
+    setEmailChangePassword('');
+  };
+
+  const handleValidarCodigo = async () => {
+    if (!user?.id) return;
+    if (emailVerificationCode.length !== 6) {
+      toast.error('Ingresa el código de 6 dígitos.');
+      return;
+    }
+
+    try {
+      setIsValidatingEmailCode(true);
+      await usuariosAPI.validarCodigoCambioEmail(user.id, emailVerificationCode);
+      setShowConfirmEmailDialog(true);
+    } catch (error: any) {
+      toast.error(error.message || 'Código inválido o expirado.');
+    } finally {
+      setIsValidatingEmailCode(false);
+    }
+  };
+
+  const handleSolicitarCambioEmail = async () => {
+    if (!user?.id) return;
+    if (!nuevoEmailInput.trim()) {
+      toast.error('Ingresa el nuevo correo.');
+      return;
+    }
+
+    try {
+      setIsSendingEmailCode(true);
+      await usuariosAPI.solicitarCambioEmail(user.id, nuevoEmailInput.trim());
+      toast.success('Código enviado a tu nuevo correo.');
+      setEmailCodeSent(true);
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo enviar el código.');
+    } finally {
+      setIsSendingEmailCode(false);
+    }
+  };
+
+  const handleReenviarCodigoCambioEmail = async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsResendingEmailCode(true);
+      await usuariosAPI.reenviarCodigoCambioEmail(user.id);
+      toast.success('Código reenviado correctamente.');
+      emailResendCooldown.start();
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo reenviar el código.');
+    } finally {
+      setIsResendingEmailCode(false);
+    }
+  };
+
+  const handleConfirmarCambioEmail = async () => {
+    if (!user?.id) return;
+    if (!emailChangePassword) {
+      toast.error('Ingresa tu contraseña para confirmar.');
+      return;
+    }
+
+    try {
+      setIsConfirmingEmailCode(true);
+      // El cambio queda programado (período de gracia de 24h), no se aplica
+      // al instante — profileData/AuthContext siguen con el correo actual
+      // hasta que el backend lo aplique de verdad.
+      await usuariosAPI.confirmarCambioEmail(user.id, emailVerificationCode, emailChangePassword);
+      handleCancelChangeEmail();
+      setShowEmailSuccessDialog(true);
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo confirmar el cambio de correo.');
+      setEmailChangePassword('');
+    } finally {
+      setIsConfirmingEmailCode(false);
     }
   };
 
@@ -504,6 +618,103 @@ export default function PatientDashboard() {
                 <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El nombre no puede ser modificado por el paciente.</p>
               </div>
 
+              {/* CORREO ELECTRÓNICO — cambio propio con verificación por código */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center ml-1">
+                  <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Correo Electrónico</Label>
+                  {!isChangingEmail && (
+                    <button
+                      onClick={handleStartChangeEmail}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors focus:outline-none"
+                    >
+                      <Edit2 className="w-3 h-3" /> Cambiar
+                    </button>
+                  )}
+                </div>
+                <div className="relative flex items-center">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-4" />
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    disabled={true}
+                    className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+
+                {isChangingEmail && (
+                  <div className="mt-2 p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-2">
+                    {!emailCodeSent ? (
+                      <>
+                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nuevo correo</Label>
+                        <input
+                          type="email"
+                          value={nuevoEmailInput}
+                          onChange={(e) => setNuevoEmailInput(e.target.value)}
+                          disabled={isSendingEmailCode}
+                          placeholder="nuevo@correo.com"
+                          className="w-full rounded-xl px-3 py-2 text-sm font-medium bg-white border border-blue-300 ring-2 ring-blue-500/20 text-blue-900 focus:outline-none disabled:opacity-60"
+                        />
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={handleCancelChangeEmail} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors">
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleSolicitarCambioEmail}
+                            disabled={isSendingEmailCode}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
+                          >
+                            {isSendingEmailCode ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando...</> : 'Enviar código'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Label className="text-[10px] font-black text-orange-600 uppercase tracking-widest ml-1 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Código enviado a {nuevoEmailInput}
+                        </Label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          value={emailVerificationCode}
+                          onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
+                          disabled={isValidatingEmailCode || isConfirmingEmailCode}
+                          placeholder="123456"
+                          className="w-full rounded-xl px-3 py-2 text-sm font-mono text-center text-lg tracking-widest bg-white border border-orange-300 ring-2 ring-orange-500/20 text-slate-800 focus:outline-none disabled:opacity-60"
+                        />
+                        <div className="text-center">
+                          <button
+                            type="button"
+                            onClick={handleReenviarCodigoCambioEmail}
+                            disabled={isResendingEmailCode || emailResendCooldown.isActive}
+                            className="text-[11px] font-bold text-orange-600 hover:text-orange-700 tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ¿No recibiste el código? Reenviar código
+                          </button>
+                          {emailResendCooldown.isActive && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">Podrás reenviar en {emailResendCooldown.secondsLeft}s</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={handleCancelChangeEmail} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors">
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleValidarCodigo}
+                            disabled={isValidatingEmailCode || emailVerificationCode.length !== 6}
+                            className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-xl text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
+                          >
+                            {isValidatingEmailCode ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Validando...</> : 'Validar código'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">Cambiar tu correo requiere confirmarlo con un código — es el correo con el que inicias sesión.</p>
+              </div>
+
               {/* INPUT: NÚMERO DE TELÉFONO */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Número de Teléfono</Label>
@@ -586,7 +797,112 @@ export default function PatientDashboard() {
           </div>
         </div>
       </div>
-      
+
+      {/* MODAL 1: CONFIRMAR INTENCIÓN DE CAMBIAR CORREO */}
+      <Dialog open={showConfirmEmailDialog} onOpenChange={setShowConfirmEmailDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-900">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              ¿Cambiar tu correo electrónico?
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="text-sm text-slate-600 space-y-2 pt-2">
+                <p>Estás a punto de reemplazar tu correo actual:</p>
+                <p className="font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">{profileData.email}</p>
+                <p>por el nuevo correo:</p>
+                <p className="font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">{nuevoEmailInput}</p>
+                <p>A partir de ese momento, tendrás que iniciar sesión con el correo nuevo.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button onClick={() => setShowConfirmEmailDialog(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={() => { setShowConfirmEmailDialog(false); setShowEmailPasswordDialog(true); }}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm"
+            >
+              Aceptar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 2: CONFIRMAR CON CONTRASEÑA */}
+      <Dialog open={showEmailPasswordDialog} onOpenChange={(open) => { setShowEmailPasswordDialog(open); if (!open) setEmailChangePassword(''); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-900">
+              <Lock className="w-5 h-5 text-blue-600" />
+              Confirma tu contraseña
+            </DialogTitle>
+            <DialogDescription>
+              Por seguridad, ingresa tu contraseña actual para completar el cambio de correo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative flex items-center">
+            <Lock className="w-4 h-4 text-slate-400 absolute left-4" />
+            <input
+              type="password"
+              name="current-password"
+              autoComplete="current-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              value={emailChangePassword}
+              onChange={(e) => setEmailChangePassword(e.target.value)}
+              disabled={isConfirmingEmailCode}
+              placeholder="Tu contraseña"
+              autoFocus
+              className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium bg-white border border-blue-300 ring-2 ring-blue-500/20 text-blue-900 focus:outline-none disabled:opacity-60"
+            />
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => { setShowEmailPasswordDialog(false); setEmailChangePassword(''); }}
+              disabled={isConfirmingEmailCode}
+              className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmarCambioEmail}
+              disabled={isConfirmingEmailCode || !emailChangePassword}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              {isConfirmingEmailCode ? <><Loader2 className="w-4 h-4 animate-spin" /> Confirmando...</> : 'Confirmar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 3: CAMBIO PROGRAMADO */}
+      <Dialog open={showEmailSuccessDialog} onOpenChange={setShowEmailSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle2 className="w-5 h-5" />
+              Cambio programado
+            </DialogTitle>
+            <DialogDescription>
+              Tu correo se cambiará en 24 horas puedes cerrar eseta ventana.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setShowEmailSuccessDialog(false)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm"
+            >
+              Aceptar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

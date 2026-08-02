@@ -44,7 +44,7 @@ import {
   Target,
   User, X, Edit2, Phone, Building, AlertTriangle,
   Calendar, Clock, UserPlus, CalendarClock, ChevronUp, Loader2, Utensils, Activity,
-  UserX, RotateCcw
+  UserX, RotateCcw, Mail
 } from 'lucide-react';
 import { toast } from '../lib/toast';
 
@@ -1281,6 +1281,20 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
     />
   </div>
   <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El nombre no puede ser modificado.</p>
+</div>
+
+              <div className="space-y-1">
+  <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Correo Electrónico</Label>
+  <div className="relative flex items-center">
+    <Mail className="w-4 h-4 text-blue-400 absolute left-4" />
+    <input
+      type="email"
+      value={profileData.email}
+      disabled={true}
+      className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
+    />
+  </div>
+  <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El correo solo puede modificarlo un paciente desde su propio perfil.</p>
 </div>
 
              <div className="space-y-1">

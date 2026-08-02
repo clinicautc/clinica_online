@@ -26,6 +26,23 @@
 
 const { enviarCorreo, reenviarCorreo } = require('./emailService');
 
+// Enmascara la parte local de un correo para mostrarlo en notificaciones
+// sin exponerlo completo (ej. "enriquejesusresendiz@hotmail.com" ->
+// "en*******iz@hotmail.com"). El dominio queda visible.
+function enmascararEmail(email) {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex < 1) return email;
+
+  const local = email.slice(0, atIndex);
+  const dominio = email.slice(atIndex);
+
+  if (local.length <= 4) {
+    return local[0] + '*'.repeat(Math.max(local.length - 1, 1)) + dominio;
+  }
+
+  return local.slice(0, 2) + '*'.repeat(7) + local.slice(-2) + dominio;
+}
+
 // ==========================================================
 // PLANTILLAS POR DOMINIO
 // ==========================================================
@@ -33,7 +50,10 @@ const { enviarCorreo, reenviarCorreo } = require('./emailService');
 const {
   crearHtmlCodigoVerificacion,
   crearHtmlRecuperacionPassword,
-  crearHtmlCodigoPrimerInicio
+  crearHtmlCodigoPrimerInicio,
+  crearHtmlCambioEmail,
+  crearHtmlCambioEmailProgramado,
+  crearHtmlCambioEmailConfirmado
 } = require('./templates/auth.templates');
 
 const {
@@ -110,6 +130,46 @@ async function notificarCodigoPrimerInicio(nombre, email, codigo) {
 async function notificarReenvioCodigoPrimerInicio(nombre, email, codigo) {
   const html = crearHtmlCodigoPrimerInicio(nombre, codigo);
   return reenviarCorreo(email, 'Código de configuración inicial · Clínica UTC', html);
+}
+
+// El código se envía al correo NUEVO (aún no verificado), no al actual —
+// confirma que el paciente realmente controla esa bandeja antes de que el
+// cambio se aplique en usuarios.email.
+async function notificarCodigoCambioEmail(nombre, nuevoEmail, codigo) {
+  const html = crearHtmlCambioEmail(nombre, codigo);
+  return enviarCorreo(nuevoEmail, 'Confirma tu nuevo correo - Clínica UTC', html);
+}
+
+// Informativa: el cambio de correo YA se aplicó en la base de datos para
+// cuando esto se envía — si el correo falla, no se revierte el cambio, solo
+// se registra el error (igual que notificarBienvenidaPaciente).
+async function notificarReenvioCodigoCambioEmail(nombre, nuevoEmail, codigo) {
+  const html = crearHtmlCambioEmail(nombre, codigo);
+  return reenviarCorreo(nuevoEmail, 'Confirma tu nuevo correo - Clínica UTC', html);
+}
+
+// Se envía al correo ANTERIOR en cuanto se valida código+contraseña — el
+// cambio real todavía no se aplicó (período de gracia). Bloqueante: si este
+// aviso no llega, el dueño legítimo no tiene forma de enterarse ni cancelar.
+async function notificarCambioEmailProgramado(nombre, correoAnterior, correoNuevo, fechaAplicacionTexto) {
+  const html = crearHtmlCambioEmailProgramado(nombre, enmascararEmail(correoNuevo), fechaAplicacionTexto);
+  return enviarCorreo(correoAnterior, 'Tu correo de acceso va a cambiar - Clínica UTC', html);
+}
+
+async function notificarCambioEmailConfirmado(nombre, correoAnterior, correoNuevo, fechaHoraTexto) {
+  // Se enmascaran solo para mostrarse en el cuerpo del correo — el envío
+  // real sigue yendo a la dirección completa (correoAnterior sin enmascarar).
+  const html = crearHtmlCambioEmailConfirmado(
+    nombre,
+    enmascararEmail(correoAnterior),
+    enmascararEmail(correoNuevo),
+    fechaHoraTexto
+  );
+  try {
+    await enviarCorreo(correoAnterior, 'Tu correo de acceso fue cambiado - Clínica UTC', html);
+  } catch (error) {
+    console.error('⚠️ No se pudo enviar la confirmación de cambio de correo:', error.message);
+  }
 }
 
 // ==========================================================
@@ -229,6 +289,12 @@ module.exports = {
   // Autenticación — primer inicio
   notificarCodigoPrimerInicio,
   notificarReenvioCodigoPrimerInicio,
+
+  // Perfil — cambio de correo
+  notificarCodigoCambioEmail,           // bloqueante (paso 1: código)
+  notificarReenvioCodigoCambioEmail,    // bloqueante (paso 1b: reenvío)
+  notificarCambioEmailProgramado,       // bloqueante (paso 2: aviso de período de gracia)
+  notificarCambioEmailConfirmado,       // informativa (paso 3: confirmación final)
 
   // Personal — bloqueante
   notificarCambioPasswordInicial,

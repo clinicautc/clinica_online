@@ -25,7 +25,7 @@ import {
   LogOut, Users, FileText, Calendar, Clock, Activity, BarChart3,
   Settings, UserPlus, Loader2, Send, FileEdit, Target, UserCheck,
   User, X, Edit2, Phone, Building, Trash2, AlertTriangle,
-  Search, Shield, UserX, RotateCcw
+  Search, Shield, UserX, RotateCcw, Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, subDays } from 'date-fns';
@@ -113,6 +113,7 @@ export default function PhysiotherapyAdminDashboard() {
     matricula: user?.matricula || '',
     numero_empleado: user?.numero_empleado || '',
     rol: user?.rol || '',
+    email: user?.email || '',
   });
   const [backupProfile, setBackupProfile] = useState(profileData);
 
@@ -201,7 +202,8 @@ export default function PhysiotherapyAdminDashboard() {
         telefono: user.telefono || profileData.telefono,
         matricula: user.matricula || profileData.matricula,
         numero_empleado: user.numero_empleado || profileData.numero_empleado,
-        rol: user.rol || profileData.rol
+        rol: user.rol || profileData.rol,
+        email: user.email || profileData.email
       });
     }
   }, [user]);
@@ -1063,6 +1065,20 @@ export default function PhysiotherapyAdminDashboard() {
                       />
                     </div>
                     <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El nombre no puede ser modificado.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-black text-blue-950/60 uppercase tracking-widest ml-1">Correo Electrónico</Label>
+                    <div className="relative flex items-center">
+                      <Mail className="w-4 h-4 text-blue-400 absolute left-4" />
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        disabled={true}
+                        className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium transition-all focus:outline-none bg-slate-50 border border-slate-200 text-slate-500 cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-medium italic ml-1 mt-0.5">El correo solo puede modificarlo un paciente desde su propio perfil.</p>
                   </div>
 
 
