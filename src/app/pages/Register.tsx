@@ -295,7 +295,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   disabled={codeSent}
                   required
                   className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#002f6c]/20 focus:border-[#002f6c] transition-all text-slate-800 placeholder-slate-400 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="usuario@utc.mx"
+                  placeholder=""
                 />
               </div>
             </div>

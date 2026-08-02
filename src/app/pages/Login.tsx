@@ -150,7 +150,7 @@
                     required
                     autoComplete="username"
                     className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#002f6c]/20 focus:border-[#002f6c] transition-all placeholder-slate-400 font-medium text-slate-800 shadow-sm"
-                    placeholder="usuario@utc.edu.mx"
+                    placeholder=""
                   />
                 </div>
               </div>
