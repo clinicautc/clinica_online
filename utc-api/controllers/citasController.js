@@ -324,18 +324,32 @@ async function create(req, res) {
     return res.status(400).json({ error: `Las citas solo pueden agendarse con un máximo de ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación.` });
   }
 
+  const client = await pool.connect();
   try {
     const errorHorario = await validarHorarioDisponible(area, fecha, hora);
     if (errorHorario) {
       return res.status(400).json({ error: errorHorario });
     }
 
-    const conflictoPaciente = await pool.query(
+    await client.query('BEGIN');
+
+    // Candado de cupo: pg_advisory_xact_lock serializa, a nivel de Postgres,
+    // todas las peticiones que compitan por el mismo (area, fecha, hora) —
+    // se libera solo al hacer COMMIT/ROLLBACK. Sin esto, el COUNT de abajo
+    // (¿cuántos consultorios ya están ocupados?) es un SELECT-antes-de-INSERT
+    // clásico: dos citas creadas casi al mismo tiempo pueden ver ambas "hay
+    // cupo" antes de que cualquiera termine de insertar, colando más citas
+    // de las que caben. Con el candado, la segunda petición espera a que la
+    // primera termine su transacción y entonces sí ve el cupo real.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${area}|${fecha}|${hora}`]);
+
+    const conflictoPaciente = await client.query(
       "SELECT tipo FROM citas WHERE paciente_id = $1 AND fecha = $2 AND hora = $3 AND estado IN ('programada', 'en_atencion')",
       [paciente_id, fecha, hora]
     );
 
     if (conflictoPaciente.rows.length > 0) {
+      await client.query('ROLLBACK');
       const areaExistente = conflictoPaciente.rows[0].tipo;
       const areaFormateada = areaExistente === 'nutricion' ? 'Nutrición' : 'Fisioterapia';
       return res.status(409).json({ error: `Ya tienes una cita de ${areaFormateada} a esa hora. Selecciona un horario distinto.` });
@@ -344,22 +358,28 @@ async function create(req, res) {
     // "Ocupado" ya no es "existe una cita" — el área puede tener varios
     // consultorios, cada uno cabe una cita simultánea en el mismo horario.
     const consultoriosArea = await obtenerConsultorios(area, fecha);
-    const check = await pool.query(
+    const check = await client.query(
       "SELECT COUNT(*) FROM citas WHERE fecha = $1 AND hora = $2 AND tipo = $3 AND estado IN ('programada', 'en_atencion')",
       [fecha, hora, area]
     );
 
     if (parseInt(check.rows[0].count, 10) >= consultoriosArea) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ error: "Este horario ya está lleno en esta área. Por favor elige otro." });
     }
 
     // Insertar la cita sin practicante todavía
-    const inserted = await pool.query(
+    const inserted = await client.query(
       `INSERT INTO citas (paciente_id, paciente_nombre, tipo, fecha, hora, estado)
        VALUES ($1, $2, $3, $4, $5, 'programada') RETURNING *`,
       [paciente_id, paciente_nombre, area, fecha, hora]
     );
     const nuevaCita = inserted.rows[0];
+
+    await client.query('COMMIT');
+
+    // A partir de aquí el cupo y el candado ya cumplieron su función — la
+    // cita ya existe y ya reservó su lugar. Lo que sigue usa el pool normal.
 
     // Asignación automática
     const { cita, asignado, esFallbackDocente } = await asignarPracticante(
@@ -392,7 +412,24 @@ async function create(req, res) {
 
     res.status(201).json({ ...cita, asignado, esFallbackDocente });
   } catch (error) {
+    // Si la transacción sigue abierta (falló entre el BEGIN y el COMMIT de
+    // arriba), revertirla antes de responder — si ya se hizo COMMIT esto no
+    // hace nada.
+    await client.query('ROLLBACK').catch(() => {});
+
+    // Respaldo a nivel de base de datos contra la validación de arriba (SELECT
+    // + INSERT no es atómico: dos peticiones casi simultáneas, ej. el mismo
+    // paciente en dos dispositivos, pueden pasar ambas el chequeo antes de que
+    // cualquiera termine de insertar). El índice único
+    // idx_citas_paciente_fecha_hora_activa (migración 017) rechaza la segunda
+    // a nivel de Postgres con este código — lo traducimos al mismo mensaje
+    // amigable en vez de un 500 genérico.
+    if (error.code === '23505' && error.constraint === 'idx_citas_paciente_fecha_hora_activa') {
+      return res.status(409).json({ error: 'Ya tienes una cita a esa hora. Selecciona un horario distinto.' });
+    }
     res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 }
 
@@ -470,6 +507,13 @@ async function update(req, res) {
       res.status(404).json({ error: "Cita no encontrada" });
     }
   } catch (error) {
+    // Mismo respaldo que en create() — ver esa nota (índice
+    // idx_citas_paciente_fecha_hora_activa, migración 017). Aquí cubre el
+    // caso de reagendar dos citas casi al mismo tiempo hacia el mismo
+    // horario, que ya quedaba ocupado por otra cita activa del paciente.
+    if (error.code === '23505' && error.constraint === 'idx_citas_paciente_fecha_hora_activa') {
+      return res.status(409).json({ error: 'Ya tienes una cita a esa hora. Selecciona un horario distinto.' });
+    }
     res.status(500).json({ error: error.message });
   }
 }

@@ -45,8 +45,10 @@ export default function App() {
       */}
       <RouterProvider router={router} />
       
-      {/* Sistema global de notificaciones toast */}
-      <Toaster position="top-right" richColors closeButton />
+      {/* Sistema global de notificaciones toast — expand:true evita que se
+          apilen como cartas encimadas (comportamiento por defecto de sonner);
+          con esto cada toast queda completo, uno debajo del otro. */}
+      <Toaster position="top-right" richColors closeButton expand />
     </AuthProvider>
   );
 }

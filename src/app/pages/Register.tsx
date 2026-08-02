@@ -5,6 +5,8 @@ import { toast } from '../lib/toast';
 import { authAPI } from '../lib/api';
 import { capitalizeWords } from '../lib/textFormat';
 import { useAuth } from '../contexts/AuthContext';
+import { useResendCooldown } from '../hooks/useResendCooldown';
+import PrivacyNoticeDialog from '../components/PrivacyNoticeDialog';
 
 // En móvil, salir de la app para abrir el correo y leer el código puede hacer
 // que el navegador descargue la pestaña por memoria y la recargue al volver.
@@ -16,6 +18,7 @@ const DRAFT_KEY = 'utc_registro_draft';
 function loadDraft(): Partial<{
   nombre: string; apellido: string; email: string; password: string;
   confirmPassword: string; telefono: string; verificationCode: string; codeSent: boolean;
+  privacyAccepted: boolean;
 }> {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
@@ -54,19 +57,22 @@ export default function Register() {
   const [codeSent, setCodeSent] = useState(draft.codeSent || false);
   const [_isVerified, _setIsVerified] = useState(false);
 
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(draft.privacyAccepted || false);
+
   const navigate = useNavigate();
   const { completarRegistro } = useAuth();
 
   useEffect(() => {
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-        nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent
+        nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent, privacyAccepted
       }));
     } catch {
       // sessionStorage no disponible (modo privado, etc.) — el flujo sigue funcionando,
       // solo se pierde la recuperación tras una recarga.
     }
-  }, [nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent]);
+  }, [nombre, apellido, email, password, confirmPassword, telefono, verificationCode, codeSent, privacyAccepted]);
 
   const clearDraft = () => {
     try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
@@ -79,6 +85,10 @@ const handleSendCode = async () => {
     // Validamos que no falte nada antes de "retenerlo" en la DB temporal
     if (!nombre || !apellido || !email || !password) {
       setError('Llena todos los campos para recibir tu código.');
+      return;
+    }
+    if (!privacyAccepted) {
+      setError('Debes aceptar el Aviso de Privacidad para continuar.');
       return;
     }
 
@@ -105,6 +115,7 @@ await authAPI.sendRegisterCode({
     }
 };
 
+const resendCooldown = useResendCooldown();
 const handleResendCode = async () => {
 
   try {
@@ -122,6 +133,7 @@ await authAPI.resendCode({
     toast.success(
       'Código reenviado correctamente.'
     );
+    resendCooldown.start();
 
   } catch (err: any) {
 
@@ -147,6 +159,10 @@ const handleSubmit = async (e: React.FormEvent) => {
   if (!isPasswordValid) {
   setError('La contraseña no cumple los requisitos de seguridad.');
   return;
+  }
+  if (!privacyAccepted) {
+    setError('Debes aceptar el Aviso de Privacidad para continuar.');
+    return;
   }
 
   try {
@@ -398,6 +414,29 @@ const handleSubmit = async (e: React.FormEvent) => {
               </ul>
             </div>
 
+            {/* CONSENTIMIENTO OBLIGATORIO — AVISO DE PRIVACIDAD */}
+            <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <input
+                type="checkbox"
+                id="privacyAccepted"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                required
+                className="mt-0.5 w-4 h-4 shrink-0 rounded border-slate-300 text-[#002f6c] focus:ring-2 focus:ring-[#002f6c]/30 cursor-pointer"
+              />
+              <label htmlFor="privacyAccepted" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                He leído y acepto el{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyNotice(true)}
+                  className="font-bold text-[#002f6c] hover:text-[#f26522] underline underline-offset-2 transition-colors cursor-pointer"
+                >
+                  Aviso de Privacidad
+                </button>{' '}
+                y autorizo el tratamiento de mis datos personales conforme a la LFPDPPP.
+              </label>
+            </div>
+
             {/* CAMPO DINÁMICO: CÓDIGO DE VERIFICACIÓN */}
             {codeSent && (
               <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
@@ -427,9 +466,9 @@ const handleSubmit = async (e: React.FormEvent) => {
               <button
                 type="button"
                 onClick={handleSendCode}
-                disabled={isSendingCode ||!isPasswordValid ||!passwordsMatch}
+                disabled={isSendingCode ||!isPasswordValid ||!passwordsMatch ||!privacyAccepted}
                 className={`w-full font-bold py-2.5 rounded-xl shadow-lg transition-all duration-300 active:scale-[0.98] flex justify-center items-center gap-2
-                  ${isPasswordValid && passwordsMatch
+                  ${isPasswordValid && passwordsMatch && privacyAccepted
                     ? 'bg-[#002f6c] hover:bg-[#001f4c] text-white shadow-[#002f6c]/30 cursor-pointer'
                     : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed'
                   }`}
@@ -445,13 +484,18 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  disabled={isResendingCode}
+                  disabled={isResendingCode || resendCooldown.isActive}
                   className="text-xs font-bold text-[#f26522] hover:text-[#d1551a] tracking-wide cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ¿No recibiste el código?
                   <br />
                   Reenviar código
                 </button>
+                {resendCooldown.isActive && (
+                  <p className="text-[11px] text-slate-400">
+                    Podrás reenviar en {resendCooldown.secondsLeft}s
+                  </p>
+                )}
                 <div>
                   <button
                     type="button"
@@ -467,9 +511,9 @@ const handleSubmit = async (e: React.FormEvent) => {
             {/* BOTÓN DE REGISTRO FINAL */}
             <button
               type="submit"
-              disabled={verificationCode.length !== 6 ||!isPasswordValid ||!passwordsMatch}
+              disabled={verificationCode.length !== 6 ||!isPasswordValid ||!passwordsMatch ||!privacyAccepted}
               className={`w-full font-bold py-2.5 rounded-xl shadow-lg transition-all duration-300 active:scale-[0.98]
-                ${verificationCode.length === 6 && isPasswordValid && passwordsMatch
+                ${verificationCode.length === 6 && isPasswordValid && passwordsMatch && privacyAccepted
                   ? 'bg-[#f26522] hover:bg-[#d1551a] text-white shadow-[#f26522]/30 cursor-pointer'
                   : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed'
                 }`}
@@ -488,6 +532,8 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         </div>
       </div>
+
+      <PrivacyNoticeDialog open={showPrivacyNotice} onOpenChange={setShowPrivacyNotice} />
     </div>
   );
 }

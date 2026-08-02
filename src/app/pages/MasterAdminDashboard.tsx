@@ -122,6 +122,14 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
   const [viewMode, setViewMode] = useState<'day' | 'month'>('month');
   const [citasAreaFilter, setCitasAreaFilter] = useState<'todos' | 'nutricion' | 'fisioterapia'>('todos');
   const [estadoFilter, setEstadoFilter] = useState<string>('programada');
+  // Búsqueda dentro de "Citas Programadas" — filtro puramente en pantalla
+  // (no dispara una nueva carga a la API), aplicado sobre lo que ya trajeron
+  // citasAreaFilter/estadoFilter/fecha. Busca por nombre del paciente, por
+  // nombre del responsable (practicante/docente asignado), y por el correo
+  // del paciente vía emailPorPacienteId (ver cargarPracticantes) — el objeto
+  // Appointment no trae el correo directamente, así que se cruza por id.
+  const [busquedaCita, setBusquedaCita] = useState('');
+  const [emailPorPacienteId, setEmailPorPacienteId] = useState<Record<string, string>>({});
   const [reagendarCitaId, setReagendarCitaId] = useState<number | null>(null);
   const [revertirCita, setRevertirCita] = useState<Appointment | null>(null);
   const [motivoRevertir, setMotivoRevertir] = useState('');
@@ -199,6 +207,15 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
         }));
 
       setPracticantes(listaMapeada);
+
+      // Mapa id→correo de pacientes, construido de esta misma respuesta (ya
+      // trae a todos los usuarios) para no pedirle a la API una lista aparte
+      // solo para poder buscar citas por correo — ver busquedaCita.
+      const mapaCorreos: Record<string, string> = {};
+      data
+        .filter((u: any) => u.rol === 'paciente')
+        .forEach((p: any) => { mapaCorreos[String(p.id)] = (p.email || '').toLowerCase(); });
+      setEmailPorPacienteId(mapaCorreos);
     } catch (error) {
       console.error("Error al cargar docentes:", error);
       toast.error('Error de conexión con el servidor PostgreSQL');
@@ -562,6 +579,15 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                       )}
                     </div>
                   </div>
+                  <div className="relative mt-5">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      placeholder="Buscar citas del responsable por nombre o correo..."
+                      value={busquedaCita}
+                      onChange={(e) => setBusquedaCita(e.target.value)}
+                      className="pl-9 h-10.75 rounded-xl border-blue-200 text-blue-900 font-medium w-full"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-1.5 pt-3">
                     {[
                       { value: 'todos',       label: 'Todos',       active: 'bg-slate-700 text-white',   inactive: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
@@ -585,17 +611,40 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                 </CardHeader>
                 <CardContent className="p-7">
                   <div className="space-y-3.5">
-                    {isLoadingCitas ? (
-                      <div className="flex flex-col items-center py-12 gap-3">
-                        <Loader2 className="animate-spin text-blue-900" />
-                        <p className="text-base font-bold text-blue-900/50">Sincronizando agenda...</p>
-                      </div>
-                    ) : appointments.length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
-                        No se registran citas para {viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.
-                      </div>
-                    ) : (
-                      appointments.map((apt) => (
+                    {(() => {
+                      const q = busquedaCita.trim().toLowerCase();
+                      const appointmentsFiltrados = q === ''
+                        ? appointments
+                        : appointments.filter((apt) => {
+                            const correoResponsable = practicantes.find((p) => p.id === String(apt.practicante_id))?.email || '';
+                            return (
+                              apt.paciente_nombre.toLowerCase().includes(q) ||
+                              (apt.practicante_nombre || '').toLowerCase().includes(q) ||
+                              (emailPorPacienteId[String(apt.paciente_id)] || '').includes(q) ||
+                              correoResponsable.toLowerCase().includes(q)
+                            );
+                          });
+
+                      if (isLoadingCitas) {
+                        return (
+                          <div className="flex flex-col items-center py-12 gap-3">
+                            <Loader2 className="animate-spin text-blue-900" />
+                            <p className="text-base font-bold text-blue-900/50">Sincronizando agenda...</p>
+                          </div>
+                        );
+                      }
+
+                      if (appointmentsFiltrados.length === 0) {
+                        return (
+                          <div className="text-center py-12 border-2 border-dashed rounded-3xl border-blue-100 italic text-slate-400">
+                            {q !== ''
+                              ? 'Ningún paciente coincide con la búsqueda.'
+                              : `No se registran citas para ${viewMode === 'day' ? 'la fecha seleccionada' : 'el mes seleccionado'}.`}
+                          </div>
+                        );
+                      }
+
+                      return appointmentsFiltrados.map((apt) => (
                         <div key={apt.id} className="space-y-2">
                           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 border rounded-2xl bg-white hover:border-blue-300 transition-all shadow-sm">
                             <div className="flex items-start sm:items-center gap-3 sm:gap-5 min-w-0">
@@ -628,6 +677,12 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                                   <span className="bg-blue-50 text-blue-700 px-5 py-2 rounded-xl text-sm font-black border border-blue-100 flex items-center gap-2">
                                     <UserCheck className="w-3.5 h-3.5" /> {apt.practicante_nombre || "Asignado"}
                                   </span>
+                                  {(() => {
+                                    const correoResponsable = practicantes.find((p) => p.id === String(apt.practicante_id))?.email;
+                                    return correoResponsable ? (
+                                      <span className="text-[11px] text-slate-400 font-medium mt-1">{correoResponsable}</span>
+                                    ) : null;
+                                  })()}
                                 </div>
                               )}
 
@@ -712,8 +767,8 @@ const [roleFilter, setRoleFilter] = useState<'todos' | 'admin' | 'practicante'>(
                             </div>
                           )}
                         </div>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </div>
                 </CardContent>
               </Card>

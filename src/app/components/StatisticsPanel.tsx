@@ -6,11 +6,12 @@
  * ============================================================================
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { citasAPI, historialesAPI, metricasAPI, usuariosAPI } from '../lib/api';
 import MonthFilterPicker from './MonthFilterPicker';
 import WeekFilterPicker from './WeekFilterPicker';
+import { Input } from './ui/input';
 
 
 
@@ -19,7 +20,7 @@ import { saveAs } from 'file-saver';
 import {
   Calendar, Clock, CheckCircle, XCircle, BarChart3,
   Zap, AlertTriangle, TrendingUp, Users2, Activity,
-  CalendarClock, Download, UserX, RotateCcw, ChevronLeft, ChevronRight
+  CalendarClock, Download, UserX, RotateCcw, ChevronLeft, ChevronRight, Search
 } from 'lucide-react';
 import { parseISO, getDay, startOfWeek, endOfWeek } from 'date-fns';
 import {
@@ -499,6 +500,66 @@ function SectionCard({
 }
 
 // ---------------------------------------------------------------------------
+// Ranking simple de practicantes por citas completadas — solo nombre +
+// cantidad, sin barras ni porcentajes (a propósito: es un ranking rápido de
+// leer, no un KPI detallado — eso ya lo cubre el Excel).
+// ---------------------------------------------------------------------------
+function RankingPracticantes({
+  titulo,
+  datos,
+  color,
+  hayBusqueda = false,
+}: {
+  titulo: string;
+  datos: { id: string | number; nombre: string; email: string; completadas: number; incompletas: number }[];
+  color: string;
+  hayBusqueda?: boolean;
+}) {
+  return (
+    <div>
+      <p style={{ color, fontWeight: 700, fontSize: 13, marginBottom: 10 }}>{titulo}</p>
+      {datos.length === 0 ? (
+        <p style={{ color: C.faint, fontSize: 12 }}>
+          {hayBusqueda ? 'Ningún practicante coincide con la búsqueda.' : 'Sin practicantes en esta área.'}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 260 }}>
+          <div className="flex items-center gap-2 sm:gap-4 px-2 sm:px-3 pb-1">
+            <span className="min-w-0 flex-1" style={{ color: C.faint, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Practicante
+            </span>
+            <span className="w-14 sm:w-24 shrink-0 text-center" style={{ color: C.faint, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Incompletas
+            </span>
+            <span className="w-14 sm:w-24 shrink-0 text-center" style={{ color: C.faint, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Completadas
+            </span>
+          </div>
+          {datos.map((p, i) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-2"
+              style={{
+                borderRadius: 8,
+                background: i % 2 === 0 ? C.bg : 'transparent',
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate" style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>
+                {i + 1}. {p.nombre}
+              </span>
+              <span className="w-14 sm:w-24 shrink-0 text-center" style={{ color: C.accent.pink.top, fontSize: 15, fontWeight: 700 }}>{p.incompletas}</span>
+              <span className="w-14 sm:w-24 shrink-0 text-center" style={{ color, fontSize: 15, fontWeight: 700 }}>{p.completadas}</span>
+            </div>
+          ))}
+        </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Encabezado ligero de agrupación — mismo tipo de letra/color que ya usa el
 // título+descripción de SectionCard, sin envolver las tarjetas en una caja
 // nueva. Separa conceptualmente "Estado de las Citas" (partición, suma 100%)
@@ -561,7 +622,8 @@ async function exportToExcel(
   etiquetaPeriodo: string,
   rangoFechasTexto: string,
   citasBitacora: any[],
-  chartImages: { tendencia: string | null; distribucion: string | null; resumen: string | null; flujo: string | null }
+  chartImages: { tendencia: string | null; distribucion: string | null; resumen: string | null; flujo: string | null },
+  pracPerf: any[]
 ) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Sistema Clínico UTC';
@@ -666,22 +728,9 @@ async function exportToExcel(
     .map(([horario, cantidad]) => ({ horario, cantidad: cantidad as number }))
     .sort((a, b) => b.cantidad - a.cantidad);
 
-  const pracPerf = practicantes.map((p: Usuario) => {
-    const sc  = allCitas.filter((c: any) => String(c.practicante_id) === String(p.id));
-    const comp = byStatus(sc, 'completada');
-    const canc = byStatus(sc, 'cancelada')
-      + eventos.filter((e) => e.tipo_evento === 'cita_cancelada' && String(e.practicante_id) === String(p.id)).length;
-    const prog = byStatus(sc, 'programada');
-    const tot  = sc.length;
-    
-    // Evitar NaN en efectividad si tot es 0
-    const eff  = tot > 0 ? (comp / tot) * 100 : 0; 
-    
-    // Lógica de calificación ajustada (si no tiene citas, N/A directo)
-    const grade = tot === 0 ? 'N/A' : (eff >= 90 ? 'A' : eff >= 75 ? 'B' : eff >= 60 ? 'C' : 'D');
-    
-    return { ...p, tot, comp, canc, prog, eff, grade };
-  }).sort((a: any, b: any) => b.eff - a.eff);
+  // pracPerf ya no se calcula aquí — llega como parámetro, calculado una
+  // sola vez en el componente (useMemo) y compartido con el panel en
+  // pantalla, para que ambos consuman exactamente la misma fuente.
 
   // Incluye los estados vigentes del ciclo de vida (migraciones 008/009).
   // 'cancelada'/'reagendada' no son valores reales de citas.estado (cancelar
@@ -1272,6 +1321,9 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
   const resumenRef = useRef<HTMLDivElement>(null);
   const flujoRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  // Búsqueda por nombre o correo dentro del ranking "Citas Completadas por
+  // Practicante" — solo filtra esa sección, no afecta al resto del panel.
+  const [busquedaPracticante, setBusquedaPracticante] = useState('');
 
   const [stats, setStats] = useState<ExtendedStats>({
     totalCitas: 0,
@@ -1459,6 +1511,49 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
     setCitasParaExportar(filteredCitas);
     setEventosParaExportar(eventosFiltrados);
   }, [filtroArea, periodo, mesSeleccionado, trimestreSeleccionado, anioSeleccionado, rangoSemana, rawData, eventos]);
+
+  // Rendimiento por practicante — misma fuente que antes vivía solo dentro
+  // de exportToExcel (Hoja 8), ahora calculada una única vez aquí y
+  // compartida entre el panel en pantalla ("Citas Completadas por
+  // Practicante") y la exportación a Excel, para que nunca puedan mostrar
+  // números distintos. Ya parte de citasParaExportar/eventosParaExportar
+  // (ya filtrados por área+periodo), así que no duplica esa lógica.
+  const pracPerf = useMemo(() => {
+    const practicantes = rawData.usuarios.filter((u: Usuario) => u.rol === 'practicante');
+    const byStatus = (arr: Cita[], s: string) => arr.filter((c) => (c.estado || '').toLowerCase() === s.toLowerCase()).length;
+
+    return practicantes.map((p: Usuario) => {
+      const sc = citasParaExportar.filter((c: Cita) => String(c.practicante_id) === String(p.id));
+      const comp = byStatus(sc, 'completada');
+      const canc = byStatus(sc, 'cancelada')
+        + eventosParaExportar.filter((e) => e.tipo_evento === 'cita_cancelada' && String(e.practicante_id) === String(p.id)).length;
+      const prog = byStatus(sc, 'programada');
+      const incompletas = byStatus(sc, 'incompleta');
+      const tot = sc.length;
+      const eff = tot > 0 ? (comp / tot) * 100 : 0;
+      const grade = tot === 0 ? 'N/A' : (eff >= 90 ? 'A' : eff >= 75 ? 'B' : eff >= 60 ? 'C' : 'D');
+      return { ...p, tot, comp, canc, prog, incompletas, eff, grade };
+    }).sort((a, b) => b.eff - a.eff);
+  }, [rawData.usuarios, citasParaExportar, eventosParaExportar]);
+
+  // Ranking en pantalla: solo "atendió" = citas completadas (comp), agrupado
+  // por área cuando el filtro está en "general" (Nutrición y Fisioterapia
+  // por separado) o una sola lista cuando ya hay un área específica
+  // seleccionada — respeta filtroArea, no agrega ningún filtro nuevo.
+  // Orden: mayor a menor completadas; empate, alfabético por nombre.
+  const rankingPracticantes = useMemo(() => {
+    const ordenar = (lista: typeof pracPerf) =>
+      [...lista].sort((a, b) => b.comp - a.comp || a.nombre.localeCompare(b.nombre, 'es'))
+        .map((p) => ({ id: p.id, nombre: p.nombre, email: p.email || '', completadas: p.comp, incompletas: p.incompletas }));
+
+    const porArea = (a: 'nutricion' | 'fisioterapia') =>
+      ordenar(pracPerf.filter((p) => (p.area || '').toLowerCase() === a));
+
+    if (isGeneralView) {
+      return { nutricion: porArea('nutricion'), fisioterapia: porArea('fisioterapia') };
+    }
+    return { nutricion: filtroArea === 'nutricion' ? porArea('nutricion') : [], fisioterapia: filtroArea === 'fisioterapia' ? porArea('fisioterapia') : [] };
+  }, [pracPerf, filtroArea, isGeneralView]);
 
   // La mayoría son valores mutuamente excluyentes de `citas.estado`; a
   // pedido se incluye también "Re-agendadas", que no es un estado (es un
@@ -1810,6 +1905,47 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
           </div>
         </SectionCard>
 
+        {/* ── Citas Completadas por Practicante — solo admin/master ── */}
+        {(user?.rol === 'admin' || user?.rol === 'master') && (() => {
+          const q = busquedaPracticante.trim().toLowerCase();
+          const filtrar = (lista: typeof rankingPracticantes.nutricion) =>
+            q === '' ? lista : lista.filter((p) => p.nombre.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+          const nutricionFiltrado = filtrar(rankingPracticantes.nutricion);
+          const fisioterapiaFiltrado = filtrar(rankingPracticantes.fisioterapia);
+
+          return (
+            <SectionCard
+              title="Citas Completadas por Practicante"
+              description={`Ranking del período activo (${etiquetaPeriodo}) — solo consultas que finalizaron como completada.`}
+              icon={CheckCircle}
+              accentColor={C.accent.green.top}
+            >
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por nombre o correo..."
+                  value={busquedaPracticante}
+                  onChange={(e) => setBusquedaPracticante(e.target.value)}
+                  className="pl-9 h-10.75 rounded-xl border-blue-200 text-blue-900 font-medium w-full"
+                />
+              </div>
+              {isGeneralView ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <RankingPracticantes titulo="Nutrición" datos={nutricionFiltrado} color={C.accent.amber.top} hayBusqueda={q !== ''} />
+                  <RankingPracticantes titulo="Fisioterapia" datos={fisioterapiaFiltrado} color={C.accent.indigo.top} hayBusqueda={q !== ''} />
+                </div>
+              ) : (
+                <RankingPracticantes
+                  titulo={filtroArea === 'nutricion' ? 'Nutrición' : 'Fisioterapia'}
+                  datos={filtroArea === 'nutricion' ? nutricionFiltrado : fisioterapiaFiltrado}
+                  color={filtroArea === 'nutricion' ? C.accent.amber.top : C.accent.indigo.top}
+                  hayBusqueda={q !== ''}
+                />
+              )}
+            </SectionCard>
+          );
+        })()}
+
         {/* ── Botón Exportar Excel ── */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
          <button
@@ -1855,7 +1991,8 @@ export default function StatisticsPanel({ area }: StatisticsPanelProps) {
                   etiquetaPeriodo,
                   rangoFechasTexto,
                   citasBitacora,
-                  { tendencia: imgTendencia, distribucion: imgDistribucion, resumen: imgResumen, flujo: imgFlujo }
+                  { tendencia: imgTendencia, distribucion: imgDistribucion, resumen: imgResumen, flujo: imgFlujo },
+                  pracPerf
                 );
               } catch (error) {
                 console.error("Error al exportar:", error);

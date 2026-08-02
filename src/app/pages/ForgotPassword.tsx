@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { authAPI } from '../lib/api';
+import { useResendCooldown } from '../hooks/useResendCooldown';
 
 type Step = 'email' | 'code' | 'password' | 'success';
 
@@ -84,6 +85,7 @@ const passwordsMatch =
   };
 
   const handleBackToLogin = () => { clearDraft(); navigate('/'); };
+  const resendCooldown = useResendCooldown();
   const handleResendCode = async () => {
 
     try {
@@ -96,6 +98,7 @@ const passwordsMatch =
       });
 
       toast.success('Código reenviado correctamente.');
+      resendCooldown.start();
 
     } catch (err: any) {
 
@@ -303,16 +306,17 @@ setCurrentStep('password');
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  className="
+                  disabled={resendCooldown.isActive}
+                  className={`
                     text-xs
                     font-black
-                    text-slate-500
-                    hover:text-blue-900
                     tracking-wide
-                    cursor-pointer
                     transition-colors
                     duration-200
-                  "
+                    ${resendCooldown.isActive
+                      ? 'text-slate-300 cursor-not-allowed'
+                      : 'text-slate-500 hover:text-blue-900 cursor-pointer'}
+                  `}
                 >
 
                   ¿No recibiste el código?
@@ -320,6 +324,11 @@ setCurrentStep('password');
                   Reenviar código
 
                 </button>
+                {resendCooldown.isActive && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Podrás reenviar en {resendCooldown.secondsLeft}s
+                  </p>
+                )}
               </div>
             </form>
           )}

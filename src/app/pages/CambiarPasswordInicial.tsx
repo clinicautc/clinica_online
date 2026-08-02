@@ -11,6 +11,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../lib/api';
 import { AlertCircle, Eye, EyeOff, KeyRound, Lock, Check, X } from 'lucide-react';
+import { useResendCooldown } from '../hooks/useResendCooldown';
 
 interface LocationState {
   email: string;
@@ -117,10 +118,12 @@ export default function CambiarPasswordInicial() {
     return <Navigate to="/login" replace />;
   }
 
+  const resendCooldown = useResendCooldown();
   const handleResendCode = async () => {
     try {
       setCodeError('');
       await authAPI.resendCode({ email, tipo: 'primer_inicio' });
+      resendCooldown.start();
     } catch {
       setCodeError('Error al reenviar el código.');
     }
@@ -290,10 +293,20 @@ export default function CambiarPasswordInicial() {
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  className="text-xs font-bold text-slate-500 hover:text-[#002f6c] tracking-wide cursor-pointer transition-colors"
+                  disabled={resendCooldown.isActive}
+                  className={`text-xs font-bold tracking-wide transition-colors ${
+                    resendCooldown.isActive
+                      ? 'text-slate-300 cursor-not-allowed'
+                      : 'text-slate-500 hover:text-[#002f6c] cursor-pointer'
+                  }`}
                 >
                   ¿No recibiste el código? Reenviar código
                 </button>
+                {resendCooldown.isActive && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Podrás reenviar en {resendCooldown.secondsLeft}s
+                  </p>
+                )}
               </div>
             </form>
           )}

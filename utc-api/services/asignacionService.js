@@ -17,13 +17,18 @@ const pool = require('../db');
  *
  * Excluye practicantes con conflicto de horario exacto (misma fecha + hora).
  */
-async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusentes = false, excluirId = null }) {
+async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusentes = false, excluirId = null, excluirIds = [] }) {
   const params = [fecha, hora, area];
 
+  // excluirId (compatibilidad con llamadas existentes de un solo id) y
+  // excluirIds (lista, usada por el reintento de asignarPracticante cuando
+  // un candidato pierde la carrera contra otra petición concurrente) se
+  // combinan en una sola cláusula.
+  const idsAExcluir = [...excluirIds, ...(excluirId !== null ? [excluirId] : [])];
   let excluirClause = '';
-  if (excluirId !== null) {
-    params.push(excluirId);
-    excluirClause = `AND u.id != $${params.length}`;
+  if (idsAExcluir.length > 0) {
+    params.push(idsAExcluir);
+    excluirClause = `AND u.id != ALL($${params.length}::int[])`;
   }
 
   let asistenciaClause = '';
@@ -93,13 +98,21 @@ async function _buscarPracticante({ area, fecha, hora, esMismoDia, excluirAusent
  * Los docentes no tienen horarios_practicas, por lo que solo se verifica
  * que no tengan conflicto de horario y que estén activos.
  */
-async function _buscarDocente({ area, fecha, hora }) {
+async function _buscarDocente({ area, fecha, hora, excluirIds = [] }) {
+  const params = [area, fecha, hora];
+  let excluirClause = '';
+  if (excluirIds.length > 0) {
+    params.push(excluirIds);
+    excluirClause = `AND u.id != ALL($${params.length}::int[])`;
+  }
+
   const { rows } = await pool.query(
     `SELECT u.id, u.nombre
      FROM usuarios u
      WHERE u.rol    = 'admin'
        AND u.area   = $1
        AND u.status = 'activo'
+       ${excluirClause}
        AND NOT EXISTS (
          SELECT 1 FROM citas cc
          WHERE cc.practicante_id = u.id
@@ -108,7 +121,7 @@ async function _buscarDocente({ area, fecha, hora }) {
            AND cc.estado IN ('programada', 'en_atencion')
        )
      LIMIT 1`,
-    [area, fecha, hora]
+    params
   );
   return rows[0] || null;
 }
@@ -162,19 +175,19 @@ async function _marcarPendiente(citaId) {
  * Retorna:
  *   { cita, asignado: { id, nombre } | null, esFallbackDocente: boolean }
  */
-async function asignarPracticante(citaId, area, fecha, hora) {
+async function asignarPracticante(citaId, area, fecha, hora, _idsDescartados = []) {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
   const esHoy = fecha === hoy;
 
   // Paso 1: practicante por horario.
   // Si la cita es para hoy, excluye a los marcados como ausentes (pero acepta sin registro aún).
   // Para fechas futuras, no hay restricción de asistencia.
-  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia: false, excluirAusentes: esHoy });
+  let candidato = await _buscarPracticante({ area, fecha, hora, esMismoDia: false, excluirAusentes: esHoy, excluirIds: _idsDescartados });
   let esFallbackDocente = false;
 
   // Paso 2: docente como fallback
   if (!candidato) {
-    candidato = await _buscarDocente({ area, fecha, hora });
+    candidato = await _buscarDocente({ area, fecha, hora, excluirIds: _idsDescartados });
     if (candidato) esFallbackDocente = true;
   }
 
@@ -184,8 +197,22 @@ async function asignarPracticante(citaId, area, fecha, hora) {
     return { cita, asignado: null, esFallbackDocente: false };
   }
 
-  const cita = await _guardarAsignacion(citaId, candidato, esFallbackDocente);
-  return { cita, asignado: candidato, esFallbackDocente };
+  try {
+    const cita = await _guardarAsignacion(citaId, candidato, esFallbackDocente);
+    return { cita, asignado: candidato, esFallbackDocente };
+  } catch (error) {
+    // Condición de carrera: otra petición concurrente (ej. dos citas
+    // creadas casi al mismo tiempo para el mismo horario) le ganó este
+    // mismo practicante/docente antes de que esta terminara de guardar la
+    // asignación — lo bloquea el índice idx_citas_practicante_fecha_hora_activa
+    // (migración 018). Reintenta excluyendo a quien acaba de perder la
+    // carrera, para buscar el siguiente disponible. Termina solo cuando ya
+    // no queden candidatos (candidato === null arriba → pendiente_reprogramacion).
+    if (error.code === '23505' && error.constraint === 'idx_citas_practicante_fecha_hora_activa') {
+      return asignarPracticante(citaId, area, fecha, hora, [..._idsDescartados, candidato.id]);
+    }
+    throw error;
+  }
 }
 
 /**
