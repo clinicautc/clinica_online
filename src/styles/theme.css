@@ -185,7 +185,34 @@ input {
     line-height: 1.5;
   }
 }
+/* Sonner toast: aumentar tamaño de notificaciones en 65% */
+[data-sonner-toast][data-styled=true] {
+  font-size: 21.45px !important;
+  padding: 26.4px !important;
+  gap: 9.9px !important;
+}
 
+[data-sonner-toast][data-styled=true] [data-icon] {
+  width: 26.4px !important;
+  height: 26.4px !important;
+}
+
+[data-sonner-toast][data-styled=true] [data-icon] svg {
+  width: 26.4px !important;
+  height: 26.4px !important;
+}
+
+[data-sonner-toast][data-styled=true] [data-button] {
+  height: 39.6px !important;
+  padding-left: 13.2px !important;
+  padding-right: 13.2px !important;
+  font-size: 16px !important;
+}
+
+[data-sonner-toast][data-styled=true] [data-close-button] {
+  width: 33px !important;
+  height: 33px !important;
+}
 /* =========================================================
    FORZAR CURSOR DE MANITA EN ELEMENTOS INTERACTIVOS (TAILWIND)
    ========================================================= */
