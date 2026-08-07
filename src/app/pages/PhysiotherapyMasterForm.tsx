@@ -1601,7 +1601,21 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .movilidad-box-p3 th, .movilidad-box-p3 td, .movilidad-box-p3 textarea, .movilidad-box-p3 span {
             font-size: 8.5px !important;
         }
-        .movilidad-box-p3 td { height: 15px !important; }
+        /* Las celdas de tabla nunca se encogen por debajo del tamaño mínimo
+           de su contenido — un height fijo en el td (como se intentaba
+           antes) no tiene ningún efecto si el textarea de adentro pide
+           más espacio. El textarea de estas filas de una sola línea
+           hereda height: 100% de .free-text-p3, que contra un td sin
+           alto explícito se resuelve como auto, y el navegador aplica su
+           alto por defecto de 2 líneas, casi el doble de lo que el texto
+           real necesita. Se fija aquí un alto explícito en px (con
+           box-sizing: border-box para que el padding no se sume encima) que
+           coincide con una sola línea a este tamaño de fuente, sin tocar
+           el textarea en sí, solo su tamaño renderizado. */
+        .movilidad-box-p3 textarea.free-text-p3:not(.h-8) {
+            height: 19px;
+            box-sizing: border-box;
+        }
         .movilidad-box-p3 td.movilidad-nota { height: auto !important; }
 
         /*
