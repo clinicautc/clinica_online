@@ -55,7 +55,18 @@ const PX_POR_MM = 96 / 25.4; // 96 CSS px por pulgada (constante del navegador)
 // blanco exactamente como describe este comentario. Subido a 24px (~6.3mm)
 // para dar margen real de sobra sin afectar visualmente el resultado (el
 // factor de escala ya reduce la hoja completa de forma uniforme).
-const COLCHON_REDONDEO_PX = 24;
+//
+// 2026-08-06: 24px seguía sin ser suficiente para Historia Clínica
+// Fisioterapéutica (PhysiotherapyMasterForm.tsx) — su página 1 creció (se
+// agregaron filas "Cáncer, tipo:"/"Otras:" a los antecedentes heredofamiliares
+// y personales) y ahora necesita un factor de reducción mucho más agresivo
+// (~0.76, vs. las reducciones leves de Nutrición) para caber en una hoja
+// Carta. El error de redondeo de Chromium no es un valor fijo — crece con lo
+// agresiva que sea la reducción — así que el mismo pie de página que sobraba
+// ~10.6px con un factor leve volvía a derramarse a una hoja extra casi en
+// blanco con un factor de 0.76. Subido a 60px (~15.9mm) para dar margen de
+// sobra incluso en reducciones fuertes, sin afectar visualmente el resultado.
+const COLCHON_REDONDEO_PX = 60;
 
 export function usePrintFitScale(selectores: string[]) {
   const clave = selectores.join('|');

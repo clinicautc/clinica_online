@@ -34,11 +34,28 @@ import { formatExpediente } from '../../lib/formatExpediente';
 import type { FormClinicoHandle, FormClinicoCallbacks } from '../../lib/types/formClinico';
 
 const ENFERMEDADES_HEREDO = [
-  'Diabetes Mellitus', 'Obesidad o sobrepeso', 'Hipertensión', 'Enfermedades Renales',
-  'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas',
+  'Diabetes Mellitus', 'Obesidad o sobrepeso',
+  { key: 'Cáncer', label: 'Cáncer, tipo:' },
+  'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea',
+  'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas', 'Enfermedades Autoinmunes', 'Enfermedades Gastrointestinales',
 ];
 const COLS_HEREDO = ['Madre', 'Padre', 'Aa Mat', 'Ao Mat', 'Aa Pat', 'Ao Pat'];
-const ENFERMEDADES_PERSONALES = ['Diabetes', 'Obesidad', 'Hipertensión', 'Renales', 'Endocrinas', 'Tiroidea', 'Fracturas', 'Esguinces'];
+const ENFERMEDADES_PERSONALES = [
+  { key: 'Diabetes', label: 'Diabetes Mellitus' },
+  { key: 'Obesidad', label: 'Obesidad o Sobrepeso' },
+  { key: 'Cancer', label: 'Cáncer, tipo:', textField: 'pers_cancer_tipo' as const },
+  { key: 'Hipertensión', label: 'Hipertensión' },
+  { key: 'Renales', label: 'Enfermedades Renales' },
+  { key: 'Endocrinas', label: 'Enfermedades Endocrinas' },
+  { key: 'Tiroidea', label: 'Enfermedad Tiroidea' },
+  { key: 'Psiquiatricas', label: 'Enfermedades Psiquiátricas' },
+  { key: 'Neurologicas', label: 'Enfermedades Neurológicas' },
+  { key: 'Autoinmunes', label: 'Enfermedades Autoinmunes' },
+  { key: 'Gastrointestinales', label: 'Enfermedades Gastrointestinales' },
+  { key: 'Fracturas', label: 'Fracturas' },
+  { key: 'Esguinces', label: 'Esguinces' },
+  { key: 'Otras', label: 'Otras:', textField: 'pers_otras_tipo' as const },
+];
 
 const EXPLORACION_FISICA_ROWS: Array<{ obs?: { label: string; name: string }; ins?: { label: string; name: string }; pal?: { label: string; name: string } }> = [
   { obs: { label: 'Marcha', name: 'obs_marcha' }, ins: { label: 'Cicatriz', name: 'ins_cicatriz' }, pal: { label: 'Temperatura', name: 'pal_temp' } },
@@ -155,15 +172,31 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
               fieldName={(row, ci) => `heredo-${row}-${ci}`}
               formData={p1}
               onChange={(name, checked) => set1({ [name]: checked })}
+              rowExtraText={{
+                'Cáncer': {
+                  value: (p1.heredo_cancer_tipo as string) || '',
+                  onTextChange: (value) => set1({ heredo_cancer_tipo: value }),
+                  maxLength: 40,
+                },
+              }}
+              otrasRow={{
+                value: (p1.heredo_otras_tipo as string) || '',
+                onTextChange: (value) => set1({ heredo_otras_tipo: value }),
+                fieldName: (ci) => `heredo-Otras-${ci}`,
+                maxLength: 40,
+              }}
             />
           </FormSectionCard>
 
           <FormSectionCard title="Antecedentes personales">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {ENFERMEDADES_PERSONALES.map(item => (
-                <label key={item} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={!!p1[`pers-${item}`]} onChange={e => set1({ [`pers-${item}`]: e.target.checked })} />
-                  {item}
+              {ENFERMEDADES_PERSONALES.map(({ key, label, textField }) => (
+                <label key={key} className={`flex items-center gap-2 text-sm ${textField ? 'sm:col-span-2' : ''}`}>
+                  <input type="checkbox" checked={!!p1[`pers-${key}`]} onChange={e => set1({ [`pers-${key}`]: e.target.checked })} />
+                  <span className="shrink-0">{label}</span>
+                  {textField && (
+                    <Input value={(p1[textField] as string) || ''} onChange={e => set1({ [textField]: e.target.value })} className="flex-1 min-w-0 h-7" />
+                  )}
                 </label>
               ))}
             </div>
@@ -189,8 +222,96 @@ const FisioterapiaPrimeraConsultaCaptura = forwardRef<FormClinicoHandle, Partial
             </FormSectionCard>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormSectionCard title="Estudios de gabinete">
+              <div className="space-y-2">{[0, 1, 2, 3].map(i => <Input key={i} {...field1(`estudio_gabinete_${i}`)} />)}</div>
+            </FormSectionCard>
+            <FormSectionCard title="Qx o Tx previos">
+              <div className="space-y-2">{[0, 1, 2, 3].map(i => <Input key={i} {...field1(`qx_tx_${i}`)} />)}</div>
+            </FormSectionCard>
+          </div>
+
+          <FormSectionCard title="Antecedentes personales no patológicos">
+            <div className="space-y-2">
+              {[
+                { key: 'Habito tabaquico', label: 'Hábito tabáquico' },
+                { key: 'Consumo de alcohol', label: 'Consumo de alcohol' },
+                { key: 'Consumo de drogas', label: 'Consumo de drogas' },
+              ].map(({ key, label }, i) => (
+                <div key={key} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 sm:items-center">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={!!p1[`no_pat-${key}`]} onChange={e => set1({ [`no_pat-${key}`]: e.target.checked })} />
+                    {label}
+                  </label>
+                  <div className="space-y-1 sm:w-28"><label className="text-[10px] text-slate-500">Frecuencia</label><Input {...field1(`no_pat_frecuencia_${i}`)} className="text-xs" /></div>
+                  <div className="space-y-1 sm:w-28"><label className="text-[10px] text-slate-500">Cantidad</label><Input {...field1(`no_pat_cantidad_${i}`)} className="text-xs" /></div>
+                </div>
+              ))}
+            </div>
+          </FormSectionCard>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormSectionCard title="Ejercicio">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-xs font-medium text-slate-600">Realiza ejercicio</label>
+                  {['No', 'Si'].map(v => (
+                    <label key={v} className="flex items-center gap-1 text-sm"><input type="radio" name="ejercicio_realiza" checked={p1.ejercicio_realiza === v} onChange={() => set1({ ejercicio_realiza: v })} /> {v === 'Si' ? 'Sí' : v}</label>
+                  ))}
+                </div>
+                <div className="space-y-1"><label className="text-xs font-medium text-slate-600">¿Cuál?</label><Input {...field1('ejercicio_cual')} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Frecuencia</label><Input {...field1('ejercicio_frecuencia')} /></div>
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Intensidad</label><Input {...field1('ejercicio_intensidad')} /></div>
+                </div>
+                <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Tiempo</label><Input {...field1('ejercicio_tiempo')} /></div>
+              </div>
+            </FormSectionCard>
+
+            <FormSectionCard title="Antecedentes gineco-obstétricos">
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Gestas</label><Input {...field1('gineco_gestas')} /></div>
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Partos</label><Input {...field1('gineco_partos')} /></div>
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Cesárea</label><Input {...field1('gineco_cesarea')} /></div>
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">Abortos</label><Input {...field1('gineco_abortos')} /></div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">FUM</label><Input {...field1('gineco_fum')} /></div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-600">Embarazo</label>
+                    <div className="flex gap-3">
+                      {['No', 'Si'].map(v => (
+                        <label key={v} className="flex items-center gap-1 text-sm"><input type="radio" name="gineco_embarazo" checked={p1.gineco_embarazo === v} onChange={() => set1({ gineco_embarazo: v })} /> {v === 'Si' ? 'Sí' : v}</label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1"><label className="text-xs font-medium text-slate-600">SDG</label><Input {...field1('gineco_sdg')} /></div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">Remplazo hormonal</label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {['No', 'Si'].map(v => (
+                      <label key={v} className="flex items-center gap-1 text-sm"><input type="radio" name="gineco_reemplazo_hormonal" checked={p1.gineco_reemplazo_hormonal === v} onChange={() => set1({ gineco_reemplazo_hormonal: v })} /> {v === 'Si' ? 'Sí' : v}</label>
+                    ))}
+                    <Input placeholder="¿Cuál?" {...field1('gineco_reemplazo_hormonal_cual')} className="flex-1 min-w-[120px]" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">Anticonceptivos</label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {['No', 'Si'].map(v => (
+                      <label key={v} className="flex items-center gap-1 text-sm"><input type="radio" name="gineco_anticonceptivos" checked={p1.gineco_anticonceptivos === v} onChange={() => set1({ gineco_anticonceptivos: v })} /> {v === 'Si' ? 'Sí' : v}</label>
+                    ))}
+                    <Input placeholder="¿Cuál?" {...field1('gineco_anticonceptivos_cual')} className="flex-1 min-w-[120px]" />
+                  </div>
+                </div>
+              </div>
+            </FormSectionCard>
+          </div>
+
           <FormSectionCard title="Motivo de consulta" description="ALICIA — Antigüedad, Lugar, Incidencia, Característica, Intensidad, Agravantes">
-            <div className="space-y-2">{[0, 1, 2, 3, 4].map(i => <Input key={i} {...field1(`motivo_${i}`)} />)}</div>
+            <div className="space-y-2">{[0, 1, 2, 3, 4, 5, 6].map(i => <Input key={i} {...field1(`motivo_${i}`)} />)}</div>
           </FormSectionCard>
         </TabsContent>
 

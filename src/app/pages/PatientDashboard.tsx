@@ -16,7 +16,7 @@ import { Label } from '../components/ui/label';
 import {
   LogOut, Calendar, FileText, User, Clock, Utensils,
   Activity, AlertCircle, Trash2, CalendarClock, ChevronUp, CalendarDays,
-  X, Edit2, Phone, AlertTriangle, Mail, ShieldCheck, Loader2, Lock, CheckCircle2
+  X, Edit2, Phone, AlertTriangle, Mail, ShieldCheck, Loader2, Lock, CheckCircle2, Eye, EyeOff
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import AppointmentForm from '../components/AppointmentForm';
@@ -34,6 +34,7 @@ import ViewModeToggle from '../components/ViewModeToggle';
 import { getEstadoBadgeClasses, getEstadoLabel } from '../lib/citasHelpers';
 import { formatExpediente } from '../lib/formatExpediente';
 import { useResendCooldown } from '../hooks/useResendCooldown';
+import { useMaskedPasswordInput } from '../hooks/useMaskedPasswordInput';
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth();
@@ -87,7 +88,7 @@ export default function PatientDashboard() {
   const [showConfirmEmailDialog, setShowConfirmEmailDialog] = useState(false);
   const [showEmailPasswordDialog, setShowEmailPasswordDialog] = useState(false);
   const [showEmailSuccessDialog, setShowEmailSuccessDialog] = useState(false);
-  const [emailChangePassword, setEmailChangePassword] = useState('');
+  const emailChangePasswordField = useMaskedPasswordInput();
 
   const patientId = (user as any)?.id;
   const patientRole = (user as any)?.rol || "paciente";
@@ -220,7 +221,7 @@ export default function PatientDashboard() {
     setEmailCodeSent(false);
     setShowConfirmEmailDialog(false);
     setShowEmailPasswordDialog(false);
-    setEmailChangePassword('');
+    emailChangePasswordField.reset();
   };
 
   const handleValidarCodigo = async () => {
@@ -277,7 +278,7 @@ export default function PatientDashboard() {
 
   const handleConfirmarCambioEmail = async () => {
     if (!user?.id) return;
-    if (!emailChangePassword) {
+    if (!emailChangePasswordField.realValue) {
       toast.error('Ingresa tu contraseña para confirmar.');
       return;
     }
@@ -287,12 +288,12 @@ export default function PatientDashboard() {
       // El cambio queda programado (período de gracia de 24h), no se aplica
       // al instante — profileData/AuthContext siguen con el correo actual
       // hasta que el backend lo aplique de verdad.
-      await usuariosAPI.confirmarCambioEmail(user.id, emailVerificationCode, emailChangePassword);
+      await usuariosAPI.confirmarCambioEmail(user.id, emailVerificationCode, emailChangePasswordField.realValue);
       handleCancelChangeEmail();
       setShowEmailSuccessDialog(true);
     } catch (error: any) {
       toast.error(error.message || 'No se pudo confirmar el cambio de correo.');
-      setEmailChangePassword('');
+      emailChangePasswordField.reset();
     } finally {
       setIsConfirmingEmailCode(false);
     }
@@ -831,7 +832,7 @@ export default function PatientDashboard() {
       </Dialog>
 
       {/* MODAL 2: CONFIRMAR CON CONTRASEÑA */}
-      <Dialog open={showEmailPasswordDialog} onOpenChange={(open) => { setShowEmailPasswordDialog(open); if (!open) setEmailChangePassword(''); }}>
+      <Dialog open={showEmailPasswordDialog} onOpenChange={(open) => { setShowEmailPasswordDialog(open); if (!open) emailChangePasswordField.reset(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-blue-900">
@@ -845,24 +846,38 @@ export default function PatientDashboard() {
           <div className="relative flex items-center">
             <Lock className="w-4 h-4 text-slate-400 absolute left-4" />
             <input
-              type="password"
-              name="current-password"
-              autoComplete="current-password"
+              ref={emailChangePasswordField.inputRef}
+              type="text"
+              name="current-password-confirm"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               data-lpignore="true"
               data-1p-ignore="true"
               data-bwignore="true"
-              value={emailChangePassword}
-              onChange={(e) => setEmailChangePassword(e.target.value)}
+              value={emailChangePasswordField.displayValue}
+              onChange={emailChangePasswordField.handleChange}
+              onSelect={emailChangePasswordField.handleSelect}
+              onClick={emailChangePasswordField.handleSelect}
+              onKeyUp={emailChangePasswordField.handleSelect}
               disabled={isConfirmingEmailCode}
               placeholder="Tu contraseña"
               autoFocus
-              className="w-full rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium bg-white border border-blue-300 ring-2 ring-blue-500/20 text-blue-900 focus:outline-none disabled:opacity-60"
+              className="w-full rounded-xl pl-11 pr-10 py-2.5 text-sm font-medium bg-white border border-blue-300 ring-2 ring-blue-500/20 text-blue-900 focus:outline-none disabled:opacity-60"
             />
+            <button
+              type="button"
+              onClick={emailChangePasswordField.toggleVisible}
+              className="absolute right-3 text-slate-400 hover:text-blue-900 transition-colors"
+            >
+              {emailChangePasswordField.visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
           <DialogFooter>
             <button
               type="button"
-              onClick={() => { setShowEmailPasswordDialog(false); setEmailChangePassword(''); }}
+              onClick={() => { setShowEmailPasswordDialog(false); emailChangePasswordField.reset(); }}
               disabled={isConfirmingEmailCode}
               className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
             >
@@ -871,7 +886,7 @@ export default function PatientDashboard() {
             <button
               type="button"
               onClick={handleConfirmarCambioEmail}
-              disabled={isConfirmingEmailCode || !emailChangePassword}
+              disabled={isConfirmingEmailCode || !emailChangePasswordField.realValue}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
               {isConfirmingEmailCode ? <><Loader2 className="w-4 h-4 animate-spin" /> Confirmando...</> : 'Confirmar'}

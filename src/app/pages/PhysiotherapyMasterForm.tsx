@@ -303,7 +303,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             width: 12px; height: 12px;
             border: 1.5px solid #2A4B8C;
             margin-right: 4px; position: relative; cursor: pointer;
-            display: grid; place-content: center;
+            display: inline-grid; place-content: center;
             background-color: #fff;
         }
         input[type="radio"] { border-radius: 50%; }
@@ -316,7 +316,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
            respecto a la base general de arriba, para que la fila
            Sexo/Edo.civil/Ocupación/F-N no haga wrap y duplique el alto. */
         .box-datos-personales {
-            padding: 8px 10px 4px 10px;
+            padding: 14px 10px 4px 10px;
             gap: 0;
         }
         .box-datos-personales .form-row { gap: 4px 10px; margin-bottom: 2px; }
@@ -328,7 +328,23 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         .box-datos-personales input[type="checkbox"]:checked::after,
         .box-datos-personales input[type="radio"]:checked::after { font-size: 10px; top: -2.5px; left: 0.5px; }
 
-        .escala-dolor-container { height: 70px; margin-top: 15px; width: 100%; display: flex; justify-content: center; align-items: center; }
+        input.chk-square {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border: 1.5px solid #2c5392;
+            border-radius: 0;
+            cursor: pointer;
+            vertical-align: middle;
+            flex-shrink: 0;
+            transition: background-color 0.15s;
+            margin-right: 4px;
+        }
+        input.chk-square:checked { background-color: #2c5392; }
+        input.chk-square:checked::after { content: none !important; }
+
+        .escala-dolor-container { height: 92px; margin-top: 15px; width: 100%; display: flex; justify-content: center; align-items: center; }
         .escala-dolor-chk { display: flex; width: 100%; justify-content: space-around; margin-top: 8px; flex-wrap: wrap; gap: 6px; }
         .escala-dolor-chk label { display: flex; flex-direction: column; align-items: center; font-size: 9px; font-weight: bold; color: #2A4B8C; cursor: pointer; gap: 4px; }
 
@@ -346,8 +362,9 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         }
         .tabla-antecedentes th { background-color: rgba(240, 244, 250, 0.5) !important; font-size: 9px; }
         .tabla-antecedentes td.text-left { font-size: 9px; color: #333 !important; }
+        .tabla-antecedentes input[type="checkbox"] { margin: 0; }
 
-        .free-text { border: none; background: transparent; width: 100%; height: 100%; resize: none; outline: none; font-size: 9px; font-family: inherit; color: #333; min-height: 16px; text-align: center; }
+        .free-text { border: none; background: transparent; width: 100%; height: 100%; resize: none; outline: none; overflow: hidden; font-size: 9px; font-family: inherit; color: #333; min-height: 16px; text-align: center; }
 
         .grid-60-40 { display: grid; grid-template-columns: 63% 35%; gap: 2%; }
         .grid-55-43 { display: grid; grid-template-columns: 55% 43%; gap: 2%; }
@@ -366,7 +383,13 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
         .alicia-box ul { padding-left: 12px; }
 
         /* FOOTER */
-        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 4px;}
+        /* margin-top fijo (no "auto"): igual que el footer de
+           NutritionMasterForm.tsx — con "auto" el separador solo aparece si
+           sobra alto en el flex column, y estas hojas casi siempre van al
+           límite (o se reducen por usePrintFitScale), así que "auto" se
+           resolvía a 0 y el pie de página quedaba pegado a la tabla de
+           arriba en impresión. */
+        .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; font-size: 9px; color: #5575B3; border-top: 1px solid var(--utc-light-blue); padding-top: 4px;}
         .page-num { font-size: 14px; font-weight: bold; color: #2A4B8C; }
 
         .btn-salir-fixed { position: fixed; top: 64px; right: 16px; background-color: #e11d48; color: white; padding: 8px 20px; border-radius: 8px; font-weight: bold; z-index: 50; border: none; cursor: pointer; }
@@ -446,13 +469,13 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             <div className="form-row">
               <div className="field chk-group" style={{ flex: 0.9 }}>
                 <span className="field-label">Sexo</span>
-                <label className="chk-label"><input type="radio" name="sexo" checked={accumulatedData.pagina_1.sexo === 'Fem'} onChange={() => onUpdate('pagina_1', { sexo: 'Fem' })} /> Fem</label>
-                <label className="chk-label"><input type="radio" name="sexo" checked={accumulatedData.pagina_1.sexo === 'Mas'} onChange={() => onUpdate('pagina_1', { sexo: 'Mas' })} /> Mas</label>
+                <label className="chk-label"><input type="checkbox" className="chk-square" checked={accumulatedData.pagina_1.sexo === 'Fem'} onChange={() => onUpdate('pagina_1', { sexo: 'Fem' })} /> Fem</label>
+                <label className="chk-label"><input type="checkbox" className="chk-square" checked={accumulatedData.pagina_1.sexo === 'Mas'} onChange={() => onUpdate('pagina_1', { sexo: 'Mas' })} /> Mas</label>
               </div>
               <div className="field chk-group" style={{ flex: 1.9 }}>
                 <span className="field-label">Edo. civil</span>
                 {['Soltero', 'Casado', 'Viuda(o)'].map(civil => (
-                  <label key={civil} className="chk-label"><input type="radio" name="civil" checked={accumulatedData.pagina_1.civil === civil} onChange={() => onUpdate('pagina_1', { civil })} /> {civil}</label>
+                  <label key={civil} className="chk-label"><input type="checkbox" className="chk-square" checked={accumulatedData.pagina_1.civil === civil} onChange={() => onUpdate('pagina_1', { civil })} /> {civil}</label>
                 ))}
               </div>
               <div className="field" style={{ flex: 1.3 }}>
@@ -477,11 +500,11 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           </div>
 
           {/* ANTECEDENTES */}
-          <div className="grid-60-40">
+          <div className="grid-60-40" style={{ marginTop: '8px' }}>
             <div className="box" style={{ padding: 0, borderWidth: '2px' }}>
               <div className="full-width-title">Antecedentes patológicos heredofamiliares</div>
-              <div className="table-responsive">
-                <table className="tabla-antecedentes">
+              <div className="table-responsive" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <table className="tabla-antecedentes" style={{ flex: 1, height: '100%' }}>
                   <thead>
                     <tr>
                       <th className="text-left" style={{ width: '42%' }}>Enfermedades</th>
@@ -489,11 +512,31 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {['Diabetes Mellitus', 'Obesidad o sobrepeso', 'Hipertensión', 'Enfermedades Renales', 'Enfermedades Endocrinas', 'Enfermedad Tiroidea', 'Enfermedades Psiquiátricas', 'Enfermedades Neurológicas'].map((item) => (
-                      <tr key={item}>
-                        <td className="text-left">{item}</td>
+                    {[
+                      { key: 'Diabetes Mellitus', label: 'Diabetes Mellitus' },
+                      { key: 'Obesidad o sobrepeso', label: 'Obesidad o sobrepeso' },
+                      { key: 'Cáncer', label: 'Cáncer, tipo:', textField: 'heredo_cancer_tipo' },
+                      { key: 'Hipertensión', label: 'Hipertensión' },
+                      { key: 'Enfermedades Renales', label: 'Enfermedades Renales' },
+                      { key: 'Enfermedades Endocrinas', label: 'Enfermedades Endocrinas' },
+                      { key: 'Enfermedad Tiroidea', label: 'Enfermedad Tiroidea' },
+                      { key: 'Enfermedades Psiquiátricas', label: 'Enfermedades Psiquiátricas' },
+                      { key: 'Enfermedades Neurológicas', label: 'Enfermedades Neurológicas' },
+                      { key: 'Enfermedades Autoinmunes', label: 'Enfermedades Autoinmunes' },
+                      { key: 'Enfermedades Gastrointestinales', label: 'Enfermedades Gastrointestinales' },
+                      { key: 'Otras', label: 'Otras:', textField: 'heredo_otras_tipo' },
+                    ].map(({ key, label, textField }) => (
+                      <tr key={key}>
+                        <td className="text-left">
+                          {textField ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+                              <input type="text" className="line-input" style={{ flex: 1, minWidth: 0 }} value={accumulatedData.pagina_1[textField] || ''} onChange={(e) => handleInputChange(e, textField)} />
+                            </div>
+                          ) : label}
+                        </td>
                         {[...Array(6)].map((_, i) => (
-                          <td key={i}><input type="checkbox" checked={accumulatedData.pagina_1[`heredo-${item}-${i}`] || false} onChange={(e) => handleCheckboxChange(`heredo-${item}-${i}`, e.target.checked)} /></td>
+                          <td key={i}><input type="checkbox" checked={accumulatedData.pagina_1[`heredo-${key}-${i}`] || false} onChange={(e) => handleCheckboxChange(`heredo-${key}-${i}`, e.target.checked)} /></td>
                         ))}
                       </tr>
                     ))}
@@ -507,6 +550,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                 {[
                   { key: 'Diabetes', label: 'Diabetes Mellitus' },
                   { key: 'Obesidad', label: 'Obesidad o Sobrepeso' },
+                  { key: 'Cancer', label: 'Cáncer, tipo:', textField: 'pers_cancer_tipo' },
                   { key: 'Hipertensión', label: 'Hipertensión' },
                   { key: 'Renales', label: 'Enfermedades Renales' },
                   { key: 'Endocrinas', label: 'Enfermedades Endocrinas' },
@@ -517,22 +561,20 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                   { key: 'Gastrointestinales', label: 'Enfermedades Gastrointestinales' },
                   { key: 'Fracturas', label: 'Fracturas' },
                   { key: 'Esguinces', label: 'Esguinces' },
-                ].map(({ key, label }) => (
-                  <label key={key} className="chk-label"><input type="checkbox" checked={accumulatedData.pagina_1[`pers-${key}`] || false} onChange={(e) => handleCheckboxChange(`pers-${key}`, e.target.checked)} /> {label}</label>
+                  { key: 'Otras', label: 'Otras:', textField: 'pers_otras_tipo' },
+                ].map(({ key, label, textField }) => (
+                  <label key={key} className="chk-label" style={textField ? { display: 'flex', alignItems: 'center' } : undefined}>
+                    <input type="checkbox" checked={accumulatedData.pagina_1[`pers-${key}`] || false} onChange={(e) => handleCheckboxChange(`pers-${key}`, e.target.checked)} /> {label}
+                    {textField && (
+                      <input type="text" className="line-input" style={{ marginLeft: '5px' }} value={accumulatedData.pagina_1[textField] || ''} onChange={(e) => handleInputChange(e, textField)} />
+                    )}
+                  </label>
                 ))}
-                <label className="chk-label" style={{ display: 'flex', alignItems: 'center' }}>
-                  <input type="checkbox" checked={accumulatedData.pagina_1['pers-Cancer'] || false} onChange={(e) => handleCheckboxChange('pers-Cancer', e.target.checked)} /> Cáncer, tipo:
-                  <input type="text" className="line-input" style={{ marginLeft: '5px' }} value={accumulatedData.pagina_1.pers_cancer_tipo || ''} onChange={(e) => handleInputChange(e, 'pers_cancer_tipo')} />
-                </label>
-                <label className="chk-label" style={{ display: 'flex', alignItems: 'center' }}>
-                  <input type="checkbox" checked={accumulatedData.pagina_1['pers-Otras'] || false} onChange={(e) => handleCheckboxChange('pers-Otras', e.target.checked)} /> Otras:
-                  <input type="text" className="line-input" style={{ marginLeft: '5px' }} value={accumulatedData.pagina_1.pers_otras_tipo || ''} onChange={(e) => handleInputChange(e, 'pers_otras_tipo')} />
-                </label>
               </div>
             </div>
           </div>
 
-          <div className="grid-3-col">
+          <div className="grid-3-col" style={{ marginTop: '8px' }}>
             <div className="box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
               <div className="box-title">Dolor</div>
               <div className="escala-dolor-container">
@@ -574,8 +616,8 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
             </div>
             <div className="box" style={{ padding: 0, borderWidth: '2px' }}>
               <div className="full-width-title" style={{ fontSize: '10px' }}>Antecedentes personales no patológicos</div>
-              <div className="table-responsive">
-                <table>
+              <div className="table-responsive" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <table style={{ flex: 1, height: '100%' }}>
                   <thead>
                     <tr><th></th><th>Frecuencia</th><th>Cantidad</th></tr>
                   </thead>
@@ -600,7 +642,7 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
           </div>
 
           {/* Ejercicio / Antecedentes gineco-obstétricos */}
-          <div className="grid-55-43">
+          <div className="grid-55-43" style={{ marginTop: '8px' }}>
             <div className="box" style={{ padding: '18px 10px 5px 10px' }}>
               <div className="box-title">Ejercicio</div>
               <div className="form-row" style={{ marginBottom: '8px' }}>
@@ -671,20 +713,20 @@ const PhysiotherapyPage1Component: React.FC<PageProps> = ({
                 <div className="field chk-group">
                   <span className="field-label">Remplazo hormonal</span>
                   <label className="chk-label"><input type="radio" name="gineco_reemplazo_hormonal" checked={accumulatedData.pagina_1.gineco_reemplazo_hormonal === 'No'} onChange={() => onUpdate('pagina_1', { gineco_reemplazo_hormonal: 'No' })} /> No</label>
-                  <label className="chk-label"><input type="radio" name="gineco_reemplazo_hormonal" checked={accumulatedData.pagina_1.gineco_reemplazo_hormonal === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_reemplazo_hormonal: 'Si' })} /> Sí</label>
+                  <label className="chk-label"><input type="radio" name="gineco_reemplazo_hormonal" checked={accumulatedData.pagina_1.gineco_reemplazo_hormonal === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_reemplazo_hormonal: 'Si' })} /> Sí<input type="text" className="line-input" style={{ width: '110px', marginLeft: '6px' }} value={accumulatedData.pagina_1.gineco_reemplazo_hormonal_cual || ''} onChange={(e) => handleInputChange(e, 'gineco_reemplazo_hormonal_cual')} /></label>
                 </div>
               </div>
               <div className="form-row">
                 <div className="field chk-group">
                   <span className="field-label">Anticonceptivos</span>
                   <label className="chk-label"><input type="radio" name="gineco_anticonceptivos" checked={accumulatedData.pagina_1.gineco_anticonceptivos === 'No'} onChange={() => onUpdate('pagina_1', { gineco_anticonceptivos: 'No' })} /> No</label>
-                  <label className="chk-label"><input type="radio" name="gineco_anticonceptivos" checked={accumulatedData.pagina_1.gineco_anticonceptivos === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_anticonceptivos: 'Si' })} /> Sí</label>
+                  <label className="chk-label"><input type="radio" name="gineco_anticonceptivos" checked={accumulatedData.pagina_1.gineco_anticonceptivos === 'Si'} onChange={() => onUpdate('pagina_1', { gineco_anticonceptivos: 'Si' })} /> Sí<input type="text" className="line-input" style={{ width: '110px', marginLeft: '6px' }} value={accumulatedData.pagina_1.gineco_anticonceptivos_cual || ''} onChange={(e) => handleInputChange(e, 'gineco_anticonceptivos_cual')} /></label>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="box" style={{ flexGrow: 1 }}>
+          <div className="box" style={{ flexGrow: 1, marginTop: '8px' }}>
             <div className="box-title">Motivo de consulta</div>
             <div className="motivo-container">
               <div className="motivo-lines">
@@ -962,6 +1004,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
             color: #333;
             outline: none !important;
             resize: none;
+            overflow: hidden;
             width: 100%;
             height: 100%;
             min-height: 18px;
@@ -979,7 +1022,7 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
             width: 12px; height: 12px;
             border: 1.5px solid var(--utc-blue);
             margin-right: 5px; position: relative; cursor: pointer;
-            display: grid; place-content: center;
+            display: inline-grid; place-content: center;
             background-color: #fff;
         }
         input[type="checkbox"]:checked::before {
@@ -1009,15 +1052,22 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .plazos-header div { flex: 1; text-align: center; font-size: 12px; font-weight: bold; padding: 5px 0; border-right: 1px solid white; }
         .plazos-header div:last-child { border-right: none; }
         .plazos-columns { display: flex; flex-grow: 1; margin-top: 6px; }
-        .plazos-columns textarea { flex: 1; border: none; border-right: 1px solid var(--utc-blue); background: transparent; resize: none; outline: none; padding: 10px; font-size: 12px; font-family: Arial, sans-serif; color: #000; }
+        .plazos-columns textarea { flex: 1; border: none; border-right: 1px solid var(--utc-blue); background: transparent; resize: none; outline: none; overflow: hidden; padding: 10px; font-size: 12px; font-family: Arial, sans-serif; color: #000; }
         .plazos-columns textarea:last-child { border-right: none; }
 
-        .table-responsive-p2 { width: 100%; overflow: hidden; }
-        .tabla-exploracion-p2 { width: 100%; border-collapse: collapse; text-align: center; }
-        .tabla-exploracion-p2 th { color: var(--utc-blue); font-size: 12px; padding: 4px; border-bottom: 1px solid var(--utc-blue); border-right: 1px solid var(--utc-blue); }
-
-        .tabla-exploracion-p2 td { border: 1px solid var(--utc-blue); height: 24px; padding: 0; vertical-align: middle; }
-        .lbl-col-p2 { color: var(--utc-blue); font-size: 11px; width: 12%; text-align: center; padding: 4px;}
+        /* Exploración física — tres bloques independientes (Observación /
+           Inspección / Palpación), cada uno con su propia pila de filas.
+           No es una <table> porque el PDF oficial no alinea las líneas
+           horizontales entre bloques (cada bloque agrupa sus campos con
+           alturas propias, ver rowSpans que tenía la tabla anterior). */
+        .exploracion-p2-cols { display: flex; width: 100%; text-align: center; }
+        .exploracion-p2-col { flex: 1 1 33.333%; display: flex; flex-direction: column; border-right: 1px solid var(--utc-blue); }
+        .exploracion-p2-col:last-child { border-right: none; }
+        .exploracion-p2-col-title { color: var(--utc-blue); font-size: 12px; font-weight: bold; padding: 4px; border-bottom: 1px solid var(--utc-blue); }
+        .exploracion-p2-row { display: flex; border-bottom: 1px solid var(--utc-blue); min-height: 24px; }
+        .exploracion-p2-row:last-child { border-bottom: none; }
+        .exploracion-p2-input { flex: 1 1 64%; }
+        .lbl-col-p2 { color: var(--utc-blue); font-size: 11px; text-align: center; padding: 4px; flex: 0 0 36%; border-right: 1px solid var(--utc-blue); display: flex; align-items: center; justify-content: center; }
 
         .zona-content { display: flex; padding: 14px 16px; }
         .zona-left { width: 35%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-right: 1px dashed #ccc; padding-right: 12px; }
@@ -1054,7 +1104,8 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
         .otros-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
         .otros-row .lbl { font-weight: bold; font-size: 11px; color: var(--utc-blue); }
 
-        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; font-size: 9px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 4px; }
+        /* margin-top fijo — ver comentario equivalente en .footer (página 1). */
+        .footer-p2 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; font-size: 9px; color: var(--utc-blue); border-top: 1px solid var(--utc-light-blue); padding-top: 4px; }
         .page-num-p2 { font-size: 14px; font-weight: bold; }
 
         @media print {
@@ -1159,83 +1210,97 @@ const PhysiotherapyPage2Component: React.FC<PageProps> = ({
           </div>
 
           {/* SECCIÓN 2: EXPLORACIÓN FÍSICA */}
-          <div className="box-p2">
+          <div className="box-p2" style={{ marginTop: '8px' }}>
             <div className="box-header-p2">Exploración física</div>
-            <div className="table-responsive-p2">
-              <table className="tabla-exploracion-p2">
-                <thead>
-                  <tr>
-                    <th colSpan={2} style={{ width: '33.33%' }}>Observación</th>
-                    <th colSpan={2} style={{ width: '33.33%' }}>Inspección</th>
-                    <th colSpan={2} style={{ width: '33.33%' }}>Palpación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="lbl-col-p2" rowSpan={2}>Marcha</td>
-                    <td className="inp-col" rowSpan={2}>
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_marcha || ''} onChange={(e) => handleLocalInputChange(e, 'obs_marcha')} />
-                    </td>
-                    <td className="lbl-col-p2">Cicatriz</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_cicatriz || ''} onChange={(e) => handleLocalInputChange(e, 'ins_cicatriz')} />
-                    </td>
-                    <td className="lbl-col-p2">Temperatura</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_temp || ''} onChange={(e) => handleLocalInputChange(e, 'pal_temp')} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="lbl-col-p2">Hematoma</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_hematoma || ''} onChange={(e) => handleLocalInputChange(e, 'ins_hematoma')} />
-                    </td>
-                    <td className="lbl-col-p2" rowSpan={2}>Contractura</td>
-                    <td className="inp-col" rowSpan={2}>
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_contractura || ''} onChange={(e) => handleLocalInputChange(e, 'pal_contractura')} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="lbl-col-p2" rowSpan={2}>Movilidad</td>
-                    <td className="inp-col" rowSpan={2}>
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_movilidad || ''} onChange={(e) => handleLocalInputChange(e, 'obs_movilidad')} />
-                    </td>
-                    <td className="lbl-col-p2">Edema</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_edema || ''} onChange={(e) => handleLocalInputChange(e, 'ins_edema')} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="lbl-col-p2">Tumefacción</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_tumefaccion || ''} onChange={(e) => handleLocalInputChange(e, 'ins_tumefaccion')} />
-                    </td>
-                    <td className="lbl-col-p2">Dolor</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_dolor || ''} onChange={(e) => handleLocalInputChange(e, 'pal_dolor')} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="lbl-col-p2">Agilidad</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_agilidad || ''} onChange={(e) => handleLocalInputChange(e, 'obs_agilidad')} />
-                    </td>
-                    <td className="lbl-col-p2">Otro</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_otro || ''} onChange={(e) => handleLocalInputChange(e, 'ins_otro')} />
-                    </td>
-                    <td className="lbl-col-p2">Otro</td>
-                    <td className="inp-col">
-                      <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_otro || ''} onChange={(e) => handleLocalInputChange(e, 'pal_otro')} />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="exploracion-p2-cols">
+              <div className="exploracion-p2-col">
+                <div className="exploracion-p2-col-title">Observación</div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Marcha</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_marcha || ''} onChange={(e) => handleLocalInputChange(e, 'obs_marcha')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Movilidad</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_movilidad || ''} onChange={(e) => handleLocalInputChange(e, 'obs_movilidad')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Agilidad</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.obs_agilidad || ''} onChange={(e) => handleLocalInputChange(e, 'obs_agilidad')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="exploracion-p2-col">
+                <div className="exploracion-p2-col-title">Inspección</div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Cicatriz</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_cicatriz || ''} onChange={(e) => handleLocalInputChange(e, 'ins_cicatriz')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Hematoma</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_hematoma || ''} onChange={(e) => handleLocalInputChange(e, 'ins_hematoma')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Edema</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_edema || ''} onChange={(e) => handleLocalInputChange(e, 'ins_edema')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Tumefacción</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_tumefaccion || ''} onChange={(e) => handleLocalInputChange(e, 'ins_tumefaccion')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Otro</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.ins_otro || ''} onChange={(e) => handleLocalInputChange(e, 'ins_otro')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="exploracion-p2-col">
+                <div className="exploracion-p2-col-title">Palpación</div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Temperatura</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_temp || ''} onChange={(e) => handleLocalInputChange(e, 'pal_temp')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Contractura</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_contractura || ''} onChange={(e) => handleLocalInputChange(e, 'pal_contractura')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Dolor</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_dolor || ''} onChange={(e) => handleLocalInputChange(e, 'pal_dolor')} />
+                  </div>
+                </div>
+                <div className="exploracion-p2-row" style={{ flex: 1 }}>
+                  <div className="lbl-col-p2">Otro</div>
+                  <div className="exploracion-p2-input">
+                    <textarea className="free-text-p2" value={accumulatedData.pagina_2.pal_otro || ''} onChange={(e) => handleLocalInputChange(e, 'pal_otro')} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* SECCIÓN 3: ESTADO DE LA ZONA (CON MARCADORES X) */}
-          <div className="box-p2">
+          <div className="box-p2" style={{ marginTop: '8px' }}>
             <div className="box-header-p2">Estado de la zona</div>
             <div className="zona-content">
               <div className="zona-left">
@@ -1521,6 +1586,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             color: #333;
             outline: none !important;
             resize: none;
+            overflow: hidden;
             width: 100%;
             height: 100%;
             font-family: Arial, sans-serif;
@@ -1536,6 +1602,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             font-size: 8.5px !important;
         }
         .movilidad-box-p3 td { height: 15px !important; }
+        .movilidad-box-p3 td.movilidad-nota { height: auto !important; }
 
         /*
           aspect-ratio fijo al de Humano_2.png (636/601, medido del archivo)
@@ -1567,7 +1634,8 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         .signatures-area-p3 { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; padding: 0 30px; margin-bottom: 10px; }
         .signature-line-p3 { border-top: 1.5px solid #1F4287; width: 42%; text-align: center; font-size: 11px; color: #1F4287; font-weight: bold; padding-top: 6px; }
 
-        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; color: #1F4287; margin-top: auto; border-top: 1px solid #1F4287; padding-top: 4px; }
+        /* margin-top fijo — ver comentario equivalente en .footer (página 1). */
+        .footer-p3 { display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; color: #1F4287; margin-top: 12px; border-top: 1px solid #1F4287; padding-top: 4px; }
 
         @media print {
             @page { size: 215.9mm 279.4mm; margin: 0; }
@@ -1624,7 +1692,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
         )}
 
         <div className="page-p3">
-          <div className="flex gap-3 w-full">
+          <div className="flex gap-3 w-full" style={{ marginTop: '8px' }}>
             <div className="box-p3 flex-[0.8]">
               <div className="box-title-p3">Exploración de sensibilidad</div>
               <div className="relative">
@@ -1656,7 +1724,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
                   {['Bicipital', 'Tricipital', 'Rotuliano', 'Aquileo'].map((ref, i) => (
                     <tr key={ref}>
                       {i === 0 && <td rowSpan={4}><textarea className="free-text-p3" value={accumulatedData.pagina_3.hallazgos_derma || ''} onChange={(e)=>handleLocalInputChange(e, 'hallazgos_derma')}></textarea></td>}
-                      <td className="font-bold p-1 bg-gray-50">{ref}</td>
+                      <td className="font-bold p-1 bg-gray-50" style={{ color: '#5575B3' }}>{ref}</td>
                       <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`ref_${ref}`] || ''} onChange={(e)=>handleLocalInputChange(e, `ref_${ref}`)}></textarea></td>
                       {i === 0 && <td rowSpan={4}><textarea className="free-text-p3" value={accumulatedData.pagina_3.valoracion_tono || ''} onChange={(e)=>handleLocalInputChange(e, 'valoracion_tono')}></textarea></td>}
                     </tr>
@@ -1666,7 +1734,7 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
             </div>
           </div>
 
-          <div className="box-p3 movilidad-box-p3">
+          <div className="box-p3 movilidad-box-p3" style={{ marginTop: '8px' }}>
             <div className="box-title-p3">Movilidad</div>
             <table className="tabla-p3">
               <thead>
@@ -1681,19 +1749,19 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
               </thead>
               <tbody>
                 <tr>
-                  <td className="font-bold text-left px-2">Zona a valorar:</td>
+                  <td className="font-bold text-left" style={{ padding: '0 8px', color: '#1F4287' }}>Zona a valorar:</td>
                   <td colSpan={4} className="border-r-2 border-blue-900"><textarea className="free-text-p3" value={accumulatedData.pagina_3.zona_der || ''} onChange={(e)=>handleLocalInputChange(e, 'zona_der')}></textarea></td>
-                  <td className="font-bold text-left px-2">Zona a valorar:</td>
+                  <td className="font-bold text-left" style={{ padding: '0 8px', color: '#1F4287' }}>Zona a valorar:</td>
                   <td colSpan={4}><textarea className="free-text-p3" value={accumulatedData.pagina_3.zona_izq || ''} onChange={(e)=>handleLocalInputChange(e, 'zona_izq')}></textarea></td>
                 </tr>
                 {['Flexión', 'Extensión', 'Abducción', 'Rot. Interna', 'Rot. Externa', 'Desv. Radial', 'Desv. Cubital'].map((mov) => (
                   <tr key={mov}>
-                    <td className="font-bold">{mov}</td>
+                    <td className="font-bold" style={{ color: '#5575B3' }}>{mov}</td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`d_fza1_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `d_fza1_${mov}`)}></textarea></td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`d_fza2_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `d_fza2_${mov}`)}></textarea></td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`d_arc1_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `d_arc1_${mov}`)}></textarea></td>
                     <td className="border-r-2 border-blue-900"><textarea className="free-text-p3" value={accumulatedData.pagina_3[`d_arc2_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `d_arc2_${mov}`)}></textarea></td>
-                    <td className="font-bold">{mov}</td>
+                    <td className="font-bold" style={{ color: '#5575B3' }}>{mov}</td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`i_fza1_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `i_fza1_${mov}`)}></textarea></td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`i_fza2_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `i_fza2_${mov}`)}></textarea></td>
                     <td><textarea className="free-text-p3" value={accumulatedData.pagina_3[`i_arc1_${mov}`] || ''} onChange={(e)=>handleLocalInputChange(e, `i_arc1_${mov}`)}></textarea></td>
@@ -1701,20 +1769,25 @@ const PhysiotherapyPage3Component: React.FC<PageProps> = ({
                   </tr>
                 ))}
                 <tr>
-                  <td colSpan={5} className="text-left p-1 border-r-2 border-blue-900">
-                    <span className="font-bold">Observaciones:</span>
+                  <td colSpan={5} className="text-left border-r-2 border-blue-900" style={{ padding: '4px 8px' }}>
+                    <span className="font-bold" style={{ color: '#5575B3' }}>Observaciones:</span>
                     <textarea className="free-text-p3 h-8" value={accumulatedData.pagina_3.obs_der || ''} onChange={(e)=>handleLocalInputChange(e, 'obs_der')}></textarea>
                   </td>
-                  <td colSpan={5} className="text-left p-1">
-                    <span className="font-bold">Observaciones:</span>
+                  <td colSpan={5} className="text-left" style={{ padding: '4px 8px' }}>
+                    <span className="font-bold" style={{ color: '#5575B3' }}>Observaciones:</span>
                     <textarea className="free-text-p3 h-8" value={accumulatedData.pagina_3.obs_izq || ''} onChange={(e)=>handleLocalInputChange(e, 'obs_izq')}></textarea>
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={10} className="movilidad-nota text-left" style={{ padding: '4px 8px', color: '#5575B3' }}>
+                    MMSS: Miembros superiores MMII: Miembros inferiores CV: columna vertebral. Especificar la zona a valorar ejemplo: MMSS Hombro / CV cervical / MMII tobillo
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="box-p3">
+          <div className="box-p3" style={{ marginTop: '8px' }}>
             <div className="box-title-p3">Pruebas específicas</div>
             <table className="tabla-p3 text-[10px]">
               <thead><tr className="bg-gray-100"><th>Pruebas</th><th>Hallazgos</th></tr></thead>

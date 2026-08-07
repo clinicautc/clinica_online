@@ -274,6 +274,30 @@
             page-break-after: always;
           }
         }
+        /* Checkbox tipo "palomita" (igual a Historia Clínica Fisioterapéutica)
+           — usado en todo el documento salvo en el encabezado de Datos
+           personales (Sexo/Edo. civil), que conserva el estilo de cuadro
+           relleno sólido (CustomCheckbox variant="square"). */
+        input.chk-checkmark {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 10px;
+          height: 10px;
+          border: 1.5px solid #2c5392;
+          cursor: pointer;
+          vertical-align: middle;
+          position: relative;
+          display: inline-grid;
+          place-content: center;
+          background-color: #fff;
+          flex-shrink: 0;
+        }
+        input.chk-checkmark:checked::after {
+          content: '✓';
+          font-size: 10px;
+          color: #2c5392;
+          font-weight: bold;
+        }
       `}</style>
       {/* Solo lectura: las 4 páginas se muestran apiladas (no hay wizard de
           pasos que navegar, no aplica a un documento ya finalizado). Botones
@@ -395,11 +419,13 @@
                     label="Fem"
                     checked={formData.pagina_1.sexo === 'Fem'}
                     onChange={() => updateGlobalData('pagina_1', {sexo: 'Fem'})}
+                    variant="square"
                   />
                   <CustomCheckbox
                     label="Mas"
                     checked={formData.pagina_1.sexo === 'Mas'}
                     onChange={() => updateGlobalData('pagina_1', {sexo: 'Mas'})}
+                    variant="square"
                   />
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -408,11 +434,13 @@
                     label="Soltero"
                     checked={formData.pagina_1.civil === 'Soltero'}
                     onChange={() => updateGlobalData('pagina_1', {civil: 'Soltero'})}
+                    variant="square"
                   />
                   <CustomCheckbox
                     label="Casado"
                     checked={formData.pagina_1.civil === 'Casado'}
                     onChange={() => updateGlobalData('pagina_1', {civil: 'Casado'})}
+                    variant="square"
                   />
                 </div>
                 <div className="flex items-end gap-1 flex-grow ml-2">
@@ -498,7 +526,7 @@
                               checked={formData.pagina_1[`heredo-${item}-${i}`] || false}
                               onChange={(e) => updateGlobalData('pagina_1', {[`heredo-${item}-${i}`]: e.target.checked})}
                               disabled={isReadOnly}
-                              className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
+                              className="chk-checkmark"
                             />
                           </div>
                         ))}
@@ -524,7 +552,7 @@
                             checked={formData.pagina_1[`heredo-otras-${i}`] || false}
                             onChange={(e) => updateGlobalData('pagina_1', {[`heredo-otras-${i}`]: e.target.checked})}
                             disabled={isReadOnly}
-                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] cursor-pointer align-middle"
+                            className="chk-checkmark"
                           />
                         </div>
                       ))}
@@ -578,7 +606,7 @@
                             type="checkbox"
                             checked={formData.pagina_1[`sintoma-check-${item}`] || false}
                             onChange={(e) => updateGlobalData('pagina_1', {[`sintoma-check-${item}`]: e.target.checked})}
-                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] shrink-0 cursor-pointer align-middle"
+                            className="chk-checkmark shrink-0"
                           />
                           <span className="truncate">{item}</span>
                         </div>
@@ -648,7 +676,7 @@
                             type="checkbox"
                             checked={formData.pagina_1[`nopato-check-${item}`] || false}
                             onChange={(e) => updateGlobalData('pagina_1', {[`nopato-check-${item}`]: e.target.checked})}
-                            className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] shrink-0 cursor-pointer align-middle"
+                            className="chk-checkmark shrink-0"
                           />
                           <span className="truncate">{item}</span>
                         </td>
@@ -921,13 +949,15 @@
     </div>
   );
 
-  const CustomCheckbox: React.FC<{ label: string, checked?: boolean, onChange?: any, textSize?: string }> = ({ label, checked, onChange, textSize = "text-[9px]" }) => (
+  const CustomCheckbox: React.FC<{ label: string, checked?: boolean, onChange?: any, textSize?: string, variant?: 'checkmark' | 'square' }> = ({ label, checked, onChange, textSize = "text-[9px]", variant = 'checkmark' }) => (
     <label className={`flex items-center gap-1 cursor-pointer shrink-0 ${textSize} font-bold`}>
       <input
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] transition-colors relative cursor-pointer align-middle shrink-0"
+        className={variant === 'square'
+          ? "appearance-none w-2.5 h-2.5 border-[1.5px] border-[#2c5392] checked:bg-[#2c5392] transition-colors relative cursor-pointer align-middle shrink-0"
+          : "chk-checkmark"}
       />
       <span className="truncate leading-none pt-[1px]">{label}</span>
     </label>
@@ -986,7 +1016,7 @@
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="h-3 w-3 appearance-none border border-[#2c5697] checked:bg-[#2c5697]"
+        className="chk-checkmark"
       />
       {label && <span>{label}</span>}
     </label>

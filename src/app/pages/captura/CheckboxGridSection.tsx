@@ -1,12 +1,20 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table';
 
+interface RowSpec {
+  /** Clave usada para generar los nombres de campo (fieldName/rowExtraText) — estable aunque cambie la etiqueta. */
+  key: string;
+  label: string;
+}
+
 interface CheckboxGridSectionProps {
-  rows: string[];
+  rows: (string | RowSpec)[];
   columns: string[];
-  /** Genera la clave de formData para (fila, columna). */
+  /** Genera la clave de formData para (fila, columna). Recibe row.key (o el string tal cual). */
   fieldName: (row: string, colIndex: number) => string;
   formData: Record<string, any>;
   onChange: (name: string, checked: boolean) => void;
+  /** Input de texto inline para filas específicas (ej. "Cáncer, tipo:") — clave = row.key. */
+  rowExtraText?: Partial<Record<string, { value: string; onTextChange: (value: string) => void; maxLength?: number }>>;
   /** Fila final "Otras" — mismo formato de checkbox por columna que las demás filas, con un input de texto en vez de la etiqueta fija. */
   otrasRow?: {
     value: string;
@@ -22,7 +30,9 @@ interface CheckboxGridSectionProps {
  * como una lista de checkboxes con su etiqueta de columna, en vez de una
  * tabla angosta de 6+ columnas.
  */
-export default function CheckboxGridSection({ rows, columns, fieldName, formData, onChange, otrasRow }: CheckboxGridSectionProps) {
+export default function CheckboxGridSection({ rows, columns, fieldName, formData, onChange, rowExtraText, otrasRow }: CheckboxGridSectionProps) {
+  const normalizedRows: RowSpec[] = rows.map(r => (typeof r === 'string' ? { key: r, label: r } : r));
+
   return (
     <div>
       <div className="hidden sm:block">
@@ -34,11 +44,26 @@ export default function CheckboxGridSection({ rows, columns, fieldName, formData
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(row => (
-              <TableRow key={row}>
-                <TableCell className="whitespace-normal font-medium text-slate-700">{row}</TableCell>
+            {normalizedRows.map(({ key, label }) => {
+              const extra = rowExtraText?.[key];
+              return (
+              <TableRow key={key}>
+                <TableCell className="whitespace-normal font-medium text-slate-700">
+                  {extra ? (
+                    <div className="flex items-center gap-1">
+                      <span className="shrink-0">{label}</span>
+                      <input
+                        type="text"
+                        value={extra.value}
+                        onChange={e => extra.onTextChange(e.target.value)}
+                        maxLength={extra.maxLength}
+                        className="w-full min-w-0 border-b border-slate-300 bg-transparent text-sm outline-none"
+                      />
+                    </div>
+                  ) : label}
+                </TableCell>
                 {columns.map((c, ci) => {
-                  const name = fieldName(row, ci);
+                  const name = fieldName(key, ci);
                   return (
                     <TableCell key={c} className="text-center">
                       <input
@@ -51,7 +76,8 @@ export default function CheckboxGridSection({ rows, columns, fieldName, formData
                   );
                 })}
               </TableRow>
-            ))}
+              );
+            })}
             {otrasRow && (
               <TableRow>
                 <TableCell className="whitespace-normal font-medium text-slate-700">
@@ -86,12 +112,25 @@ export default function CheckboxGridSection({ rows, columns, fieldName, formData
       </div>
 
       <div className="block sm:hidden space-y-3">
-        {rows.map(row => (
-          <div key={row} className="border border-slate-200 rounded-lg p-2.5">
-            <p className="text-xs font-bold text-slate-700 mb-2">{row}</p>
+        {normalizedRows.map(({ key, label }) => (
+          <div key={key} className="border border-slate-200 rounded-lg p-2.5">
+            {rowExtraText?.[key] ? (
+              <div className="flex items-center gap-1 mb-2">
+                <span className="shrink-0 text-xs font-bold text-slate-700">{label}</span>
+                <input
+                  type="text"
+                  value={rowExtraText[key]!.value}
+                  onChange={e => rowExtraText[key]!.onTextChange(e.target.value)}
+                  maxLength={rowExtraText[key]!.maxLength}
+                  className="w-full min-w-0 border-b border-slate-300 bg-transparent text-sm outline-none"
+                />
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-slate-700 mb-2">{label}</p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               {columns.map((c, ci) => {
-                const name = fieldName(row, ci);
+                const name = fieldName(key, ci);
                 return (
                   <label key={c} className="flex items-center gap-1.5 text-xs text-slate-600">
                     <input

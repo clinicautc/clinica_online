@@ -518,8 +518,8 @@ const SeguimientoNutricional = () => {
           .page5 input, .page5 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 8px; color: #000; text-align: center; outline: none; resize: none; padding: 2px; display: block; }
           .page5 textarea { text-align: left; padding: 4px; }
           .page5 input:focus, .page5 textarea:focus { background-color: var(--azul-claro) !important; }
-          .page5 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; cursor: default; }
-          .page5 input[type="checkbox"]:checked { background-color: var(--azul-utc) !important; }
+          .page5 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; background-color: #fff !important; cursor: default; position: relative; display: grid; place-content: center; }
+          .page5 input[type="checkbox"]:checked::after { content: '✓'; font-size: 10px; color: var(--azul-utc); font-weight: bold; }
           
           .page5 .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; z-index: 1; }
           .page5 .footer-left { font-size: 7px; color: var(--azul-utc); font-weight: bold; line-height: 1.2; text-align: left; }
@@ -592,8 +592,8 @@ const SeguimientoNutricional = () => {
           .page6 input, .page6 textarea { width: 100%; height: 100%; border: none !important; background-color: transparent !important; font-family: inherit; font-size: 8px; color: #000; text-align: center; outline: none; resize: none; padding: 0px; display: block; line-height: 1.1; }
           .page6 textarea { text-align: left; padding: 1px 3px; min-height: 0 !important; }
           .page6 input:focus, .page6 textarea:focus { background-color: var(--azul-claro) !important; }
-          .page6 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; cursor: default; }
-          .page6 input[type="checkbox"]:checked { background-color: var(--azul-utc) !important; }
+          .page6 input[type="checkbox"] { width: 12px; height: 12px; max-width: 12px; max-height: 12px; margin: 0 auto; appearance: none; border: 1px solid var(--azul-utc) !important; background-color: #fff !important; cursor: default; position: relative; display: grid; place-content: center; }
+          .page6 input[type="checkbox"]:checked::after { content: '✓'; font-size: 10px; color: var(--azul-utc); font-weight: bold; }
           .page6 .fecha-alta input { font-size: 4.8px !important; padding: 1px 0 !important; letter-spacing: -0.3px; height: 64.5px !important; }
           
           .page6 .footer { display: flex; justify-content: flex-end; align-items: center; margin-top: 10px; z-index: 1; }
